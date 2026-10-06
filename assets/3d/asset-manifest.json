@@ -1,0 +1,109 @@
+{
+  "manifestVersion": "1.1.0",
+  "project": "KshetraSense",
+  "reviewedAt": "2026-10-07",
+  "reviewStatus": "approved-procedural-mvp",
+  "reviewConclusion": "No external GLB improves the current MVP. All functional simulation visuals are dynamic data views and are approved as procedural geometry or SVG/Canvas overlays. No third-party model file is bundled.",
+  "deliveryPolicy": {
+    "functionalField": "Procedural Three.js geometry plus SVG/Canvas/DOM overlays; never a static model.",
+    "decorativeHero": "Optional lazy Spline or procedural/SVG vignette with static fallback; no required content or operation is in the hero.",
+    "approvedRuntimeModelFormatIfAJustifiedNeedAppears": "glb",
+    "bundledExternalModels": []
+  },
+  "proceduralAssets": [
+    {
+      "id": "field-grid-cells",
+      "scope": "required functional simulation visual",
+      "implementation": "One BoxGeometry and shared material in an InstancedMesh. Per-cell transform/color comes from the active scenario and zoning result.",
+      "reasonExternalModelIsIncorrect": "The cells must update after edits and clustering. A static terrain/field GLB cannot faithfully encode cell data or retain efficient picking.",
+      "limits": { "maximumInstances": 768, "trianglesPerInstance": 12, "maximumTriangles": 9216, "maximumDrawCalls": 1 },
+      "externalBytes": 0
+    },
+    {
+      "id": "zones-and-data-overlays",
+      "scope": "required functional simulation visual",
+      "implementation": "Generate zone boundary paths, hatching, heatmaps, cell hit targets, brush cursor, legends, and labels from the latest result in SVG/Canvas/DOM.",
+      "reasonExternalModelIsIncorrect": "Zones, membership strengths, and labels are calculated results, not static scenery. This supplies the keyboard-accessible no-WebGL fallback.",
+      "limits": { "textures": 0, "externalBytes": 0 }
+    },
+    {
+      "id": "sensor-node-markers",
+      "scope": "required visual-only marker",
+      "implementation": "Three instanced primitive batches: 8-sided cylinder base, 6-sided cylinder mast, and detail-0 icosahedron beacon.",
+      "reasonExternalModelIsIncorrect": "The specified marker is illustrative—not a real device—and needs easy placement, color changes, and batching. A sensor GLB would be heavier and risks implying a live stream.",
+      "limits": { "defaultInstances": 8, "maximumInstances": 24, "drawCalls": 3, "externalBytes": 0 },
+      "requiredUiCopy": "Illustrative; no live sensor stream"
+    },
+    {
+      "id": "crop-marker",
+      "scope": "optional functional-field atmosphere",
+      "implementation": "Sparse instanced crossed planes or three tapered blade triangles, using a flat shared material and no texture.",
+      "reasonExternalModelIsIncorrect": "A dense grass/plant GLB adds overdraw without explaining soil data. The UI specification calls for clean parametric crop silhouettes.",
+      "limits": { "defaultInstances": 0, "maximumInstances": 256, "trianglesPerInstanceMaximum": 6, "textures": 0, "externalBytes": 0 }
+    },
+    {
+      "id": "centroid-root-layer-and-overview-vignette",
+      "scope": "optional decorative visual",
+      "implementation": "Centroids use minimal line/point geometry; root-zone layers and plant silhouettes are parametric SVG or simple layered geometry. A later Spline version remains optional.",
+      "reasonExternalModelIsIncorrect": "It is only atmosphere and must retain an SVG/PNG fallback; it does not justify a runtime model dependency for the MVP.",
+      "limits": { "maximumTriangles": 500, "textures": 0, "externalBytes": 0 }
+    }
+  ],
+  "explicitlyExcluded": [
+    {
+      "assetClass": "Dense grass, foliage, crop, or plant GLB",
+      "evidence": "The functional view is an editable soil map, and the UI spec requires low-height crop markers plus clean parametric SVG/Three.js geometry. Dense foliage obscures cells, raises overdraw, and does not improve task completion."
+    },
+    {
+      "assetClass": "Static farm terrain, soil scan, or photogrammetry GLB",
+      "evidence": "The scenario is synthetic and data-responsive. Static terrain cannot reflect soil edits, zoning/membership modes, or the 2D fallback."
+    },
+    {
+      "assetClass": "Pump, irrigation hardware, realistic sensor, or farm machinery GLB",
+      "evidence": "Real sensors/pumps, irrigation replay, and pump simulation are out of MVP scope. These props would create an inaccurate capability claim."
+    }
+  ],
+  "futureExternalGlbGate": {
+    "needTest": [
+      "The visual remains useful after trying the approved procedural/SVG approach.",
+      "It is decorative only and cannot carry labels, controls, results, or the accessible interaction path.",
+      "It does not imply a live sensor, pump, irrigation capability, or real-farm evidence."
+    ],
+    "licenseTest": [
+      "Record creator, exact source URL, model-specific license URL, license version, and download date.",
+      "Accept only a model with an explicit CC0, CC-BY 4.0, MIT, Apache-2.0, or comparably permissive reuse license. Respect attribution where applicable.",
+      "Do not infer a model license from a marketplace-wide label or search result."
+    ],
+    "integrityTest": [
+      "Record original and optimized SHA-256 checksums and file size.",
+      "Validate the optimized GLB with a glTF validator and record zero errors.",
+      "Inspect it for logos, unwanted animation/cameras/lights, unrelated meshes, and hidden large textures before accepting it."
+    ],
+    "hardLimits": {
+      "perAssetTransferBytes": 524288,
+      "perAssetTriangles": 2000,
+      "perAssetMaterials": 2,
+      "perAssetTextures": 1,
+      "perAssetTextureMaxDimension": 512,
+      "decorativeHeroTotalTransferBytes": 1048576,
+      "decorativeHeroTotalTriangles": 10000
+    },
+    "reviewedSourceNotBundled": {
+      "name": "Poly Haven",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "finding": "The publisher states its 3D models, textures, and HDRIs are CC0. No individual asset was selected or downloaded because none passes the need test for the present MVP."
+    }
+  },
+  "verification": {
+    "externalFilesDownloaded": 0,
+    "licenseObligationsForBundledModels": "none",
+    "manifestIntegrity": "Validate this JSON before consuming it; the repository currently has no bundled model binary to hash or glTF-validate.",
+    "runtimeChecksBeforeShipping": [
+      "Capture frame time, draw calls, triangles, texture memory, transfer bytes, and load time at the maximum 768-cell field state.",
+      "Test a mobile-quality profile at DPR 1 and hide optional crop markers first under pressure.",
+      "Disable WebGL and confirm all editing, inspection, zoning, crop comparison, labels, and keyboard operation remain functional.",
+      "Enable prefers-reduced-motion and confirm all field drift/ripples/travel animation stop."
+    ]
+  }
+}
