@@ -33,6 +33,15 @@ Scenario {
   leafPrediction?, selectedCropContext?, actionHistory
 }
 
+DemoPresentationState {
+  activeScenarioId, zoningSampleView?: DemoSampleView | null
+}
+
+DemoSampleView {
+  kind: "mock-sample", fixtureId, fixtureVersion, sourceScenarioId,
+  method: "kmeans" | "fcm", k, viewedInputFingerprint
+}
+
 Cell {
   row, column, pH?, moisture?, soilTemperature?, ec?,
   nitrogen?, phosphorus?, potassium?, measurementContextRef?
@@ -40,6 +49,10 @@ Cell {
 ```
 
 Missing values are null/absent, never zero. Measurement context identifies source, unit, and timestamp; moisture additionally needs depth and method. Coordinates support layout/adjacency and are not silently included as soil measurements.
+
+`latestRun`, `compatibilityResult`, and `leafPrediction` contain only actual production outputs. `DemoPresentationState` is temporary UI-only state separate from production scenario/domain state and request/result schemas. Its `DemoSampleView` is only a pointer to a versioned prepared fixture; it is never serialized or displayed as a completed zoning run, rules evaluation, or model prediction. Compare the current input fingerprint with `viewedInputFingerprint` only to show the mock demo's “inputs changed since sample view” notice; the sample retains its persistent mock label either way.
+
+The mock-demo fixture gate requires a versioned exact 216-cell dataset for each named scenario, stable IDs for each supported `scenario × method × k` zoning sample, assignments and internally consistent zone summaries/membership values, three independent mock Crop Fit cards, and a separate fixed leaf sample unrelated to local preview bytes. This contract is documented in [Decision 0002](decisions/0002-mock-data-demo-first.md); create the data artifacts only when frontend implementation is explicitly started.
 
 ### Zoning
 
@@ -61,8 +74,8 @@ Request contains the image and model/preprocessing version. Result contains the 
 
 ## Rendering architecture
 
-- The mock-demo milestone is a desktop-only visual prototype and may render the low-relief 2.5D field with R3F before the production rendering phase. This early scene is not evidence of production performance or completion of the later 2D-first, accessibility, fallback, and profiling gates; see [Decision 0002](decisions/0002-mock-data-demo-first.md).
-- Implement and verify the 2D field interaction first. It is a complete mode, not a loading placeholder.
+- The mock-demo milestone is a desktop-only visual prototype and may render the low-relief 2.5D field with R3F before the production rendering phase. Its DOM controls, cell inspection, presets, brush dab, and reduced-motion behavior must be keyboard-operable, but the demo does not require a full 2D/no-WebGL rendering path. This early scene is not evidence of production performance or completion of the later 2D-first, fallback, and profiling gates; see [Decision 0002](decisions/0002-mock-data-demo-first.md).
+- After the mock-demo review is approved, implement and verify the final product's 2D field interaction first. It is a complete mode, not a loading placeholder; this sequencing does not block the earlier R3F-only desktop mock.
 - On capable desktop devices, render the functional 2.5D field with React Three Fiber and Three.js. Derive colors/transforms from scenario and run state. Reuse geometry/materials and use instancing for cells and repeated markers; do not create a React component, mesh, or material per cell.
 - The default field camera is isometric. Desktop drag orbits/pans, scroll zooms, and `F` fits the complete grid. Keep camera state separate from soil/run state. Cell relief is a bounded visual encoding of the selected feature, not geospatial elevation; soil standardization must never be visualized as terrain flattening.
 - Use DOM/SVG for controls, text, legends, accessible hit targets, zone patterns, and overlays. Use 2D fallback for mobile by default and for WebGL failure/context loss.
@@ -99,9 +112,9 @@ Use a shared box geometry with no more than 12 triangles per cell; 768 cells the
 
 ## Asset policy
 
-Procedural geometry/SVG covers grid cells, field edges, zones, patterns, membership overlays, sensor markers, crop/grass cues, centroids, and root layers. No model, texture, font, icon pack, or external asset service is required. Sensor markers are illustrative and labeled “Illustrative; no live sensor stream.”
+Procedural geometry/SVG covers grid cells, field edges, zones, patterns, membership overlays, sensor markers, crop cues, centroids, and root layers. No model, texture, font, icon pack, or external asset service is required to operate the product. Sensor markers are illustrative primitives labeled “Illustrative; no live sensor stream.”
 
-A future decorative GLB is accepted only when it improves a documented visual need, has an exact source/creator/model-specific reuse license and attribution record, stays within the budgets above, has original/optimized SHA-256 and size/geometry metadata, passes glTF validation with zero errors, and is lazy-loaded behind a working fallback. The [asset manifest](../assets/3d/asset-manifest.json) tracks the current zero-model state and the intake criteria. [Poly Haven](https://polyhaven.com/license) is a vetted CC0 source if a justified future need exists; that collection-wide license alone does not approve a specific model.
+The desktop demo may use the twelve small Kenney Nature Kit GLBs listed in the [asset manifest](../assets/3d/asset-manifest.json) as an optional art-direction palette for distant trees, sparse foliage/flowers, rocks, and a short background rail. Their combined prepared size is 79,544 bytes, with 882 triangles and no textures. They do not represent cells, crop outcomes, soil state, or sensors; the functional field remains procedural. Start with two or three distinct imported model types in the default view, keep them outside selectable cells, and never exceed the full-scene draw-call budget. Any additional decorative GLB must improve a documented visual need, have exact source/creator/license provenance, stay within the budgets above, include original/optimized SHA-256 and size/geometry metadata, pass glTF validation with zero errors, and remain optional behind a working fallback. [Poly Haven](https://polyhaven.com/license) remains a potential CC0 source; its collection-wide license alone does not approve a specific model.
 
 Use `.glb` as the runtime interchange format for a justified imported model. The [Khronos glTF 2.0 specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) defines GLB as binary glTF, a container for JSON and binary asset data.
 

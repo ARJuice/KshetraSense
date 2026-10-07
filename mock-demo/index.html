@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KshetraSense — Mock Demo</title>
+<script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+<style>
+  :root {
+    --ks-bg: #0d1117;
+    --ks-surface: #161b22;
+    --ks-card: #1c2433;
+    --ks-border: #30363d;
+    --ks-text: #e6edf3;
+    --ks-muted: #7d8590;
+    --ks-cyan: #39c5cf;
+    --ks-amber: #d4a017;
+    --ks-green: #3fb950;
+    --ks-ochre: #c9954c;
+    --ks-red: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    background: var(--ks-bg);
+    color: var(--ks-text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .tabular { font-variant-numeric: tabular-nums; }
+  canvas { display: block; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--ks-bg); }
+  ::-webkit-scrollbar-thumb { background: var(--ks-border); border-radius: 3px; }
+
+  /* Nav */
+  .nav-btn { transition: background 0.15s, color 0.15s, border-color 0.15s; }
+  .nav-btn.active { background: rgba(57,197,207,0.12); color: var(--ks-cyan); border-color: var(--ks-cyan); }
+  .nav-btn:hover:not(.active) { background: rgba(255,255,255,0.05); }
+
+  /* Field canvas */
+  #field-canvas { cursor: crosshair; }
+  #field-canvas.brush-mode { cursor: cell; }
+
+  /* Inspector glass */
+  .glass {
+    background: rgba(28, 36, 51, 0.82);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--ks-border);
+  }
+
+  /* Mock badge */
+  .mock-badge {
+    background: rgba(212,160,23,0.18);
+    border: 1px solid var(--ks-amber);
+    color: var(--ks-amber);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .synthetic-badge {
+    background: rgba(57,197,207,0.12);
+    border: 1px solid var(--ks-cyan);
+    color: var(--ks-cyan);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* Legend gradient */
+  .legend-gradient {
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(to right, #1a3a5c, #39c5cf);
+  }
+
+  /* Zone pattern overlays */
+  .zone-0 { background: rgba(57,197,207,0.18); }
+  .zone-1 { background: rgba(63,185,80,0.18); }
+  .zone-2 { background: rgba(201,149,76,0.18); }
+  .zone-3 { background: rgba(139,92,246,0.18); }
+
+  /* Crop card */
+  .crop-card { transition: border-color 0.2s; }
+  .crop-card:hover { border-color: rgba(57,197,207,0.4) !important; }
+
+  /* Factor row */
+  .factor-suitable { color: var(--ks-green); }
+  .factor-marginal { color: var(--ks-amber); }
+  .factor-unassessed { color: var(--ks-muted); }
+
+  /* Leaf drop zone */
+  .drop-zone {
+    border: 2px dashed var(--ks-border);
+    transition: border-color 0.2s;
+  }
+  .drop-zone:hover { border-color: var(--ks-cyan); }
+  .drop-zone.dragover { border-color: var(--ks-cyan); background: rgba(57,197,207,0.05); }
+
+  /* Animation */
+  @keyframes fadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); } }
+  .fade-in { animation: fadeIn 0.25s ease; }
+  @keyframes shimmer { 0%,100%{opacity:0.6} 50%{opacity:1} }
+  .shimmer { animation: shimmer 1.8s ease-in-out infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fade-in { animation: none; }
+    .shimmer { animation: none; }
+  }
+
+  /* Section pages */
+  .page { display: none; }
+  .page.active { display: flex; flex-direction: column; flex: 1; animation: fadeIn 0.2s ease; }
+
+  /* Overview hero canvas */
+  #overview-canvas { width: 100%; height: 280px; }
+
+  /* Evidence metric bar */
+  .metric-bar-fill {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--ks-cyan);
+    transition: width 0.6s ease;
+  }
+
+  /* Brush preview */
+  .touched-cell-preview {
+    position: absolute;
+    border: 2px solid var(--ks-ochre);
+    pointer-events: none;
+    border-radius: 2px;
+    transition: opacity 0.15s;
+  }
+
+  /* Scrollable zone list */
+  .zone-list-item {
+    border-left: 3px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .zone-list-item:hover { background: rgba(255,255,255,0.04); }
+  .zone-list-item.selected { background: rgba(57,197,207,0.08); border-left-color: var(--ks-cyan); }
+</style>
+</head>
+<body class="bg-[var(--ks-bg)]">
+
+<!-- ═══════════════════════════════════════════
+     TOP SHELL
+════════════════════════════════════════════ -->
+<header style="background:var(--ks-surface);border-bottom:1px solid var(--ks-border);" class="px-5 py-2 flex items-center gap-3 flex-wrap">
+  <!-- Logo -->
+  <div class="flex items-center gap-2 mr-3">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <rect width="28" height="28" rx="6" fill="#161b22" stroke="#30363d"/>
+      <!-- soil layers -->
+      <rect x="4" y="16" width="20" height="3" rx="1" fill="#c9954c" opacity="0.8"/>
+      <rect x="4" y="19" width="20" height="4" rx="1" fill="#8b5e3c" opacity="0.6"/>
+      <!-- leaf -->
+      <path d="M14 14 Q10 8 14 4 Q18 8 14 14Z" fill="#3fb950" opacity="0.9"/>
+      <line x1="14" y1="4" x2="14" y2="14" stroke="#1c2433" stroke-width="0.8"/>
+    </svg>
+    <span class="font-bold text-sm tracking-tight" style="color:var(--ks-text)">KshetraSense</span>
+  </div>
+
+  <!-- Scenario badge -->
+  <div class="flex items-center gap-2">
+    <span class="synthetic-badge" id="scenario-badge">SYNTHETIC SCENARIO: Garden East (Seed #42)</span>
+    <button onclick="openScenarioChooser()" class="text-xs px-2 py-1 rounded border border-[var(--ks-border)] text-[var(--ks-muted)] hover:text-[var(--ks-text)] hover:border-[var(--ks-cyan)] transition-colors">
+      Explore ▾
+    </button>
+  </div>
+
+  <div class="flex-1"></div>
+
+  <!-- Undo/Redo/Reset -->
+  <div class="flex items-center gap-1">
+    <button onclick="undoAction()" id="undo-btn" title="Undo (Ctrl+Z)" class="text-xs px-2 py-1 rounded border border-[var(--ks-border)] text-[var(--ks-muted)] hover:text-[var(--ks-text)] transition-colors disabled:opacity-40">
+      ↩ Undo
+    </button>
+    <button onclick="redoAction()" id="redo-btn" title="Redo" class="text-xs px-2 py-1 rounded border border-[var(--ks-border)] text-[var(--ks-muted)] hover:text-[var(--ks-text)] transition-colors">
+      ↪ Redo
+    </button>
+    <button onclick="resetDemo()" class="text-xs px-2 py-1 rounded border border-[var(--ks-border)] text-[var(--ks-red)] hover:bg-red-900/20 transition-colors">
+      ⟳ Reset Demo
+    </button>
+  </div>
+</header>
+
+<!-- NAV BAR -->
+<nav style="background:var(--ks-surface);border-bottom:1px solid var(--ks-border);" class="px-4 flex gap-1 overflow-x-auto">
+  <button class="nav-btn active text-xs font-medium px-4 py-2.5 border-b-2 border-transparent" onclick="navigate('overview')" id="nav-overview">Overview</button>
+  <button class="nav-btn text-xs font-medium px-4 py-2.5 border-b-2 border-transparent" onclick="navigate('fieldlab')" id="nav-fieldlab" style="color:var(--ks-muted)">Field Lab</button>
+  <button class="nav-btn text-xs font-medium px-4 py-2.5 border-b-2 border-transparent" onclick="navigate('cropfit')" id="nav-cropfit" style="color:var(--ks-muted)">Crop Fit</button>
+  <button class="nav-btn text-xs font-medium px-4 py-2.5 border-b-2 border-transparent" onclick="navigate('leafdiag')" id="nav-leafdiag" style="color:var(--ks-muted)">Leaf Diagnosis</button>
+  <button class="nav-btn text-xs font-medium px-4 py-2.5 border-b-2 border-transparent" onclick="navigate('evidence')" id="nav-evidence" style="color:var(--ks-muted)">Evidence &amp; Metrics</button>
+  <!-- Future disabled item -->
+  <button disabled class="text-xs font-medium px-4 py-2.5 text-[var(--ks-border)] cursor-not-allowed" title="Post-MVP">Water Balance (post-MVP)</button>
+</nav>
+
+<!-- ═══════════════════════════════════════════
+     MAIN CONTENT
+════════════════════════════════════════════ -->
+<main class="flex flex-col" style="min-height:calc(100vh - 90px);">
+
+<!-- ─────── OVERVIEW PAGE ─────── -->
+<section id="page-overview" class="page active p-6 gap-6">
+  <div class="max-w-4xl mx-auto w-full">
+    <!-- Hero -->
+    <div class="rounded-xl overflow-hidden mb-6 relative" style="border:1px solid var(--ks-border);">
+      <canvas id="overview-canvas"></canvas>
+      <div class="absolute inset-0 flex flex-col justify-end p-6 bg-gradient-to-t from-[#0d1117] via-transparent to-transparent">
+        <h1 class="text-2xl font-bold mb-1">KshetraSense</h1>
+        <p class="text-sm max-w-lg" style="color:var(--ks-muted)">
+          An interactive applied-ML demonstrator for apple, tomato, and potato — edit a synthetic soil field, run crop-neutral clustering, compare soil-compatibility factors, and submit a leaf image to a shared classifier.
+        </p>
+        <div class="flex gap-2 mt-3 flex-wrap">
+          <span class="synthetic-badge">SYNTHETIC DATA ONLY</span>
+          <span class="text-xs py-1 px-2 rounded border border-[var(--ks-border)]" style="color:var(--ks-muted)">Educational demonstrator · not agronomic advice</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Current scenario card -->
+    <div class="rounded-xl p-4 mb-6" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="text-sm font-semibold">Active Scenario</span>
+        <span class="synthetic-badge" id="ov-scenario-name">Garden East — Baseline</span>
+      </div>
+      <p class="text-sm" style="color:var(--ks-muted)">
+        Seed: <span class="tabular font-mono" style="color:var(--ks-text)">#42</span> ·
+        Grid: <span class="tabular font-mono" style="color:var(--ks-text)">18 × 12 (216 cells)</span> ·
+        Focus feature: <span style="color:var(--ks-cyan)" id="ov-focus-feature">Nitrogen</span>
+      </p>
+    </div>
+
+    <!-- Evidence types -->
+    <h2 class="text-base font-semibold mb-3">Three evidence types</h2>
+    <div class="grid grid-cols-1 gap-4 mb-6" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+      <div class="rounded-xl p-4" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+        <div class="text-xs font-semibold mb-1" style="color:var(--ks-cyan)">UNSUPERVISED ZONING</div>
+        <p class="text-sm" style="color:var(--ks-muted)">K-means &amp; FCM clustering of soil features — crop-neutral, no labels applied.</p>
+      </div>
+      <div class="rounded-xl p-4" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+        <div class="text-xs font-semibold mb-1" style="color:var(--ks-green)">SUPERVISED CLASSIFICATION</div>
+        <p class="text-sm" style="color:var(--ks-muted)">17-class leaf image classifier (MobileNetV3-Small) — scores from pixels only.</p>
+      </div>
+      <div class="rounded-xl p-4" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+        <div class="text-xs font-semibold mb-1" style="color:var(--ks-amber)">TRANSPARENT RULES</div>
+        <p class="text-sm" style="color:var(--ks-muted)">Sourced soil-to-crop compatibility factors — assessed independently per crop.</p>
+      </div>
+    </div>
+
+    <!-- Entry points -->
+    <h2 class="text-base font-semibold mb-3">Start exploring</h2>
+    <div class="grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+      <button onclick="navigate('fieldlab')" class="rounded-xl p-4 text-left hover:border-[var(--ks-cyan)] transition-colors" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+        <div class="text-2xl mb-2">🌾</div>
+        <div class="font-semibold text-sm">Field Lab</div>
+        <div class="text-xs mt-1" style="color:var(--ks-muted)">Edit soil values, run zoning, inspect cells</div>
+      </button>
+      <button onclick="navigate('cropfit')" class="rounded-xl p-4 text-left hover:border-[var(--ks-green)] transition-colors" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+        <div class="text-2xl mb-2">🍎</div>
+        <div class="font-semibold text-sm">Crop Fit</div>
+        <div class="text-xs mt-1" style="color:var(--ks-muted)">Compare apple, tomato, potato factors</div>
+      </button>
+      <button onclick="navigate('leafdiag')" class="rounded-xl p-4 text-left hover:border-[var(--ks-cyan)] transition-colors" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+        <div class="text-2xl mb-2">🍃</div>
+        <div class="font-semibold text-sm">Leaf Diagnosis</div>
+        <div class="text-xs mt-1" style="color:var(--ks-muted)">Upload a leaf image for 17-class preview</div>
+      </button>
+      <button onclick="navigate('evidence')" class="rounded-xl p-4 text-left hover:border-[var(--ks-amber)] transition-colors" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+        <div class="text-2xl mb-2">📊</div>
+        <div class="font-semibold text-sm">Evidence &amp; Metrics</div>
+        <div class="text-xs mt-1" style="color:var(--ks-muted)">Methods, datasets, known limits</div>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ─────── FIELD LAB PAGE ─────── -->
+<section id="page-fieldlab" class="page" style="flex-direction:row;height:calc(100vh - 90px);overflow:hidden;">
+
+  <!-- LEFT: Tools + Field -->
+  <div class="flex flex-col flex-1 overflow-hidden">
+
+    <!-- Toolbar -->
+    <div class="px-3 py-2 flex flex-wrap items-center gap-2" style="background:var(--ks-surface);border-bottom:1px solid var(--ks-border);">
+      <!-- Map mode -->
+      <div class="flex gap-1 border rounded-lg overflow-hidden" style="border-color:var(--ks-border);">
+        <button onclick="setMapMode('soil')" id="mode-soil" class="text-xs px-3 py-1.5 font-medium transition-colors" style="background:rgba(57,197,207,0.15);color:var(--ks-cyan)">Soil Attribute</button>
+        <button onclick="setMapMode('zoning')" id="mode-zoning" class="text-xs px-3 py-1.5 font-medium transition-colors" style="color:var(--ks-muted)">Zoning</button>
+        <button onclick="setMapMode('membership')" id="mode-membership" class="text-xs px-3 py-1.5 font-medium transition-colors" style="color:var(--ks-border);" disabled title="Available after FCM sample">Membership</button>
+      </div>
+
+      <!-- Feature selector (soil mode) -->
+      <div id="feature-selector-wrap" class="flex items-center gap-1">
+        <span class="text-xs" style="color:var(--ks-muted)">Feature:</span>
+        <select id="feature-select" onchange="setActiveFeature(this.value)" class="text-xs px-2 py-1.5 rounded border" style="background:var(--ks-card);color:var(--ks-text);border-color:var(--ks-border);">
+          <option value="nitrogen">Nitrogen (mg/kg)</option>
+          <option value="phosphorus">Phosphorus (mg/kg)</option>
+          <option value="potassium">Potassium (mg/kg)</option>
+          <option value="pH">pH</option>
+          <option value="ec">EC (dS/m)</option>
+          <option value="soilTemp">Soil Temp (°C)</option>
+        </select>
+      </div>
+
+      <!-- Quick presets -->
+      <div class="flex items-center gap-1">
+        <span class="text-xs" style="color:var(--ks-muted)">Preset:</span>
+        <button onclick="applyPreset('lowN')" class="text-xs px-2 py-1.5 rounded border hover:border-[var(--ks-ochre)] transition-colors" style="border-color:var(--ks-border);color:var(--ks-ochre)">Low-N Patch</button>
+        <button onclick="applyPreset('highEC')" class="text-xs px-2 py-1.5 rounded border hover:border-[var(--ks-ochre)] transition-colors" style="border-color:var(--ks-border);color:var(--ks-ochre)">High Salinity</button>
+        <button onclick="applyPreset('acidicWash')" class="text-xs px-2 py-1.5 rounded border hover:border-[var(--ks-ochre)] transition-colors" style="border-color:var(--ks-border);color:var(--ks-ochre)">Acidic Wash</button>
+      </div>
+
+      <div class="h-5 w-px" style="background:var(--ks-border)"></div>
+
+      <!-- Mode toggle: inspect / brush -->
+      <div class="flex gap-1 border rounded-lg overflow-hidden" style="border-color:var(--ks-border);">
+        <button onclick="setInteractMode('inspect')" id="imode-inspect" class="text-xs px-3 py-1.5 font-medium transition-colors" style="background:rgba(57,197,207,0.15);color:var(--ks-cyan)">🔍 Inspect</button>
+        <button onclick="setInteractMode('brush')" id="imode-brush" class="text-xs px-3 py-1.5 font-medium transition-colors" style="color:var(--ks-muted)">✏️ Brush</button>
+      </div>
+
+      <!-- Brush options (shown in brush mode) -->
+      <div id="brush-opts" class="flex items-center gap-2 hidden">
+        <select id="brush-dir" class="text-xs px-2 py-1.5 rounded border" style="background:var(--ks-card);color:var(--ks-text);border-color:var(--ks-border);">
+          <option value="raise">▲ Raise</option>
+          <option value="lower">▼ Lower</option>
+        </select>
+        <select id="brush-str" class="text-xs px-2 py-1.5 rounded border" style="background:var(--ks-card);color:var(--ks-text);border-color:var(--ks-border);">
+          <option value="light">Light (2%)</option>
+          <option value="medium">Medium (5%)</option>
+          <option value="strong">Strong (10%)</option>
+        </select>
+        <select id="brush-size" class="text-xs px-2 py-1.5 rounded border" style="background:var(--ks-card);color:var(--ks-text);border-color:var(--ks-border);">
+          <option value="1">1 cell</option>
+          <option value="3">3 cells</option>
+          <option value="5">5 cells</option>
+        </select>
+        <span class="text-xs italic" style="color:var(--ks-ochre)">Esc to cancel</span>
+      </div>
+
+      <div class="flex-1"></div>
+      <!-- Camera fit -->
+      <button onclick="fitCamera()" title="Fit field (F)" class="text-xs px-2 py-1.5 rounded border hover:border-[var(--ks-cyan)] transition-colors" style="border-color:var(--ks-border);color:var(--ks-muted)">⊞ Fit (F)</button>
+    </div>
+
+    <!-- Field canvas area -->
+    <div class="relative flex-1 overflow-hidden" style="background:#0a0e14;">
+      <canvas id="field-canvas" class="w-full h-full"></canvas>
+
+      <!-- Legend overlay -->
+      <div class="absolute bottom-4 left-4 rounded-lg px-3 py-2 glass" style="min-width:160px;">
+        <div class="text-xs font-semibold mb-1" style="color:var(--ks-cyan)" id="legend-title">Nitrogen</div>
+        <div class="legend-gradient mb-1" id="legend-gradient-bar"></div>
+        <div class="flex justify-between text-xs tabular" style="color:var(--ks-muted)">
+          <span id="legend-min">0 mg/kg</span>
+          <span id="legend-max">250 mg/kg</span>
+        </div>
+        <div class="text-xs mt-1" style="color:var(--ks-border)" id="legend-type">· synthetic ·</div>
+      </div>
+
+      <!-- Coordinate tooltip -->
+      <div id="cell-tooltip" class="absolute pointer-events-none rounded glass px-2 py-1 text-xs tabular hidden" style="color:var(--ks-muted)">R1 C1</div>
+
+      <!-- Synthetic badge overlay -->
+      <div class="absolute top-3 right-3">
+        <span class="synthetic-badge">SYNTHETIC SCENARIO: Garden East (Seed #42)</span>
+      </div>
+
+      <!-- Inputs changed notice (amber, hidden by default) -->
+      <div id="inputs-changed-notice" class="absolute top-10 right-3 rounded-lg px-3 py-2 hidden" style="background:rgba(212,160,23,0.15);border:1px solid var(--ks-amber);max-width:280px;">
+        <div class="text-xs font-semibold" style="color:var(--ks-amber)">⚠ INPUTS CHANGED SINCE SAMPLE VIEW</div>
+        <div class="text-xs mt-1" style="color:var(--ks-muted)">Sample output is unchanged and was not computed from these edits.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Inspector + Zoning panel -->
+  <div class="flex flex-col overflow-y-auto" style="width:280px;background:var(--ks-surface);border-left:1px solid var(--ks-border);">
+
+    <!-- INSPECTOR -->
+    <div class="p-3 border-b" style="border-color:var(--ks-border);">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-semibold" style="color:var(--ks-muted)">INSPECTOR</span>
+        <span id="inspector-cell-label" class="text-xs tabular" style="color:var(--ks-cyan)">No cell selected</span>
+      </div>
+      <div id="inspector-content" class="text-xs" style="color:var(--ks-muted)">
+        Click a cell on the field to inspect its values.
+      </div>
+    </div>
+
+    <!-- ZONING PANEL -->
+    <div class="p-3 border-b" style="border-color:var(--ks-border);">
+      <div class="text-xs font-semibold mb-2" style="color:var(--ks-muted)">ZONING</div>
+
+      <div class="flex gap-2 mb-2">
+        <select id="zone-method" class="flex-1 text-xs px-2 py-1.5 rounded border" style="background:var(--ks-card);color:var(--ks-text);border-color:var(--ks-border);">
+          <option value="kmeans">K-means</option>
+          <option value="fcm">Fuzzy C-means</option>
+        </select>
+        <select id="zone-k" class="text-xs px-2 py-1.5 rounded border" style="background:var(--ks-card);color:var(--ks-text);border-color:var(--ks-border);">
+          <option value="3">k = 3</option>
+          <option value="4">k = 4</option>
+        </select>
+      </div>
+
+      <button onclick="loadZoningSample()" id="show-sample-btn" class="w-full text-xs py-2 rounded border font-medium transition-colors hover:border-[var(--ks-cyan)] hover:text-[var(--ks-cyan)]" style="border-color:var(--ks-border);color:var(--ks-muted);">
+        Show sample result
+      </button>
+
+      <div id="zoning-state" class="mt-2 text-xs text-center" style="color:var(--ks-muted);">
+        No sample result loaded
+      </div>
+
+      <!-- Zone list (hidden until sample loaded) -->
+      <div id="zone-list" class="mt-3 hidden">
+        <div class="mock-badge mb-2 inline-block">MOCK OUTPUT — prepared fixture, not an algorithm result</div>
+        <div id="zone-items" class="flex flex-col gap-1"></div>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="p-3">
+      <div class="text-xs font-semibold mb-2" style="color:var(--ks-muted)">EDIT HISTORY</div>
+      <div id="history-list" class="flex flex-col gap-1 text-xs" style="color:var(--ks-muted);">
+        <span class="italic">No edits yet.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────── CROP FIT PAGE ─────── -->
+<section id="page-cropfit" class="page p-6 gap-4 overflow-y-auto">
+  <div class="max-w-5xl mx-auto w-full">
+    <div class="flex items-center gap-3 mb-2">
+      <h2 class="text-lg font-semibold">Crop Fit</h2>
+      <span class="mock-badge">MOCK / NOT ASSESSED</span>
+    </div>
+    <p class="text-sm mb-4" style="color:var(--ks-muted)">
+      Soil-to-crop compatibility factors are independently assessed per crop. This is not a probability split — more than one crop may be suitable, or none.
+    </p>
+
+    <!-- Zone context prompt -->
+    <div id="cropfit-no-zone" class="rounded-xl p-4 mb-4" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+      <div class="text-sm" style="color:var(--ks-muted)">
+        👆 <strong style="color:var(--ks-text)">Choose a sample zone</strong> in Field Lab to see zone-scoped context. Showing general mock cards for now.
+      </div>
+    </div>
+
+    <div id="cropfit-zone-context" class="hidden rounded-xl p-4 mb-4" style="background:rgba(57,197,207,0.08);border:1px solid var(--ks-cyan);">
+      <div class="text-xs font-semibold mb-1" style="color:var(--ks-cyan)">ZONE CONTEXT (fixture summary)</div>
+      <div class="text-sm" id="cropfit-zone-summary" style="color:var(--ks-muted)">Zone 1 · K-means k=3 · 72 cells · Mean N: 48 mg/kg, pH: 6.4</div>
+    </div>
+
+    <!-- Crop cards -->
+    <div class="grid gap-4" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+      <!-- Apple -->
+      <div class="crop-card rounded-xl overflow-hidden" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+        <div class="px-4 pt-4 pb-2 flex items-center gap-3 border-b" style="border-color:var(--ks-border);">
+          <span class="text-2xl">🍎</span>
+          <div>
+            <div class="font-semibold">Apple</div>
+            <div class="text-xs" style="color:var(--ks-muted)">Malus domestica</div>
+          </div>
+          <span class="ml-auto mock-badge">MOCK</span>
+        </div>
+        <div class="p-4">
+          <table class="w-full text-xs">
+            <thead><tr class="text-left" style="color:var(--ks-muted);">
+              <th class="pb-2 font-medium">Factor</th><th class="pb-2 font-medium">Observed</th><th class="pb-2 font-medium">Range</th><th class="pb-2 font-medium">Status</th>
+            </tr></thead>
+            <tbody class="divide-y" style="border-color:var(--ks-border);">
+              <tr class="py-1"><td class="py-1.5">pH</td><td class="py-1.5 tabular">6.4</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">5.5–7.0</td><td class="py-1.5 factor-suitable">✓ Suitable</td></tr>
+              <tr><td class="py-1.5">N (mg/kg)</td><td class="py-1.5 tabular">48</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">40–80</td><td class="py-1.5 factor-suitable">✓ Suitable</td></tr>
+              <tr><td class="py-1.5">EC (dS/m)</td><td class="py-1.5 tabular">1.42</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">&lt;2.0</td><td class="py-1.5 factor-suitable">✓ Suitable</td></tr>
+              <tr><td class="py-1.5">Soil Temp</td><td class="py-1.5 tabular">24.5°C</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">15–25°C</td><td class="py-1.5 factor-marginal">⚠ Marginal</td></tr>
+              <tr><td class="py-1.5">Calcium</td><td class="py-1.5">—</td><td class="py-1.5" style="color:var(--ks-muted);">—</td><td class="py-1.5 factor-unassessed">— Not assessed</td></tr>
+            </tbody>
+          </table>
+          <div class="mt-3 text-xs rounded p-2" style="background:rgba(255,255,255,0.03);color:var(--ks-muted);">
+            Profile v0.1-mock · Source: illustrative only · <span style="color:var(--ks-amber)">Not agronomic advice</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tomato -->
+      <div class="crop-card rounded-xl overflow-hidden" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+        <div class="px-4 pt-4 pb-2 flex items-center gap-3 border-b" style="border-color:var(--ks-border);">
+          <span class="text-2xl">🍅</span>
+          <div>
+            <div class="font-semibold">Tomato</div>
+            <div class="text-xs" style="color:var(--ks-muted)">Solanum lycopersicum</div>
+          </div>
+          <span class="ml-auto mock-badge">MOCK</span>
+        </div>
+        <div class="p-4">
+          <table class="w-full text-xs">
+            <thead><tr class="text-left" style="color:var(--ks-muted);">
+              <th class="pb-2 font-medium">Factor</th><th class="pb-2 font-medium">Observed</th><th class="pb-2 font-medium">Range</th><th class="pb-2 font-medium">Status</th>
+            </tr></thead>
+            <tbody class="divide-y" style="border-color:var(--ks-border);">
+              <tr class="py-1"><td class="py-1.5">pH</td><td class="py-1.5 tabular">6.4</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">6.0–6.8</td><td class="py-1.5 factor-suitable">✓ Suitable</td></tr>
+              <tr><td class="py-1.5">N (mg/kg)</td><td class="py-1.5 tabular">48</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">60–120</td><td class="py-1.5 factor-marginal">⚠ Marginal (low)</td></tr>
+              <tr><td class="py-1.5">EC (dS/m)</td><td class="py-1.5 tabular">1.42</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">&lt;2.5</td><td class="py-1.5 factor-suitable">✓ Suitable</td></tr>
+              <tr><td class="py-1.5">Soil Temp</td><td class="py-1.5 tabular">24.5°C</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">20–28°C</td><td class="py-1.5 factor-suitable">✓ Suitable</td></tr>
+              <tr><td class="py-1.5">P (mg/kg)</td><td class="py-1.5 tabular">24</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">30–60</td><td class="py-1.5 factor-marginal">⚠ Marginal (low)</td></tr>
+            </tbody>
+          </table>
+          <div class="mt-3 text-xs rounded p-2" style="background:rgba(255,255,255,0.03);color:var(--ks-muted);">
+            Profile v0.1-mock · Source: illustrative only · <span style="color:var(--ks-amber)">Not agronomic advice</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Potato -->
+      <div class="crop-card rounded-xl overflow-hidden" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+        <div class="px-4 pt-4 pb-2 flex items-center gap-3 border-b" style="border-color:var(--ks-border);">
+          <span class="text-2xl">🥔</span>
+          <div>
+            <div class="font-semibold">Potato</div>
+            <div class="text-xs" style="color:var(--ks-muted)">Solanum tuberosum</div>
+          </div>
+          <span class="ml-auto mock-badge">MOCK</span>
+        </div>
+        <div class="p-4">
+          <table class="w-full text-xs">
+            <thead><tr class="text-left" style="color:var(--ks-muted);">
+              <th class="pb-2 font-medium">Factor</th><th class="pb-2 font-medium">Observed</th><th class="pb-2 font-medium">Range</th><th class="pb-2 font-medium">Status</th>
+            </tr></thead>
+            <tbody class="divide-y" style="border-color:var(--ks-border);">
+              <tr class="py-1"><td class="py-1.5">pH</td><td class="py-1.5 tabular">6.4</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">5.0–6.5</td><td class="py-1.5 factor-suitable">✓ Suitable</td></tr>
+              <tr><td class="py-1.5">N (mg/kg)</td><td class="py-1.5 tabular">48</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">50–100</td><td class="py-1.5 factor-marginal">⚠ Marginal (low)</td></tr>
+              <tr><td class="py-1.5">EC (dS/m)</td><td class="py-1.5 tabular">1.42</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">&lt;1.7</td><td class="py-1.5 factor-marginal">⚠ Marginal (high)</td></tr>
+              <tr><td class="py-1.5">K (mg/kg)</td><td class="py-1.5 tabular">130</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">80–180</td><td class="py-1.5 factor-suitable">✓ Suitable</td></tr>
+              <tr><td class="py-1.5">Soil Temp</td><td class="py-1.5 tabular">24.5°C</td><td class="py-1.5 tabular" style="color:var(--ks-muted);">15–22°C</td><td class="py-1.5 factor-marginal">⚠ Marginal (high)</td></tr>
+            </tbody>
+          </table>
+          <div class="mt-3 text-xs rounded p-2" style="background:rgba(255,255,255,0.03);color:var(--ks-muted);">
+            Profile v0.1-mock · Source: illustrative only · <span style="color:var(--ks-amber)">Not agronomic advice</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="rounded-xl p-4 mt-4 text-sm" style="background:rgba(212,160,23,0.08);border:1px solid rgba(212,160,23,0.3);color:var(--ks-muted);">
+      <span style="color:var(--ks-amber)">⚠</span>
+      Each crop is assessed independently. Several crops or none may be suitable. Cards are equally weighted — do not interpret any ordering as a ranking. Scores, probabilities, and yield predictions are out of scope. These are illustrative synthetic demo values.
+    </div>
+  </div>
+</section>
+
+<!-- ─────── LEAF DIAGNOSIS PAGE ─────── -->
+<section id="page-leafdiag" class="page p-6 gap-4 overflow-y-auto">
+  <div class="max-w-4xl mx-auto w-full">
+    <div class="flex items-center gap-3 mb-1">
+      <h2 class="text-lg font-semibold">Leaf Diagnosis</h2>
+      <span class="synthetic-badge">17-CLASS CLASSIFIER</span>
+    </div>
+    <p class="text-sm mb-4" style="color:var(--ks-muted)">
+      Upload a local JPEG/PNG/WebP for browser preview only. No image is uploaded or inferred in the mock demo. Use "Show sample result" to see the fixed class example.
+    </p>
+
+    <div class="grid gap-6" style="grid-template-columns:1fr 1fr;">
+      <!-- Upload area -->
+      <div>
+        <div class="text-xs font-semibold mb-2" style="color:var(--ks-muted)">LOCAL PREVIEW (demo only)</div>
+        <div id="leaf-drop" class="drop-zone rounded-xl p-6 text-center cursor-pointer mb-3"
+          onclick="document.getElementById('leaf-input').click()"
+          ondrop="handleLeafDrop(event)" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')">
+          <input type="file" id="leaf-input" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handleLeafFile(event)" />
+          <div id="leaf-drop-content">
+            <div class="text-3xl mb-2">🍃</div>
+            <div class="text-sm" style="color:var(--ks-muted)">Drop JPEG / PNG / WebP here<br/><span class="text-xs">max 10 MB · 16 MP · preview only</span></div>
+          </div>
+          <img id="leaf-preview" class="hidden max-h-40 mx-auto rounded-lg object-contain" alt="Leaf preview" />
+        </div>
+        <div id="leaf-error" class="hidden text-xs rounded p-2 mb-2" style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--ks-red);"></div>
+        <div class="flex gap-2">
+          <button onclick="clearLeafPreview()" id="leaf-clear-btn" class="hidden text-xs px-3 py-1.5 rounded border hover:border-[var(--ks-red)] transition-colors" style="border-color:var(--ks-border);color:var(--ks-muted);">Clear preview</button>
+        </div>
+        <div class="mt-3 text-xs rounded p-3" style="background:rgba(255,255,255,0.03);border:1px solid var(--ks-border);color:var(--ks-muted);">
+          <div class="font-semibold mb-1" style="color:var(--ks-text)">Privacy note</div>
+          The preview is processed locally in your browser. No image data is transmitted or stored.
+        </div>
+      </div>
+
+      <!-- Sample result -->
+      <div>
+        <div class="text-xs font-semibold mb-2" style="color:var(--ks-muted)">SAMPLE RESULT</div>
+        <div id="leaf-sample-empty" class="rounded-xl p-4 text-center" style="background:var(--ks-card);border:1px solid var(--ks-border);color:var(--ks-muted);font-size:13px;">
+          No sample result loaded.<br/>
+          <button onclick="loadLeafSample()" class="mt-3 text-xs px-3 py-1.5 rounded border hover:border-[var(--ks-cyan)] transition-colors" style="border-color:var(--ks-border);color:var(--ks-cyan);">Show sample result</button>
+        </div>
+
+        <div id="leaf-sample-result" class="hidden fade-in rounded-xl overflow-hidden" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+          <div class="px-4 py-3 border-b flex items-center gap-2" style="border-color:var(--ks-border);">
+            <div class="mock-badge">MOCK OUTPUT — no model ran; unrelated to preview image</div>
+          </div>
+          <div class="p-4">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="text-2xl">🍅</div>
+              <div>
+                <div class="font-semibold text-sm">Tomato — Late Blight</div>
+                <div class="text-xs" style="color:var(--ks-muted)">Top class · Phytophthora infestans</div>
+              </div>
+              <div class="ml-auto text-xs rounded px-2 py-1" style="background:rgba(57,197,207,0.12);color:var(--ks-cyan);">Model score</div>
+            </div>
+
+            <!-- Score bars -->
+            <div class="space-y-1.5 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="w-44 truncate" style="color:var(--ks-muted);">Tomato — Late Blight</span>
+                <div class="flex-1 h-2 rounded-full overflow-hidden" style="background:rgba(255,255,255,0.06);">
+                  <div style="width:82%;background:var(--ks-cyan);height:100%;border-radius:999px;"></div>
+                </div>
+                <span class="w-8 text-right tabular">0.82</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-44 truncate" style="color:var(--ks-muted);">Tomato — Early Blight</span>
+                <div class="flex-1 h-2 rounded-full overflow-hidden" style="background:rgba(255,255,255,0.06);">
+                  <div style="width:9%;background:var(--ks-muted);height:100%;border-radius:999px;"></div>
+                </div>
+                <span class="w-8 text-right tabular">0.09</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-44 truncate" style="color:var(--ks-muted);">Tomato — Healthy</span>
+                <div class="flex-1 h-2 rounded-full overflow-hidden" style="background:rgba(255,255,255,0.06);">
+                  <div style="width:3%;background:var(--ks-muted);height:100%;border-radius:999px;"></div>
+                </div>
+                <span class="w-8 text-right tabular">0.03</span>
+              </div>
+              <div class="text-center py-1" style="color:var(--ks-border);">· · · 14 more classes · · ·</div>
+            </div>
+
+            <div class="mt-3 text-xs" style="color:var(--ks-muted);">
+              Model: MobileNetV3-Small · 17 classes · Version: mock-fixture · <span style="color:var(--ks-amber)">Needs review</span>
+            </div>
+            <div class="mt-2 text-xs rounded p-2" style="background:rgba(212,160,23,0.08);border:1px solid rgba(212,160,23,0.3);color:var(--ks-amber);">
+              ⚠ Supported labels: 17 PlantVillage crop-condition classes only. Field photos are not guaranteed to be supported. Result requires review.
+            </div>
+          </div>
+        </div>
+
+        <button onclick="clearLeafSample()" id="leaf-sample-clear" class="hidden mt-2 text-xs px-3 py-1.5 rounded border hover:border-[var(--ks-red)] transition-colors" style="border-color:var(--ks-border);color:var(--ks-muted);">Clear sample</button>
+
+        <!-- 17-label list -->
+        <div class="mt-4 rounded-xl p-3" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+          <div class="text-xs font-semibold mb-2" style="color:var(--ks-muted);">SUPPORTED LABELS (17 classes)</div>
+          <div class="grid gap-0.5 text-xs" style="grid-template-columns:1fr 1fr;color:var(--ks-muted);">
+            <span>🍎 Apple — Scab</span><span>🍎 Apple — Black Rot</span>
+            <span>🍎 Apple — Cedar Apple Rust</span><span>🍎 Apple — Healthy</span>
+            <span>🍅 Tomato — Bacterial Spot</span><span>🍅 Tomato — Early Blight</span>
+            <span>🍅 Tomato — Late Blight</span><span>🍅 Tomato — Leaf Mold</span>
+            <span>🍅 Tomato — Septoria Leaf Spot</span><span>🍅 Tomato — Spider Mites</span>
+            <span>🍅 Tomato — Target Spot</span><span>🍅 Tomato — YL Curl Virus</span>
+            <span>🍅 Tomato — Mosaic Virus</span><span>🍅 Tomato — Healthy</span>
+            <span>🥔 Potato — Early Blight</span><span>🥔 Potato — Late Blight</span>
+            <span>🥔 Potato — Healthy</span><span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────── EVIDENCE & METRICS PAGE ─────── -->
+<section id="page-evidence" class="page p-6 gap-4 overflow-y-auto">
+  <div class="max-w-4xl mx-auto w-full">
+    <h2 class="text-lg font-semibold mb-1">Evidence &amp; Metrics</h2>
+    <p class="text-sm mb-5" style="color:var(--ks-muted)">Methods, datasets, measured metrics, and known limitations. Only metrics with a linked, versioned report are shown. Unmeasured metrics are labeled "Not measured yet."</p>
+
+    <!-- Vision -->
+    <div class="rounded-xl overflow-hidden mb-4" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+      <div class="px-4 py-3 border-b flex items-center gap-2" style="border-color:var(--ks-border);">
+        <span class="text-sm font-semibold">👁️ Vision — Leaf Classifier</span>
+        <span class="synthetic-badge">MobileNetV3-Small</span>
+      </div>
+      <div class="p-4 grid gap-3 text-sm" style="grid-template-columns:1fr 1fr;">
+        <div>
+          <div class="text-xs font-medium mb-1" style="color:var(--ks-muted)">Architecture</div>
+          <div>MobileNetV3-Small, transfer-learned from ImageNet</div>
+        </div>
+        <div>
+          <div class="text-xs font-medium mb-1" style="color:var(--ks-muted)">Classes</div>
+          <div>17 PlantVillage crop-condition classes</div>
+        </div>
+        <div>
+          <div class="text-xs font-medium mb-1" style="color:var(--ks-muted)">Input</div>
+          <div>1 RGB image, resized 224 × 224, pixels only</div>
+        </div>
+        <div>
+          <div class="text-xs font-medium mb-1" style="color:var(--ks-muted)">Macro-F1 (PlantVillage test)</div>
+          <div class="text-[var(--ks-amber)] italic">Not measured yet</div>
+        </div>
+        <div>
+          <div class="text-xs font-medium mb-1" style="color:var(--ks-muted)">CPU latency (median/p95)</div>
+          <div class="text-[var(--ks-amber)] italic">Not measured yet</div>
+        </div>
+        <div>
+          <div class="text-xs font-medium mb-1" style="color:var(--ks-muted)">PlantDoc cross-check</div>
+          <div class="text-[var(--ks-amber)] italic">Not measured yet (exploratory)</div>
+        </div>
+      </div>
+      <div class="px-4 pb-4">
+        <div class="text-xs rounded p-2" style="background:rgba(255,255,255,0.03);color:var(--ks-muted);">
+          Planned evaluation: macro-F1, balanced accuracy, per-class precision/recall, confusion matrix, crop-level accuracy. Group-preserving split using leaf_id metadata. Calibration status: not yet evaluated — scores are not calibrated probabilities until calibration is assessed.
+        </div>
+      </div>
+    </div>
+
+    <!-- Zoning -->
+    <div class="rounded-xl overflow-hidden mb-4" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+      <div class="px-4 py-3 border-b flex items-center gap-2" style="border-color:var(--ks-border);">
+        <span class="text-sm font-semibold">🗺️ Soil Zoning</span>
+        <span class="synthetic-badge">K-means · FCM</span>
+      </div>
+      <div class="p-4 grid gap-3 text-sm" style="grid-template-columns:1fr 1fr;">
+        <div>
+          <div class="text-xs font-medium mb-1" style="color:var(--ks-muted)">Features used</div>
+          <div>pH, EC, Soil Temp, N, P, K (moisture optional)</div>
+        </div>
+        <div>
+          <div class="text-xs font-medium mb-1" style="color:var(--ks-muted)">Preprocessing</div>
+          <div>Declared, versioned feature-wise normalization</div>
+        </div>
+        <div>
+          <div class="text-xs font-medium mb-1" style="color:var(--ks-muted)">Synthetic recovery (Adj. Rand)</div>
+          <div class="text-[var(--ks-amber)] italic">Not measured yet</div>
+        </div>
+        <div>
+          <div class="text-xs font-medium mb-1" style="color:var(--ks-muted)">Silhouette score</div>
+          <div class="text-[var(--ks-amber)] italic">Not measured yet — diagnostic only, not agronomic quality</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data -->
+    <div class="rounded-xl overflow-hidden mb-4" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+      <div class="px-4 py-3 border-b" style="border-color:var(--ks-border);">
+        <span class="text-sm font-semibold">📂 Datasets &amp; Splits</span>
+      </div>
+      <div class="p-4 text-sm">
+        <div class="mb-2"><span class="font-medium">PlantVillage</span> — Primary training/evaluation dataset. 17 classes. Group-preserving train/val/test split via leaf_id. Audit and confirmed class map pending.</div>
+        <div class="mb-2"><span class="font-medium">PlantDoc</span> — Exploratory cross-dataset check only. Labels must be audited; only exact supported-class matches included. Coverage reported separately.</div>
+        <div><span class="font-medium">Synthetic soil grid</span> — Fixed-seed 18×12, spatially coherent, seed #42. Not independently randomized per cell. No real farm data.</div>
+      </div>
+    </div>
+
+    <!-- Known limits -->
+    <div class="rounded-xl overflow-hidden" style="background:rgba(212,160,23,0.06);border:1px solid rgba(212,160,23,0.25);">
+      <div class="px-4 py-3 border-b" style="border-color:rgba(212,160,23,0.25);">
+        <span class="text-sm font-semibold" style="color:var(--ks-amber)">⚠ Known Limitations</span>
+      </div>
+      <ul class="p-4 text-sm space-y-2" style="color:var(--ks-muted);">
+        <li>• Soil field is purely synthetic — not sensor telemetry or field measurements.</li>
+        <li>• Crop compatibility shows only supported factors (pH, EC, Temp, N, P, K). Calcium, micronutrients, climate, drainage, and other FAO suitability factors are absent.</li>
+        <li>• Leaf classifier supports only 17 PlantVillage classes. Performance on field photos is not evaluated.</li>
+        <li>• Cluster IDs do not identify crops. FCM membership is not confidence or probability.</li>
+        <li>• No calibrated crop-success probability in this demo — requires outcome data and independent validation.</li>
+        <li>• Geographic area (acres/hectares) is not shown — the mock grid has no declared cell dimensions.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ═══════════════════════════════════════════
+     SCENARIO CHOOSER MODAL
+════════════════════════════════════════════ -->
+<div id="scenario-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden" style="background:rgba(0,0,0,0.7);">
+  <div class="rounded-2xl p-6 max-w-md w-full mx-4 fade-in" style="background:var(--ks-card);border:1px solid var(--ks-border);">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-semibold">Choose Scenario</h3>
+      <button onclick="closeScenarioChooser()" class="text-[var(--ks-muted)] hover:text-[var(--ks-text)]">✕</button>
+    </div>
+    <div class="space-y-2 mb-4">
+      <button onclick="selectScenario('baseline')" class="w-full text-left rounded-xl px-4 py-3 hover:border-[var(--ks-cyan)] transition-all" style="background:rgba(57,197,207,0.08);border:1px solid var(--ks-cyan);">
+        <div class="font-medium text-sm">Garden East — Baseline</div>
+        <div class="text-xs mt-0.5" style="color:var(--ks-muted);">Seed #42 · original field · Focus: Nitrogen</div>
+      </button>
+      <button onclick="selectScenario('lowN')" class="w-full text-left rounded-xl px-4 py-3 hover:border-[var(--ks-ochre)] transition-all" style="background:var(--ks-surface);border:1px solid var(--ks-border);">
+        <div class="font-medium text-sm">Low Nitrogen Patch</div>
+        <div class="text-xs mt-0.5" style="color:var(--ks-muted);">Rows 4–8, cols 3–7: N −18 mg/kg · Focus: Nitrogen</div>
+      </button>
+      <button onclick="selectScenario('highEC')" class="w-full text-left rounded-xl px-4 py-3 hover:border-[var(--ks-ochre)] transition-all" style="background:var(--ks-surface);border:1px solid var(--ks-border);">
+        <div class="font-medium text-sm">High Salinity / EC Pocket</div>
+        <div class="text-xs mt-0.5" style="color:var(--ks-muted);">Rows 7–11, cols 7–10: EC +1.20 dS/m · Focus: EC</div>
+      </button>
+      <button onclick="selectScenario('acidicWash')" class="w-full text-left rounded-xl px-4 py-3 hover:border-[var(--ks-ochre)] transition-all" style="background:var(--ks-surface);border:1px solid var(--ks-border);">
+        <div class="font-medium text-sm">Acidic Wash</div>
+        <div class="text-xs mt-0.5" style="color:var(--ks-muted);">Rows 12–16, cols 3–6: pH −0.8 · Focus: pH</div>
+      </button>
+    </div>
+    <div class="text-xs" style="color:var(--ks-muted);">All values are synthetic demo values — not agronomic thresholds or advice. "Baseline" does not mean agronomically optimal.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════ -->
+<script>
+// ── STATE ──────────────────────────────────────────────────────────
+const ROWS = 12, COLS = 18;
+const FEATURES = {
+  nitrogen:    { label: 'Nitrogen', unit: 'mg/kg', min: 0,   max: 250, step: 1,   defaultVal: 55, color: '#39c5cf' },
+  phosphorus:  { label: 'Phosphorus', unit: 'mg/kg', min: 0, max: 250, step: 1,   defaultVal: 25, color: '#3fb950' },
+  potassium:   { label: 'Potassium', unit: 'mg/kg', min: 0,  max: 250, step: 1,   defaultVal: 120, color: '#c9954c' },
+  pH:          { label: 'pH', unit: '',             min: 3.0, max: 9.5, step: 0.1, defaultVal: 6.4, color: '#d4a017' },
+  ec:          { label: 'EC', unit: 'dS/m',         min: 0,   max: 8,   step: 0.01, defaultVal: 1.2, color: '#f85149' },
+  soilTemp:    { label: 'Soil Temp', unit: '°C',    min: 0,   max: 50,  step: 0.1, defaultVal: 22, color: '#7c6fff' },
+};
+
+let state = {
+  activeScenario: 'baseline',
+  activeFeature: 'nitrogen',
+  mapMode: 'soil',
+  interactMode: 'inspect',
+  selectedCell: null,
+  cells: [],
+  history: [],
+  historyIndex: -1,
+  zoningSampleLoaded: false,
+  zoningMethod: 'kmeans',
+  zoningK: 3,
+  selectedZone: null,
+  sampleInputFingerprint: null,
+  currentFingerprint: null,
+  leafSampleLoaded: false,
+  brushActive: false,
+  brushStroke: [],
+};
+
+// Seeded RNG (mulberry32)
+function mulberry32(seed) {
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function generateField(scenario) {
+  const rng = mulberry32(42);
+  const cells = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      // Spatially coherent noise: use smooth blending
+      const nx = c / COLS, ny = r / ROWS;
+      const wave = Math.sin(nx * 3.14) * Math.cos(ny * 2.71) * 0.3 + rng() * 0.7;
+      cells.push({
+        row: r, col: c,
+        nitrogen:   clamp(Math.round(55 + wave * 40 + rng() * 10), 0, 250),
+        phosphorus: clamp(Math.round(25 + wave * 15 + rng() * 8), 0, 250),
+        potassium:  clamp(Math.round(120 + wave * 30 + rng() * 15), 0, 250),
+        pH:         clamp(parseFloat((6.4 + wave * 0.6 + (rng()-0.5) * 0.4).toFixed(1)), 3.0, 9.5),
+        ec:         clamp(parseFloat((1.2 + wave * 0.4 + rng() * 0.2).toFixed(2)), 0, 8),
+        soilTemp:   clamp(parseFloat((22 + wave * 4 + rng() * 2).toFixed(1)), 0, 50),
+      });
+    }
+  }
+
+  // Apply scenario patches
+  if (scenario === 'lowN') {
+    cells.forEach(cell => {
+      if (cell.row+1 >= 4 && cell.row+1 <= 8 && cell.col+1 >= 3 && cell.col+1 <= 7) {
+        cell.nitrogen = clamp(cell.nitrogen - 18, 0, 250);
+      }
+    });
+  } else if (scenario === 'highEC') {
+    cells.forEach(cell => {
+      if (cell.row+1 >= 7 && cell.row+1 <= 11 && cell.col+1 >= 7 && cell.col+1 <= 10) {
+        cell.ec = clamp(parseFloat((cell.ec + 1.20).toFixed(2)), 0, 8);
+      }
+    });
+  } else if (scenario === 'acidicWash') {
+    cells.forEach(cell => {
+      if (cell.row+1 >= 12 && cell.row+1 <= 16 && cell.col+1 >= 3 && cell.col+1 <= 6) {
+        cell.pH = clamp(parseFloat((cell.pH - 0.8).toFixed(1)), 3.0, 9.5);
+      }
+    });
+  }
+  return cells;
+}
+
+function clamp(v, mn, mx) { return Math.min(mx, Math.max(mn, v)); }
+
+function getFingerprint() {
+  return state.cells.map(c => `${c.nitrogen}|${c.pH}|${c.ec}|${c.phosphorus}|${c.potassium}|${c.soilTemp}`).join(',');
+}
+
+// Mock zone assignments (k=3 and k=4)
+function getMockZones(method, k) {
+  const rng = mulberry32(method === 'fcm' ? 123 : 99);
+  return Array.from({length: ROWS * COLS}, (_, i) => {
+    const r = Math.floor(i / COLS), c = i % COLS;
+    // Simple spatial zone assignment for demo
+    const nx = c / COLS, ny = r / ROWS;
+    const val = nx * 0.6 + ny * 0.4 + rng() * 0.1;
+    return Math.min(k-1, Math.floor(val * k));
+  });
+}
+
+// ── INIT ───────────────────────────────────────────────────────────
+function init() {
+  state.cells = generateField('baseline');
+  state.currentFingerprint = getFingerprint();
+  drawOverviewCanvas();
+  initFieldCanvas();
+  renderField();
+  updateHistoryUI();
+  document.addEventListener('keydown', handleKeydown);
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────────
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.remove('active');
+    b.style.color = 'var(--ks-muted)';
+  });
+  document.getElementById('page-' + page).classList.add('active');
+  const navBtn = document.getElementById('nav-' + page);
+  navBtn.classList.add('active');
+  navBtn.style.color = '';
+  if (page === 'fieldlab') { resizeCanvas(); renderField(); }
+}
+
+// ── OVERVIEW CANVAS (procedural, no CDN) ──────────────────────────
+function drawOverviewCanvas() {
+  const canvas = document.getElementById('overview-canvas');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.offsetWidth || 600;
+  const H = 280;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // Background gradient
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#0d1117');
+  bg.addColorStop(1, '#101820');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw isometric mini-field vignette
+  const tileW = 18, tileH = 9;
+  const ox = W * 0.55, oy = H * 0.75;
+  const rng = mulberry32(42);
+  const palette = ['#1a3a5c','#1e4d6b','#23607a','#2a7a8a','#39c5cf','#2d9a8a','#3fb950','#c9954c','#8b5e3c'];
+  const isoRows = 10, isoCols = 18;
+  for (let r = isoRows-1; r >= 0; r--) {
+    for (let c = 0; c < isoCols; c++) {
+      const nx = c/isoCols, ny = r/isoRows;
+      const val = Math.sin(nx*3.14)*Math.cos(ny*2.71)*0.4 + rng()*0.6;
+      const pidx = Math.floor(clamp(val, 0, 0.999) * palette.length);
+      const color = palette[pidx];
+      const sx = ox + (c - r) * tileW * 0.5;
+      const sy = oy + (c + r) * tileH * 0.5;
+      // iso tile top face
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + tileW/2, sy + tileH/2);
+      ctx.lineTo(sx + tileW, sy);
+      ctx.lineTo(sx + tileW/2, sy - tileH/2);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.75;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // Overlay vignette
+  const vg = ctx.createRadialGradient(W*0.3, H*0.3, 0, W*0.5, H*0.5, W*0.7);
+  vg.addColorStop(0, 'rgba(13,17,23,0)');
+  vg.addColorStop(1, 'rgba(13,17,23,0.85)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ── FIELD CANVAS ───────────────────────────────────────────────────
+const CELL_W = 22, CELL_H = 11; // iso tile dimensions
+let fieldCanvas, fieldCtx, fieldW, fieldH;
+let camera = { ox: 0, oy: 0, zoom: 1 };
+let hoveredCell = null;
+let dragState = null;
+let brushCells = new Set();
+
+function initFieldCanvas() {
+  fieldCanvas = document.getElementById('field-canvas');
+  fieldCtx = fieldCanvas.getContext('2d');
+  resizeCanvas();
+  fieldCanvas.addEventListener('mousemove', onFieldMouseMove);
+  fieldCanvas.addEventListener('mousedown', onFieldMouseDown);
+  fieldCanvas.addEventListener('mouseup', onFieldMouseUp);
+  fieldCanvas.addEventListener('mouseleave', () => {
+    hoveredCell = null;
+    document.getElementById('cell-tooltip').classList.add('hidden');
+    if (state.brushActive) cancelBrush();
+  });
+  fieldCanvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    camera.zoom = clamp(camera.zoom * (e.deltaY < 0 ? 1.1 : 0.9), 0.3, 3.0);
+    renderField();
+  }, { passive: false });
+  window.addEventListener('resize', () => { resizeCanvas(); renderField(); });
+}
+
+function resizeCanvas() {
+  if (!fieldCanvas) return;
+  const rect = fieldCanvas.parentElement.getBoundingClientRect();
+  fieldW = rect.width || 600;
+  fieldH = rect.height || 400;
+  const dpr = window.devicePixelRatio || 1;
+  fieldCanvas.width = fieldW * dpr;
+  fieldCanvas.height = fieldH * dpr;
+  fieldCanvas.style.width = fieldW + 'px';
+  fieldCanvas.style.height = fieldH + 'px';
+  fieldCtx.scale(dpr, dpr);
+  fitCamera();
+}
+
+function fitCamera() {
+  // Center the isometric grid
+  const gridW = (COLS + ROWS) * CELL_W * 0.5;
+  const gridH = (COLS + ROWS) * CELL_H * 0.5;
+  camera.zoom = Math.min(fieldW / (gridW + 80), fieldH / (gridH + 80), 1.5);
+  camera.ox = fieldW / 2 - (COLS - ROWS) * CELL_W * 0.25 * camera.zoom;
+  camera.oy = fieldH * 0.38 - gridH * 0.05 * camera.zoom;
+  renderField();
+}
+
+function cellToIso(r, c) {
+  const x = (c - r) * CELL_W * 0.5 * camera.zoom + camera.ox;
+  const y = (c + r) * CELL_H * 0.5 * camera.zoom + camera.oy;
+  return { x, y };
+}
+
+function getFeatureValue(cell, feature) { return cell[feature]; }
+
+function getFeatureColor(val, feature) {
+  const f = FEATURES[feature];
+  const t = (val - f.min) / (f.max - f.min);
+  // Interpolate from deep blue to cyan
+  const r = Math.round(lerp(0x1a, 0x39, t));
+  const g = Math.round(lerp(0x2f, 0xc5, t));
+  const b = Math.round(lerp(0x5c, 0xcf, t));
+  return `rgb(${r},${g},${b})`;
+}
+
+function lerp(a, b, t) { return a + (b - a) * clamp(t, 0, 1); }
+
+const ZONE_COLORS = [
+  { top: 'rgba(57,197,207,0.8)',   side: 'rgba(30,100,110,0.9)'  },
+  { top: 'rgba(63,185,80,0.8)',    side: 'rgba(30,100,50,0.9)'   },
+  { top: 'rgba(201,149,76,0.8)',   side: 'rgba(120,80,30,0.9)'   },
+  { top: 'rgba(139,92,246,0.8)',   side: 'rgba(80,50,150,0.9)'   },
+];
+
+let mockZoneAssignments = null;
+
+function renderField() {
+  if (!fieldCtx) return;
+  const ctx = fieldCtx;
+  ctx.clearRect(0, 0, fieldW, fieldH);
+
+  // Background
+  ctx.fillStyle = '#0a0e14';
+  ctx.fillRect(0, 0, fieldW, fieldH);
+
+  const tw = CELL_W * camera.zoom;
+  const th = CELL_H * camera.zoom;
+  const liftH = 8 * camera.zoom;
+
+  // Draw cells back-to-front (painter's algorithm)
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const idx = r * COLS + c;
+      const cell = state.cells[idx];
+      const { x, y } = cellToIso(r, c);
+      const isSelected = state.selectedCell && state.selectedCell.row === r && state.selectedCell.col === c;
+      const isHovered = hoveredCell && hoveredCell.row === r && hoveredCell.col === c;
+      const isBrushTouched = brushCells.has(idx);
+
+      let baseColor, sideColor;
+
+      if (state.mapMode === 'soil') {
+        const val = getFeatureValue(cell, state.activeFeature);
+        baseColor = getFeatureColor(val, state.activeFeature);
+        sideColor = '#0e2230';
+      } else if (state.mapMode === 'zoning' && mockZoneAssignments) {
+        const zone = mockZoneAssignments[idx];
+        const dimmed = state.selectedZone !== null && state.selectedZone !== zone;
+        const zc = ZONE_COLORS[zone % ZONE_COLORS.length];
+        baseColor = dimmed ? 'rgba(40,50,60,0.6)' : zc.top;
+        sideColor = dimmed ? 'rgba(20,25,30,0.6)' : zc.side;
+      } else {
+        baseColor = '#1a2a3a';
+        sideColor = '#0e1a25';
+      }
+
+      // Lift for hover
+      const lift = isHovered ? 6 * camera.zoom : (isSelected ? 4 * camera.zoom : 0);
+      const py = y - lift;
+
+      // Top face
+      ctx.beginPath();
+      ctx.moveTo(x, py);
+      ctx.lineTo(x + tw/2, py + th/2);
+      ctx.lineTo(x + tw, py);
+      ctx.lineTo(x + tw/2, py - th/2);
+      ctx.closePath();
+      ctx.fillStyle = isBrushTouched ? 'rgba(201,149,76,0.6)' : baseColor;
+      ctx.fill();
+      ctx.strokeStyle = isSelected ? '#39c5cf' : 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = isSelected ? 1.5 : 0.5;
+      ctx.stroke();
+
+      // Front-left face
+      ctx.beginPath();
+      ctx.moveTo(x, py);
+      ctx.lineTo(x, py + liftH);
+      ctx.lineTo(x + tw/2, py + th/2 + liftH);
+      ctx.lineTo(x + tw/2, py + th/2);
+      ctx.closePath();
+      ctx.fillStyle = sideColor;
+      ctx.fill();
+
+      // Front-right face
+      ctx.beginPath();
+      ctx.moveTo(x + tw, py);
+      ctx.lineTo(x + tw, py + liftH);
+      ctx.lineTo(x + tw/2, py + th/2 + liftH);
+      ctx.lineTo(x + tw/2, py + th/2);
+      ctx.closePath();
+      ctx.fillStyle = adjustBrightness(sideColor, 0.7);
+      ctx.fill();
+
+      // Corner brackets for selected
+      if (isSelected) drawCornerBrackets(ctx, x, py, tw, th);
+
+      // Zoning label in zone center cells
+      if (state.mapMode === 'zoning' && mockZoneAssignments) {
+        const zone = mockZoneAssignments[idx];
+        if (r === 5 && c === (zone === 0 ? 3 : zone === 1 ? 9 : zone === 2 ? 15 : 6)) {
+          const dimmed = state.selectedZone !== null && state.selectedZone !== zone;
+          if (!dimmed) {
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.font = `bold ${Math.max(8, 10 * camera.zoom)}px system-ui`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`Z${zone+1}`, x + tw/2, py - 2);
+          }
+        }
+      }
+    }
+  }
+
+  // Sensor markers (illustrative)
+  const sensorPositions = [[2,4],[8,14],[5,9],[10,3]];
+  sensorPositions.forEach(([r,c]) => {
+    const {x,y} = cellToIso(r, c);
+    ctx.beginPath();
+    ctx.arc(x + CELL_W * camera.zoom * 0.5, y - 12 * camera.zoom, 4 * camera.zoom, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(57,197,207,0.5)';
+    ctx.fill();
+    ctx.strokeStyle = '#39c5cf';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+}
+
+function adjustBrightness(color, factor) {
+  // Simple darkening for side faces
+  return 'rgba(10,20,30,0.8)';
+}
+
+function drawCornerBrackets(ctx, x, y, tw, th) {
+  const bs = 5 * camera.zoom;
+  ctx.strokeStyle = '#39c5cf';
+  ctx.lineWidth = 1.5;
+  // top-left corner
+  [[x, y, 1, 0], [x, y, 0, 1], [x+tw, y, -1, 0], [x+tw, y, 0, 1],
+   [x+tw/2, y-th/2, 0.7, 0.35], [x+tw/2, y+th/2, 0, -1]].forEach(([px, py, dx, dy], i) => {
+    if (i < 4) {
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px + dx * bs, py);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px, py + dy * bs);
+      ctx.stroke();
+    }
+  });
+}
+
+function screenToCell(sx, sy) {
+  // Invert isometric projection
+  const tx = (sx - camera.ox) / camera.zoom;
+  const ty = (sy - camera.oy) / camera.zoom;
+  // Iso: x = (c-r)*CELL_W/2, y = (c+r)*CELL_H/2
+  const c = Math.round((tx/CELL_W + ty/CELL_H));
+  const r = Math.round((ty/CELL_H - tx/CELL_W));
+  if (r >= 0 && r < ROWS && c >= 0 && c < COLS) return { row: r, col: c };
+  return null;
+}
+
+function onFieldMouseMove(e) {
+  const rect = fieldCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const cell = screenToCell(x, y);
+  hoveredCell = cell;
+
+  // Update tooltip
+  const tooltip = document.getElementById('cell-tooltip');
+  if (cell) {
+    tooltip.textContent = `R${cell.row+1} C${cell.col+1}`;
+    tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
+    tooltip.style.top = (e.clientY - rect.top + 10) + 'px';
+    tooltip.classList.remove('hidden');
+  } else {
+    tooltip.classList.add('hidden');
+  }
+
+  // Brush drag
+  if (state.brushActive && dragState && dragState.button === 0) {
+    if (cell) applyBrushCell(cell);
+  }
+
+  // Pan drag
+  if (dragState && dragState.type === 'pan') {
+    camera.ox += e.clientX - dragState.lastX;
+    camera.oy += e.clientY - dragState.lastY;
+    dragState.lastX = e.clientX;
+    dragState.lastY = e.clientY;
+  }
+
+  renderField();
+}
+
+function onFieldMouseDown(e) {
+  const rect = fieldCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const cell = screenToCell(x, y);
+
+  if (state.interactMode === 'inspect' && e.button === 0) {
+    if (cell) selectCell(cell);
+    if (e.button === 2 || (e.button === 0 && !cell)) dragState = { type: 'pan', lastX: e.clientX, lastY: e.clientY };
+  } else if (state.interactMode === 'brush') {
+    if (e.button === 0) {
+      state.brushActive = true;
+      brushCells.clear();
+      dragState = { button: 0 };
+      if (cell) applyBrushCell(cell);
+    } else if (e.button === 2) {
+      dragState = { type: 'pan', lastX: e.clientX, lastY: e.clientY };
+    }
+  }
+
+  // Orbit (right drag in inspect mode)
+  if (e.button === 2 || (state.interactMode === 'inspect' && e.button === 0 && !cell)) {
+    dragState = { type: 'pan', lastX: e.clientX, lastY: e.clientY };
+  }
+}
+
+function onFieldMouseUp(e) {
+  if (state.brushActive && brushCells.size > 0) {
+    commitBrushStroke();
+  }
+  state.brushActive = false;
+  dragState = null;
+  brushCells.clear();
+  renderField();
+}
+
+function applyBrushCell(cell) {
+  const idx = cell.row * COLS + cell.col;
+  const size = parseInt(document.getElementById('brush-size').value);
+  const dir = document.getElementById('brush-dir').value;
+  const strength = document.getElementById('brush-str').value;
+  const f = FEATURES[state.activeFeature];
+  const pct = { light: 0.02, medium: 0.05, strong: 0.10 }[strength];
+  const delta = (f.max - f.min) * pct * (dir === 'raise' ? 1 : -1);
+  const rad = Math.floor(size / 2);
+
+  for (let dr = -rad; dr <= rad; dr++) {
+    for (let dc = -rad; dc <= rad; dc++) {
+      const nr = cell.row + dr, nc = cell.col + dc;
+      if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+        const ni = nr * COLS + nc;
+        const taper = 1 - (Math.abs(dr) + Math.abs(dc)) / (rad * 2 + 1);
+        const taperedDelta = delta * taper;
+        brushCells.add(ni);
+        const newVal = clamp(
+          state.cells[ni][state.activeFeature] + taperedDelta,
+          f.min, f.max
+        );
+        // Round to step precision
+        const precision = f.step < 1 ? Math.round(-Math.log10(f.step)) : 0;
+        state.cells[ni][state.activeFeature] = parseFloat(newVal.toFixed(precision));
+      }
+    }
+  }
+
+  checkInputsChanged();
+}
+
+function commitBrushStroke() {
+  const affectedCells = [...brushCells];
+  addHistory(`Brush ${document.getElementById('brush-dir').value} ${state.activeFeature} (${affectedCells.length} cells)`);
+}
+
+function cancelBrush() {
+  state.brushActive = false;
+  brushCells.clear();
+  renderField();
+}
+
+function checkInputsChanged() {
+  state.currentFingerprint = getFingerprint();
+  const changed = state.zoningSampleLoaded && state.sampleInputFingerprint !== state.currentFingerprint;
+  document.getElementById('inputs-changed-notice').classList.toggle('hidden', !changed);
+}
+
+// ── CELL SELECTION & INSPECTOR ─────────────────────────────────────
+function selectCell(cell) {
+  state.selectedCell = cell;
+  updateInspector();
+}
+
+function updateInspector() {
+  const label = document.getElementById('inspector-cell-label');
+  const content = document.getElementById('inspector-content');
+  if (!state.selectedCell) {
+    label.textContent = 'No cell selected';
+    content.innerHTML = '<span>Click a cell on the field to inspect its values.</span>';
+    return;
+  }
+  const { row, col } = state.selectedCell;
+  const idx = row * COLS + col;
+  const cell = state.cells[idx];
+  label.textContent = `R${row+1} C${col+1}`;
+
+  const rows = [
+    ['pH', cell.pH.toFixed(1), '', 'synthetic'],
+    ['N', cell.nitrogen, 'mg/kg', 'synthetic'],
+    ['P', cell.phosphorus, 'mg/kg', 'synthetic'],
+    ['K', cell.potassium, 'mg/kg', 'synthetic'],
+    ['EC', cell.ec.toFixed(2), 'dS/m', 'synthetic'],
+    ['Soil Temp', cell.soilTemp.toFixed(1), '°C', 'synthetic'],
+  ];
+
+  content.innerHTML = `
+    <table class="w-full">
+      <tbody>
+        ${rows.map(([name, val, unit, src]) => `
+          <tr class="border-b" style="border-color:var(--ks-border)">
+            <td class="py-1.5 pr-2" style="color:var(--ks-muted)">${name}</td>
+            <td class="py-1.5 tabular font-medium">${val} <span style="color:var(--ks-muted)">${unit}</span></td>
+            <td class="py-1.5 text-right text-xs" style="color:var(--ks-border)">${src}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <div class="mt-2 text-xs italic" style="color:var(--ks-border)">Illustrative values · not agronomic thresholds</div>
+  `;
+}
+
+// ── MAP MODE ───────────────────────────────────────────────────────
+function setMapMode(mode) {
+  state.mapMode = mode;
+  ['soil','zoning','membership'].forEach(m => {
+    const btn = document.getElementById('mode-' + m);
+    if (!btn) return;
+    if (m === mode) {
+      btn.style.background = 'rgba(57,197,207,0.15)';
+      btn.style.color = 'var(--ks-cyan)';
+    } else {
+      btn.style.background = '';
+      btn.style.color = m === 'membership' ? 'var(--ks-border)' : 'var(--ks-muted)';
+    }
+  });
+  document.getElementById('feature-selector-wrap').style.display = mode === 'soil' ? 'flex' : 'none';
+  updateLegend();
+  renderField();
+}
+
+function setActiveFeature(feat) {
+  state.activeFeature = feat;
+  updateLegend();
+  renderField();
+}
+
+function updateLegend() {
+  const f = FEATURES[state.activeFeature];
+  const titleEl = document.getElementById('legend-title');
+  const minEl = document.getElementById('legend-min');
+  const maxEl = document.getElementById('legend-max');
+  const typeEl = document.getElementById('legend-type');
+  const gradEl = document.getElementById('legend-gradient-bar');
+
+  if (state.mapMode === 'soil') {
+    titleEl.textContent = f.label;
+    minEl.textContent = `${f.min} ${f.unit}`;
+    maxEl.textContent = `${f.max} ${f.unit}`;
+    typeEl.textContent = '· synthetic ·';
+    gradEl.style.background = `linear-gradient(to right, #1a3a5c, ${f.color})`;
+  } else if (state.mapMode === 'zoning') {
+    titleEl.textContent = 'Zone map';
+    minEl.textContent = 'Zone 1';
+    maxEl.textContent = `Zone ${state.zoningK}`;
+    typeEl.textContent = '· crop-neutral ·';
+    gradEl.style.background = `linear-gradient(to right, rgba(57,197,207,0.8), rgba(63,185,80,0.8), rgba(201,149,76,0.8))`;
+  }
+}
+
+// ── INTERACT MODE ──────────────────────────────────────────────────
+function setInteractMode(mode) {
+  state.interactMode = mode;
+  const brushOpts = document.getElementById('brush-opts');
+  const brushBtn = document.getElementById('imode-brush');
+  const inspBtn = document.getElementById('imode-inspect');
+  fieldCanvas.className = mode === 'brush' ? 'brush-mode w-full h-full' : 'w-full h-full';
+  brushOpts.classList.toggle('hidden', mode !== 'brush');
+
+  if (mode === 'brush') {
+    brushBtn.style.background = 'rgba(201,149,76,0.15)';
+    brushBtn.style.color = 'var(--ks-ochre)';
+    inspBtn.style.background = '';
+    inspBtn.style.color = 'var(--ks-muted)';
+  } else {
+    inspBtn.style.background = 'rgba(57,197,207,0.15)';
+    inspBtn.style.color = 'var(--ks-cyan)';
+    brushBtn.style.background = '';
+    brushBtn.style.color = 'var(--ks-muted)';
+  }
+}
+
+// ── PRESETS ────────────────────────────────────────────────────────
+function applyPreset(preset) {
+  const snap = state.cells.map(c => ({...c}));
+  
+  if (preset === 'lowN') {
+    let anyChange = false;
+    state.cells.forEach(cell => {
+      if (cell.row+1 >= 4 && cell.row+1 <= 8 && cell.col+1 >= 3 && cell.col+1 <= 7) {
+        const newN = clamp(cell.nitrogen - 18, 0, 250);
+        if (newN !== cell.nitrogen) { cell.nitrogen = newN; anyChange = true; }
+      }
+    });
+    if (!anyChange) return;
+    state.activeFeature = 'nitrogen';
+    document.getElementById('feature-select').value = 'nitrogen';
+    addHistory('Preset: Low Nitrogen Patch (N −18 mg/kg, rows 4–8, cols 3–7)');
+  } else if (preset === 'highEC') {
+    let anyChange = false;
+    state.cells.forEach(cell => {
+      if (cell.row+1 >= 7 && cell.row+1 <= 11 && cell.col+1 >= 7 && cell.col+1 <= 10) {
+        const newEC = clamp(parseFloat((cell.ec + 1.20).toFixed(2)), 0, 8);
+        if (newEC !== cell.ec) { cell.ec = newEC; anyChange = true; }
+      }
+    });
+    if (!anyChange) return;
+    state.activeFeature = 'ec';
+    document.getElementById('feature-select').value = 'ec';
+    addHistory('Preset: High Salinity/EC Pocket (EC +1.20 dS/m, rows 7–11, cols 7–10)');
+  } else if (preset === 'acidicWash') {
+    let anyChange = false;
+    state.cells.forEach(cell => {
+      if (cell.row+1 >= 12 && cell.row+1 <= 16 && cell.col+1 >= 3 && cell.col+1 <= 6) {
+        const newPH = clamp(parseFloat((cell.pH - 0.8).toFixed(1)), 3.0, 9.5);
+        if (newPH !== cell.pH) { cell.pH = newPH; anyChange = true; }
+      }
+    });
+    if (!anyChange) return;
+    state.activeFeature = 'pH';
+    document.getElementById('feature-select').value = 'pH';
+    addHistory('Preset: Acidic Wash (pH −0.8, rows 12–16, cols 3–6)');
+  }
+
+  updateLegend();
+  checkInputsChanged();
+  renderField();
+  if (state.selectedCell) updateInspector();
+}
+
+// ── HISTORY ────────────────────────────────────────────────────────
+function addHistory(label) {
+  const snap = state.cells.map(c => ({...c}));
+  // Trim redo
+  state.history = state.history.slice(0, state.historyIndex + 1);
+  state.history.push({ label, snap, feature: state.activeFeature });
+  state.historyIndex = state.history.length - 1;
+  state.currentFingerprint = getFingerprint();
+  checkInputsChanged();
+  updateHistoryUI();
+}
+
+function undoAction() {
+  if (state.historyIndex < 0) return;
+  const entry = state.history[state.historyIndex];
+  state.cells = entry.snap.map(c => ({...c}));
+  // Restore prior feature if available
+  if (state.historyIndex > 0) {
+    state.activeFeature = state.history[state.historyIndex - 1].feature;
+  } else {
+    state.activeFeature = 'nitrogen';
+  }
+  document.getElementById('feature-select').value = state.activeFeature;
+  state.historyIndex--;
+  state.currentFingerprint = getFingerprint();
+  updateLegend();
+  checkInputsChanged();
+  renderField();
+  updateInspector();
+  updateHistoryUI();
+}
+
+function redoAction() {
+  if (state.historyIndex >= state.history.length - 1) return;
+  state.historyIndex++;
+  const entry = state.history[state.historyIndex];
+  state.cells = entry.snap.map(c => ({...c}));
+  state.activeFeature = entry.feature;
+  document.getElementById('feature-select').value = state.activeFeature;
+  state.currentFingerprint = getFingerprint();
+  updateLegend();
+  checkInputsChanged();
+  renderField();
+  updateInspector();
+  updateHistoryUI();
+}
+
+function updateHistoryUI() {
+  const list = document.getElementById('history-list');
+  const undoBtn = document.getElementById('undo-btn');
+  const redoBtn = document.getElementById('redo-btn');
+
+  if (state.history.length === 0) {
+    list.innerHTML = '<span class="italic">No edits yet.</span>';
+  } else {
+    list.innerHTML = state.history.slice().reverse().map((h, i) => {
+      const realIdx = state.history.length - 1 - i;
+      const isCurrent = realIdx === state.historyIndex;
+      return `<div class="py-1 px-2 rounded text-xs ${isCurrent ? 'zone-0' : ''}" style="color:${isCurrent ? 'var(--ks-cyan)' : 'var(--ks-muted)'}">${h.label}</div>`;
+    }).join('');
+  }
+
+  undoBtn.disabled = state.historyIndex < 0;
+  redoBtn.disabled = state.historyIndex >= state.history.length - 1;
+}
+
+// ── ZONING ─────────────────────────────────────────────────────────
+function loadZoningSample() {
+  const method = document.getElementById('zone-method').value;
+  const k = parseInt(document.getElementById('zone-k').value);
+  state.zoningMethod = method;
+  state.zoningK = k;
+
+  mockZoneAssignments = getMockZones(method, k);
+  state.zoningSampleLoaded = true;
+  state.sampleInputFingerprint = getFingerprint();
+  state.currentFingerprint = state.sampleInputFingerprint;
+
+  document.getElementById('inputs-changed-notice').classList.add('hidden');
+  document.getElementById('zoning-state').textContent = '';
+  document.getElementById('zone-list').classList.remove('hidden');
+
+  // Build zone item list
+  const zoneItems = document.getElementById('zone-items');
+  const zoneCounts = Array(k).fill(0);
+  mockZoneAssignments.forEach(z => zoneCounts[z]++);
+  zoneItems.innerHTML = Array.from({length: k}, (_, i) => {
+    const colors = ['#39c5cf','#3fb950','#c9954c','#8b5cf6'];
+    return `
+      <div class="zone-list-item rounded px-2 py-2 cursor-pointer ${state.selectedZone === i ? 'selected' : ''}" onclick="selectZone(${i})">
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 rounded-sm flex-shrink-0" style="background:${colors[i]}"></div>
+          <span class="font-medium" style="color:var(--ks-text)">Zone ${i+1}</span>
+          <span class="ml-auto tabular text-xs" style="color:var(--ks-muted)">${zoneCounts[i]} cells</span>
+        </div>
+        <div class="text-xs mt-0.5" style="color:var(--ks-muted)">Not assessed · fixture data</div>
+      </div>
+    `;
+  }).join('');
+
+  setMapMode('zoning');
+  updateLegend();
+}
+
+function selectZone(zone) {
+  state.selectedZone = state.selectedZone === zone ? null : zone;
+  const items = document.querySelectorAll('.zone-list-item');
+  items.forEach((el, i) => el.classList.toggle('selected', i === state.selectedZone));
+  renderField();
+
+  // Update Crop Fit zone context
+  if (state.selectedZone !== null) {
+    document.getElementById('cropfit-no-zone').classList.add('hidden');
+    document.getElementById('cropfit-zone-context').classList.remove('hidden');
+    document.getElementById('cropfit-zone-summary').textContent =
+      `Zone ${state.selectedZone+1} · ${state.zoningMethod === 'kmeans' ? 'K-means' : 'FCM'} k=${state.zoningK} · fixture summary · Mean N: 48 mg/kg, pH: 6.4`;
+  } else {
+    document.getElementById('cropfit-no-zone').classList.remove('hidden');
+    document.getElementById('cropfit-zone-context').classList.add('hidden');
+  }
+}
+
+// ── SCENARIO CHOOSER ────────────────────────────────────────────────
+function openScenarioChooser() {
+  document.getElementById('scenario-modal').classList.remove('hidden');
+}
+function closeScenarioChooser() {
+  document.getElementById('scenario-modal').classList.add('hidden');
+}
+function selectScenario(scenario) {
+  state.activeScenario = scenario;
+  // Reset all demo-local state per spec
+  state.cells = generateField(scenario);
+  state.history = [];
+  state.historyIndex = -1;
+  state.selectedCell = null;
+  state.zoningSampleLoaded = false;
+  state.selectedZone = null;
+  state.sampleInputFingerprint = null;
+  mockZoneAssignments = null;
+  state.currentFingerprint = getFingerprint();
+
+  // Set focus feature
+  const focusMap = { baseline: 'nitrogen', lowN: 'nitrogen', highEC: 'ec', acidicWash: 'pH' };
+  state.activeFeature = focusMap[scenario];
+  document.getElementById('feature-select').value = state.activeFeature;
+
+  const nameMap = {
+    baseline: 'Garden East — Baseline',
+    lowN: 'Low Nitrogen Patch',
+    highEC: 'High Salinity / EC Pocket',
+    acidicWash: 'Acidic Wash',
+  };
+  const name = nameMap[scenario];
+  document.getElementById('scenario-badge').textContent = `SYNTHETIC SCENARIO: ${name} (Seed #42)`;
+  document.getElementById('ov-scenario-name').textContent = name;
+  document.getElementById('ov-focus-feature').textContent = FEATURES[state.activeFeature].label;
+
+  // Reset zoning UI
+  document.getElementById('zone-list').classList.add('hidden');
+  document.getElementById('zoning-state').textContent = 'No sample result loaded';
+  document.getElementById('inputs-changed-notice').classList.add('hidden');
+  document.getElementById('cropfit-no-zone').classList.remove('hidden');
+  document.getElementById('cropfit-zone-context').classList.add('hidden');
+
+  // Reset map mode
+  setMapMode('soil');
+  updateLegend();
+  updateHistoryUI();
+  renderField();
+  closeScenarioChooser();
+}
+
+function resetDemo() {
+  selectScenario('baseline');
+}
+
+// ── LEAF DIAGNOSIS ──────────────────────────────────────────────────
+function handleLeafFile(e) {
+  const file = e.target.files[0];
+  if (file) processLeafFile(file);
+}
+function handleLeafDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) processLeafFile(file);
+}
+function processLeafFile(file) {
+  const errEl = document.getElementById('leaf-error');
+  errEl.classList.add('hidden');
+
+  const allowed = ['image/jpeg','image/png','image/webp'];
+  if (!allowed.includes(file.type)) {
+    errEl.textContent = `Unsupported format: ${file.type || 'unknown'}. Please use JPEG, PNG, or WebP.`;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    errEl.textContent = `File too large (${(file.size/1024/1024).toFixed(1)} MB). Maximum is 10 MB.`;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const img = document.getElementById('leaf-preview');
+  const reader = new FileReader();
+  reader.onload = ev => {
+    img.src = ev.target.result;
+    img.classList.remove('hidden');
+    document.getElementById('leaf-drop-content').classList.add('hidden');
+    document.getElementById('leaf-clear-btn').classList.remove('hidden');
+    // Check megapixels
+    img.onload = () => {
+      if (img.naturalWidth * img.naturalHeight > 16e6) {
+        errEl.textContent = `Image resolution (${img.naturalWidth}×${img.naturalHeight}) exceeds 16 MP limit.`;
+        errEl.classList.remove('hidden');
+      }
+    };
+  };
+  reader.readAsDataURL(file);
+}
+function clearLeafPreview() {
+  const img = document.getElementById('leaf-preview');
+  img.src = '';
+  img.classList.add('hidden');
+  document.getElementById('leaf-drop-content').classList.remove('hidden');
+  document.getElementById('leaf-clear-btn').classList.add('hidden');
+  document.getElementById('leaf-error').classList.add('hidden');
+  document.getElementById('leaf-input').value = '';
+}
+function loadLeafSample() {
+  document.getElementById('leaf-sample-empty').classList.add('hidden');
+  document.getElementById('leaf-sample-result').classList.remove('hidden');
+  document.getElementById('leaf-sample-clear').classList.remove('hidden');
+}
+function clearLeafSample() {
+  document.getElementById('leaf-sample-empty').classList.remove('hidden');
+  document.getElementById('leaf-sample-result').classList.add('hidden');
+  document.getElementById('leaf-sample-clear').classList.add('hidden');
+}
+
+// ── KEYBOARD ────────────────────────────────────────────────────────
+function handleKeydown(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoAction(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redoAction(); }
+  if (e.key === 'f' || e.key === 'F') { e.preventDefault(); fitCamera(); }
+  if (e.key === 'Escape') { cancelBrush(); }
+  // Arrow key cell navigation
+  if (state.selectedCell && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+    e.preventDefault();
+    let { row, col } = state.selectedCell;
+    if (e.key === 'ArrowUp') row = Math.max(0, row - 1);
+    if (e.key === 'ArrowDown') row = Math.min(ROWS-1, row + 1);
+    if (e.key === 'ArrowLeft') col = Math.max(0, col - 1);
+    if (e.key === 'ArrowRight') col = Math.min(COLS-1, col + 1);
+    state.selectedCell = { row, col };
+    updateInspector();
+    renderField();
+  }
+  if (e.key === 'Enter' || e.key === ' ') {
+    if (state.interactMode === 'brush' && state.selectedCell) {
+      applyBrushCell(state.selectedCell);
+      commitBrushStroke();
+      brushCells.clear();
+      renderField();
+    }
+  }
+}
+
+// ── START ──────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  init();
+  updateLegend();
+});
+window.addEventListener('resize', drawOverviewCanvas);
+</script>
+</body>
+</html>

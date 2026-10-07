@@ -1,6 +1,6 @@
 # Decision 0001: functional field and 3D assets
 
-**Status:** accepted for the MVP planning baseline
+**Status:** accepted for the functional-field architecture; the no-model bundling restriction is superseded by [Decision 0003](0003-decorative-kenney-assets.md)
 **Date:** 2026-10-06
 
 ## Context
@@ -19,7 +19,7 @@ Any future GLB must meet [the budgets and asset policy in the TRD](../TRD.md#per
 
 - The field remains data-responsive and the 2D mode remains useful for every core task.
 - Repeated geometry must be instanced and share materials; profiling must verify the stated limits.
-- The manifest records zero downloaded models. A future CC0 source does not approve an individual asset unless it also passes the need and performance checks.
+- At the time of this decision, the manifest recorded zero downloaded models. [Decision 0003](0003-decorative-kenney-assets.md) later approves small Kenney accents; functional visuals remain procedural.
 - The implementation needs a consistent palette and geometry vocabulary shared by 2D and 3D.
 
 ## Alternatives considered

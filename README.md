@@ -10,15 +10,18 @@ KshetraSense is a pre-build plan for a local, interactive applied-ML demonstrato
 | [UX specification](docs/UX-SPEC.md) | Screens, journeys, interactions, visual behavior, accessibility, and responsive behavior. |
 | [Technical requirements](docs/TRD.md) | Architecture, domain contracts, 3D implementation, performance and asset budgets, and technical verification. |
 | [Delivery plan](docs/DELIVERY.md) | Build phases, release acceptance criteria, evidence needed, assumptions, and risks. |
+| [Frontend implementation plan](docs/FRONTEND-IMPLEMENTATION-PLAN.md) | Agent-ready implementation contract for the polished React/R3F frontend, contextual Crop Fit, fixture state, motion, and validation. |
 | [Crop-suitability research](docs/research/crop-suitability-probability.md) | Evidence on suitability classes, percentages, probability semantics, and the data needed for cultivation probabilities. |
+| [External 3D asset research](docs/research/external-3d-asset-sources.md) | Source review and selected Kenney decorative assets; functional geometry stays procedural. |
 | [Decision 0001](docs/decisions/0001-functional-field-and-assets.md) | Why the functional field uses R3F and why functional visuals are procedural. |
 | [Decision 0002](docs/decisions/0002-mock-data-demo-first.md) | The clickable mock-data demo that comes before the sequential implementation phases. |
-| [3D asset manifest](assets/3d/asset-manifest.json) | Machine-readable inventory and limits for 3D visuals; currently records zero downloaded models. |
+| [Decision 0003](docs/decisions/0003-decorative-kenney-assets.md) | Why twelve small Kenney GLBs are prepared as a restrained decorative palette while the functional field remains procedural. |
+| [3D asset manifest](assets/3d/asset-manifest.json) | Machine-readable inventory, hashes, budgets, and provenance for the twelve local decorative GLBs. |
 
 ## Current scope
 
-- The functional field is a data-driven Three.js / React Three Fiber view. A complete 2D mode remains available for mobile, accessibility, and devices without WebGL.
-- Field cells, zones, overlays, sensor markers, crop cues, and root layers are generated from simple geometry or SVG. No model download is needed for the current simulation.
+- The final functional field is a data-driven Three.js / React Three Fiber view with a complete 2D mode for accessibility and devices without WebGL. The earlier desktop mock demo may be R3F-only, but still has keyboard-operable DOM controls; it does not satisfy or replace the final 2D requirement.
+- Field cells, zones, overlays, and sensor markers are generated from geometry or SVG. Twelve lightweight Kenney GLBs are prepared as an optional palette for distant trees, sparse foliage/flowers, rocks, and a short background rail; use only a few at once, and never let them encode simulation data or represent live equipment.
 - Spline may be considered for a decorative scene only after its free-tier export and embedding terms are checked. The scene must be optional and replaceable by a small Three.js hero or SVG.
 - No paid asset, hosted API, icon, font, model, or runtime is required.
 - Temporal moisture forecasting, irrigation, pumps, real sensor streams, crop recommendations, crop-cultivation probabilities, yield estimates, and fertilizer prescriptions are outside the MVP. Crop Fit reports supported per-crop factors/classes; it does not split a 100% probability among crops.

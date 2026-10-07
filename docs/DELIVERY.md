@@ -16,7 +16,7 @@ Before Phase 0, build and review the desktop 2.5D mock-data visual demo describe
 | 5. Production R3F field integration and profiling | Complete production Three.js/R3F scene, tied to real scenario/run state, with 2D parity, accessibility, error fallback, and profiling. The earlier mock-demo scene is not considered this deliverable. | Hard budgets in [TRD](TRD.md) pass on named references. |
 | 6. Optional decoration | Evaluate an SVG/Three.js vignette or optional Spline hero. | It is removable, free-tier compatible, lazy, and has no acceptance criterion dependent on it. |
 
-The mock demo has its own completion gate: a first-time user chooses Garden East or a named synthetic scenario, inspects a cell in the low-relief isometric field, applies a Quick Preset or paints a feature with the discrete manual brush, and sees the changed cells/history/stale state. They can open the prepared zoning, Crop Fit, and leaf examples with clear mock labels. It is a desktop review; phone parity is not required. No real clustering, model inference, or agronomic rule evaluation is claimed in that prototype.
+The mock demo has its own completion gate: at a 1280 × 800 CSS-pixel desktop viewport and 100% browser zoom, a first-time user chooses Garden East or a named synthetic scenario, inspects a cell in the low-relief isometric field, applies a Quick Preset or paints a feature with the discrete manual brush, and sees the changed cells/history plus the truthful sample-input status. The path includes keyboard inspection and brush dabs; a complete 2D/no-WebGL rendering fallback and phone parity are final-product requirements, not demo gates. Crop Fit remains navigable before a zone is selected and explains how to load sample-zone context. Prepared zoning, Crop Fit, and leaf examples have persistent mock labels. No real clustering, model inference, or agronomic rule evaluation is claimed in that prototype.
 
 Weather/water balance remains post-MVP and requires its own approval after sourced crop-stage parameters, uncertainty assumptions, and deterministic tests are ready.
 
@@ -29,7 +29,7 @@ All required rows need their stated evidence before calling the MVP demo-ready.
 | AC-01 | Same named seed creates the same initial synthetic grid and units on repeated loads. | Determinism test and scenario manifest. |
 | AC-02 | Cell/zone inspection shows value, unit, source, and relevant measurement context; missing data is not rendered as zero. | UI test and capture. |
 | AC-03 | Previewed edits/presets affect only recorded cells; undo/redo restores exact input state. | Domain test. |
-| AC-04 | Any soil change marks previous zoning stale and retains the prior immutable result. | Integration test. |
+| AC-04 | In the final product, any soil change marks a prior real zoning result stale and retains the prior immutable result. The mock demo instead follows the separate no-sample / mock-sample / inputs-changed states in Decision 0002. | Integration test and mock state-transition test. |
 | AC-05 | K-means/FCM run records parameters, seed, features/exclusions, versions, timing, diagnostics, and assignments. | Serialized run fixtures. |
 | AC-06 | Incomparable moisture is excluded with a visible reason; comparable moisture may be included. | Context-validation test and capture. |
 | AC-07 | FCM memberships are correctly mapped and described as membership strength, not confidence. | Algorithm/UI tests. |
@@ -38,7 +38,7 @@ All required rows need their stated evidence before calling the MVP demo-ready.
 | AC-10 | Compatibility output is unchanged when only cluster labels change and never names a best/recommended crop. | Unit test and copy scan. |
 | AC-11 | Leaf result contains the 17 ranked classes, model/preprocessing/map versions, latency, and review/unsupported state. | Model contract test. |
 | AC-12 | Leaf inference receives no zone, soil, SHI, or selected-crop feature; context mismatch cannot change scores. | Request-schema test. |
-| AC-13 | No-WebGL mode supports selection, edit, zoning, inspection, and Crop Fit. | Browser run with WebGL disabled. |
+| AC-13 | Final-MVP no-WebGL mode supports selection, edit, zoning, inspection, and Crop Fit; this is not a prerequisite for the earlier R3F-only mock demo. | Browser run with WebGL disabled. |
 | AC-14 | Keyboard-only path reaches field actions; no required information depends on hover; reduced-motion stops decorative travel/loops. | Accessibility and manual check. |
 | AC-15 | Desktop controls fit at 1280 px; mobile defaults to 2D. | Responsive capture/test. |
 | AC-16 | Performance trace meets documented budgets on named desktop/constrained devices. | Versioned profile report. |
@@ -51,10 +51,10 @@ All required rows need their stated evidence before calling the MVP demo-ready.
 ## Demonstration walkthrough
 
 1. Choose Garden East seed 42 (or a named synthetic variant), orbit/pan/zoom the field, and inspect a cell.
-2. Apply a deterministic Quick Preset or paint with the manual brush; demonstrate Undo and the stale zoning marker.
-3. Open the prepared K-means/FCM sample fixture for a supported cluster count; explain that it was not computed from the edit.
-4. Select a sample zone and compare the three independent mock Crop Fit cards; explain the no-probability boundary.
-5. Preview an arbitrary local leaf image, then separately show the canned 17-class example and explain that no model ran.
+2. Apply a deterministic Quick Preset or paint with the manual brush; demonstrate Undo and the truthful inputs-changed notice if a sample is already open.
+3. Open the prepared K-means/FCM sample fixture for a supported cluster count; explain its persistent mock label and that no algorithm ran.
+4. Open Crop Fit before and after selecting a sample zone; explain the context prompt, three independent mock cards, and no-probability boundary.
+5. Preview a local leaf image, then separately show the canned mock class example and supported 17-label list; explain that no model ran and display no fabricated confidence scores.
 6. Open Evidence & Metrics and distinguish measured findings from planned evaluation.
 
 ## Assumptions to resolve

@@ -48,7 +48,7 @@ A weather-driven soil-water-balance simulator is a possible later rules module. 
 | PR-06 | Crop compatibility is independently computed for each crop with reasons, sources, units, version, and missing-data states. It cannot alter cluster assignments. |
 | PR-07 | Leaf inference uses image pixels only. Selected crop, soil values, zone, and SHI are UI context and never model inputs. |
 | PR-08 | Each result is labeled as synthetic/user input, model output, or rules output. |
-| PR-09 | Selection, editing, zoning, inspection, and crop comparison remain usable without WebGL. |
+| PR-09 | Final-MVP selection, editing, zoning, inspection, and crop comparison remain usable without WebGL. This does not gate the earlier desktop R3F-only mock-data demo, which still requires keyboard-operable DOM controls and cell/brush actions. |
 | PR-10 | Unmeasured metrics are shown as “Not measured yet”; no placeholder score is presented as a result. |
 | PR-11 | Crop-fit output is per-crop and never presented as a probability or forced to sum to 100%. Every displayed percentage states its metric and denominator; FCM membership remains cluster membership, not crop potential. |
 
