@@ -1,10 +1,10 @@
 # Product requirements document
 
-**Status:** pre-build. No application, trained model, real-farm validation, or performance result is claimed.
+**Status:** current product requirements. The repository contains an earlier UI prototype/scaffold, but no production ML, field-monitoring workflow, real-farm validation, or measured performance result is claimed. The mock-first milestone is superseded by [Decision 0004](decisions/0004-field-monitoring-and-direct-build.md).
 
 ## Product statement
 
-KshetraSense is a local, interactive applied-ML demonstrator for apple, tomato, and potato. A user edits a reproducible synthetic soil field, runs crop-neutral soil clustering, compares supported soil-to-crop compatibility factors, and submits a leaf image to one shared crop-condition classifier. Every result must make its input source and limitations clear.
+KshetraSense is a local, interactive smart-farming application for apple, tomato, and potato. A user can inspect/edit a soil field and run crop-neutral clustering, compare independent soil-to-crop compatibility assessments, submit a leaf image to one shared crop-condition classifier, and investigate soil/satellite observations in a separate Field Monitoring module. Every result must make its source, date, method, resolution, quality, and limitations clear.
 
 The product is educational and exploratory. It is not a farm-control system or a substitute for agronomic advice.
 
@@ -14,25 +14,31 @@ The product is educational and exploratory. It is not a farm-control system or a
 | --- | --- |
 | Student or demonstrator | Edit a field patch, run a real clustering method, and explain what changed. |
 | Reviewer or teacher | Trace an output to its input, method, configuration, version, and evaluation evidence. |
-| Curious non-specialist | Explore the examples while distinguishing synthetic values, model output, and sourced rules. |
+| Curious non-specialist | Explore working features while distinguishing user measurements, modeled context, model output, and sourced rules. |
+| Farmer or field demonstrator | Review dated soil observations and relative vegetation patterns to decide where to inspect or sample next. |
 
 ## MVP scope
 
-1. A fixed-seed synthetic grid with unit-labelled pH, soil temperature, EC, N/P/K, and optional moisture with measurement context.
+1. A fixed-seed synthetic grid for repeatable tests/benchmarks, with unit-labelled pH, soil temperature, EC, N/P/K, and optional moisture with measurement context. Synthetic benchmark values are not shown as actual field results.
 2. Cell and zone inspection; localized edits; previewed deterministic presets; undo/redo; and visible stale-result state after edits.
 3. Crop-neutral K-means and Fuzzy C-means (FCM) zoning on valid, standardized soil features. Show zone summaries, adjacency, and FCM membership strengths where applicable.
 4. A separate apple/tomato/potato pre-plant soil-compatibility view using versioned, sourced rules and supported measurements. Assess each crop independently; this is not a three-way probability split.
 5. One shared, 17-label crop-condition image classifier using the fixed MobileNetV3-Small architecture, transfer-learned from ImageNet. Evaluate it on the audited, group-preserving split; model selection does not include alternative-backbone comparison.
 6. Evidence and methodology information, with actual metrics only after they have been measured.
 7. A functional Three.js / React Three Fiber field on capable devices, paired with a complete 2D workflow.
+8. A separate **Field Monitoring** destination with two independent areas: Soil Investigation and Vegetation Monitoring.
+9. Soil Investigation records dated, located, user-entered or imported field/laboratory soil samples with parameter values, original units, depth, method, collection time, and provenance. It may show SoilGrids predictions as optional regional context, with the product's resolution, depth, uncertainty, and source visible.
+10. Vegetation Monitoring uses the pinned CropSight application as an independent sub-application. It accepts CropSight's own circular area (center latitude/longitude and radius) and date window, retrieves imagery through its configured provider, and exposes only source outputs that pass a verification gate. It does not read or write Soil Zoning, Crop Fit, or Leaf Diagnosis state.
+11. The first intended monitoring outcomes are seasonal NDVI exploration and relative underperforming-patch flagging for human scouting. No causal diagnosis or prescription follows from NDVI alone.
 
 ## Out of scope
 
-- Real-time sensors, pumps, irrigation controls or replay, temporal moisture forecasting, or automatic actuation.
+- Real-time sensor streams, pumps, irrigation controls/replay, temporal soil-moisture forecasting, or automatic actuation.
 - A trained soil-to-crop recommender, yield prediction, planting certification, fertilizer quantities, deficiency diagnosis, or treatment/cure advice.
+- Validated variable-rate input prescriptions, irrigation decisions, and yield estimation from the initial Field Monitoring module. These remain later research/build goals requiring dedicated data, agronomic rules or crop-specific models, field validation, and separate acceptance criteria.
 - A crop-cultivation probability or a normalized apple/tomato/potato percentage split in the MVP. The synthetic field has no crop outcome labels, and the current soil features are insufficient for full land-suitability assessment.
 - Interpreting cluster IDs as crop identity, soil quality, or a prescription.
-- Any required paid asset, hosted API, icon, font, model, or runtime.
+- Any required paid asset, API, model, or runtime. CropSight's live imagery workflow does require an external Earth Engine project/configuration and quota; the user-visible product must report unavailable access rather than invent a result.
 
 A weather-driven soil-water-balance simulator is a possible later rules module. It requires sourced crop-stage parameters, explicit assumptions, deterministic tests, and a separate scope decision before any implementation.
 
@@ -48,9 +54,15 @@ A weather-driven soil-water-balance simulator is a possible later rules module. 
 | PR-06 | Crop compatibility is independently computed for each crop with reasons, sources, units, version, and missing-data states. It cannot alter cluster assignments. |
 | PR-07 | Leaf inference uses image pixels only. Selected crop, soil values, zone, and SHI are UI context and never model inputs. |
 | PR-08 | Each result is labeled as synthetic/user input, model output, or rules output. |
-| PR-09 | Final-MVP selection, editing, zoning, inspection, and crop comparison remain usable without WebGL. This does not gate the earlier desktop R3F-only mock-data demo, which still requires keyboard-operable DOM controls and cell/brush actions. |
+| PR-09 | Selection, editing, zoning, inspection, crop comparison, and all essential Field Monitoring information remain usable without WebGL. |
 | PR-10 | Unmeasured metrics are shown as “Not measured yet”; no placeholder score is presented as a result. |
 | PR-11 | Crop-fit output is per-crop and never presented as a probability or forced to sum to 100%. Every displayed percentage states its metric and denominator; FCM membership remains cluster membership, not crop potential. |
+| PR-12 | Field Monitoring is a distinct product destination; no monitoring result silently alters Soil Zoning, Crop Fit, or Leaf Diagnosis inputs/results. |
+| PR-13 | Every soil sample records location, collection date/time, source/method, depth where applicable, parameter, value, and original unit. Missing or incompatible values remain visibly missing; no implicit unit conversion is allowed. |
+| PR-14 | SoilGrids output is labeled as modeled regional context at its native product resolution, with property, depth, uncertainty/quantile when available, retrieval/source provenance, and an explicit warning that it is not a field sample or fine-grained soil measurement. It is not an automatic input to Soil Zoning or Crop Fit. |
+| PR-15 | CropSight remains a separate vegetation workflow with its own AOI/date state. It cannot consume Soil Zoning/Crop Fit/Leaf results by default. Displayed algorithms, raster layers, time series, and rainfall comparison must match the actual source output; known mismatches are unavailable until verified. |
+| PR-16 | Initial monitoring language is limited to relative vegetation patterns, seasonal change, and scouting priorities. NDVI alone is not called water stress, disease, nutrient deficiency, yield, or a prescription. |
+| PR-17 | No fixture-only or canned sample output is presented as a product result. Synthetic fixtures are allowed only for tests, benchmark evaluation, and explicit internal development diagnostics. |
 
 ## ML, data, and domain boundaries
 
@@ -84,20 +96,46 @@ A weather-driven soil-water-balance simulator is a possible later rules module. 
 - Do not force the three crop values to total 100%. Multiple crops may each be suitable, or none; independent crop-success events are not mutually exclusive. A future probability requires a defined outcome and horizon, representative field-by-crop-by-season outcome data, independent validation, calibration evidence, uncertainty, and a separate scope decision. If a percentage is used under a validated land-evaluation model, name its denominator (for example, per-crop modeled yield relative to that crop's attainable maximum); that is not a probability or a share among crops. See the [crop-suitability research note](research/crop-suitability-probability.md).
 - Call current output a limited soil-to-crop compatibility estimate. Do not call it a recommendation, yield prediction, planting certificate, fertilizer plan, or success guarantee.
 
+### Field Monitoring: Soil Investigation and Vegetation Monitoring
+
+Field Monitoring is a separate destination, not an extension of Soil Zoning. It contains two explicitly separated evidence views:
+
+**Soil Investigation** answers: “What did we measure at this location and time, and what broad regional soil context is available?” It is useful for organizing field/lab results, spotting gaps in sampling, and comparing observations across dates. It is not a sensor-control system or an automatic zoning input.
+
+- **Inputs:** a user-named investigation/location; one or more soil sample records with coordinates, collection date/time, sampling depth, collection/lab method, source, parameter/value/original unit, and optional notes; or a validated CSV import using the same fields. Supported parameters should align with the project schema (pH, N/P/K, EC, soil temperature, and moisture only when its unit/depth/method/time are supplied). Do not silently infer missing values or convert units without a documented conversion.
+- **Optional SoilGrids context:** a selected location or investigation area, a product-supported soil property, and a supported depth layer. Show the predicted estimate and available uncertainty quantiles, native 250 m scale, retrieval date, product version/source, and a visible “modeled regional context—not a field measurement” label. Use cached/downloaded data when available; the paused REST endpoint is not a required runtime dependency.
+- **Outputs:** a dated sample register and map pins, parameter timelines only where repeated comparable measurements exist, completeness/method metadata, and a separate SoilGrids context panel. Do not create a single quality score or automatically pass observations into Soil Zoning/Crop Fit.
+- **Limit:** no live sensors or sensor telemetry in the initial release. A future explicit export/handoff may be designed, but this module does not change existing zoning/crop/image calculations implicitly.
+
+**Vegetation Monitoring** answers: “Where and how did satellite-observed vegetation patterns change during this date window, and where might a person scout?” It is useful for prioritizing field inspection, not identifying the cause of a pattern.
+
+- **Inputs:** a circular area of interest defined by center latitude/longitude and radius, a start/end date, a CropSight-supported clustering selection/parameter where applicable, and optional crop/stage context for display only. Live analysis requires the CropSight provider configuration (Google Earth Engine project/authentication and available quota); rainfall context is optional and separately labeled.
+- **Workflow:** invoke the pinned CropSight application as an isolated sub-application, keep its source and dependency environment separate from the existing analysis services, and maintain its own AOI, date, and result state. Do not pass Soil Zoning, Crop Fit, or Leaf Diagnosis data into it. The area remains circular; exact cadastral-polygon sharing is not part of this as-is integration.
+- **Outputs:** only actual source-supported outputs after validation—NDVI map/composite or zone visualization where the original application provides it, acquisition/date coverage, per-area summaries, time-series views, and optional separately sourced rainfall context. Show method, dates, AOI, provider, quality/coverage, and errors. Do not imply pixel-level or in-field boundaries finer than the underlying imagery and AOI support.
+- **Initial user value:** seasonal tracking and relative low-performing-patch scouting. Treat pattern flags as “inspect here,” not as a diagnosis.
+- **Deferred goals:** variable-rate prescription maps require georeferenced rates, treatment rules, machinery/output compatibility, and field validation; irrigation decisions require water-status evidence such as comparable soil-moisture/weather/ET inputs and agronomic rules; yield estimation requires crop-specific stage/context and representative yield outcomes, model validation, and uncertainty. NDVI alone is insufficient for these claims.
+
+The inspected CropSight revision's README advertises use cases beyond what its code demonstrably implements. The product must not present its recommendation strings, DBSCAN display path, or yield/irrigation/prescription claims as validated. See [Decision 0004](decisions/0004-field-monitoring-and-direct-build.md) and the [pinned integration audit](research/cropsight-soilgrids-integration-architecture.md).
+
 ## Evaluation and success measures
 
-The project is ready for a presentation when a reviewer can reproduce the scenario and each reported metric, compare model baselines, and identify whether displayed evidence is synthetic, user-provided, model-derived, or rule-derived.
+The project is ready for a college demonstration when a reviewer can use each functional module, trace outputs to data/method/version, reproduce reported metrics, and distinguish user measurements, external imagery, modeled context, model output, and rule output. The existence of a visually complete screen is not sufficient evidence that its analysis ran correctly.
 
 - **Vision:** macro-F1, balanced accuracy, per-class precision/recall, confusion matrix, crop-level accuracy, class counts, artifact size, and warmed batch-one CPU median/p95 latency. Report PlantVillage test and eligible PlantDoc results separately.
 - **Zoning:** recovery on planted synthetic regions, silhouette, stability across seeds/noise, contiguity, and moisture ablation on the same benchmark.
 - **Rules:** tests for every published source/range/unit, boundary, missing value, and independence from zone labels. This verifies rule behavior, not crop-yield accuracy.
+- **Soil Investigation:** sample import/entry validation, unit/context retention, time-series comparability rules, and clear distinction from SoilGrids estimates.
+- **Vegetation Monitoring:** repeatable AOI/date request, source/method/output consistency, image coverage and invalid-pixel handling as actually available, request/error behavior, and an explicit audit that displayed map/algorithm matches returned data.
 - **Rendering:** capture frame timing, draw calls, triangles, texture memory, transfer bytes, and load time on named desktop/mobile devices before claiming performance.
 
-## Open product decisions
+## Implementation-time verification choices
+
+The product boundaries above are accepted. These details need evidence or implementation-level selection, but do not reopen the agreed module scope or direct-build approach:
 
 - Final audited class map, split, model checkpoint, and review threshold.
 - Target geography/production context and supported crop-profile parameters; whether a sourced suitability class or index is justified. Any calibrated crop-success probability is future scope and requires outcome data and a separate decision.
-- Initial synthetic value ranges, maximum supported grid, cluster-count range, and moisture-context validity rule.
+- Target soil-sample CSV schema and exact supported analyte unit conversions.
+- Which CropSight result panels are exposed after the direct code path is validated; invalid/mismatched methods remain unavailable.
 - Named performance reference devices and whether a free-tier Spline vignette is worth including.
 
 ## References

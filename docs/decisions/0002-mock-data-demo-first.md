@@ -1,7 +1,9 @@
 # Decision 0002: build a desktop mock-data field demo before implementation phases
 
-**Status:** accepted as the next requested milestone
+**Status:** superseded by [Decision 0004](0004-field-monitoring-and-direct-build.md); retained as a historical record only
 **Date:** 2026-10-07
+
+> This decision's mock-first milestone and its prototype acceptance criteria are no longer active. The user later chose to start with production-intended, functional implementation increments instead. No fixture-only result may be presented as a product result. Synthetic data may still be used in automated tests. See [Decision 0004](0004-field-monitoring-and-direct-build.md) and the current [Delivery plan](../DELIVERY.md).
 
 ## Context
 
