@@ -1,6 +1,34 @@
 # KshetraSense
 
-KshetraSense is a local, desktop-first smart-farming application for exploring soil zones, per-crop soil compatibility, leaf-image classification, and field monitoring. The repository contains an earlier UI prototype/scaffold; it is not the production implementation. The next build starts with working, production-intended features in functional increments. No real model, satellite-monitoring result, or farm validation is claimed until implemented and measured.
+KshetraSense is a local, desktop-first smart-farming application for soil zoning, zone-scoped crop-fit screening, and field monitoring. The current build replaces the former mock UX with a functional local zoning service and a clean three-module workspace. Leaf-image classification is intentionally not included in this build and will be developed separately.
+
+## Run the current build
+
+The zoning page needs both local processes. The browser app never falls back to a prepared zoning or crop-fit result if the service is unavailable.
+
+```powershell
+# Terminal 1 — local zoning and crop-fit service
+Set-Location services/zoning
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+```powershell
+# Terminal 2 — React workspace
+npm install
+npm run dev
+```
+
+Open the local Vite address shown by the second command (normally `http://127.0.0.1:5173`). The first run starts on the clearly labeled **Practice field**; its zones are calculated live. Import a real grid CSV to replace it. Required columns are `row`, `column`, `ph`, `nitrogen`, `phosphorus`, `potassium`, `ec`, and `soil_temperature`.
+
+### What is working now
+
+- Local deterministic K-means++ and Fuzzy C-means, including normalization, memberships, diagnostics, zone summaries, and validation of incomplete/constant data.
+- Zone-scoped Crop Fit: it evaluates the selected zone only. The current source-backed rule set screens pH and leaves N/P/K, EC, temperature, moisture, and missing land factors explicitly unassessed rather than inventing thresholds.
+- Soil Investigation with validated manual records, local CSV preview/import, provenance, and a relative coordinate sketch.
+- Honest integration boundaries: SoilGrids and CropSight inputs/status are visible but no external request, imagery, NDVI, recommendation, or measured context is fabricated.
 
 ## Documentation map
 
@@ -24,10 +52,10 @@ KshetraSense is a local, desktop-first smart-farming application for exploring s
 
 ## Current product scope
 
-- Soil Zoning, Crop Fit, and Leaf Diagnosis remain independent analyses. Crop Fit remains a separate per-crop rules result and never becomes a three-crop 100% probability split.
+- Soil Zoning and Crop Fit are one user workflow: select a calculated zone, then inspect independent per-crop rule checks for that zone’s mean values. Crop Fit never becomes a three-crop 100% probability split.
 - Field Monitoring is a separate destination with Soil Investigation (dated measured samples plus optional SoilGrids context) and Vegetation Monitoring (the independent CropSight/Sentinel-2 workflow). CropSight retains its own circle-of-interest and date inputs; it does not consume KshetraSense zoning, Crop Fit, or leaf outputs.
 - The initial vegetation-monitoring goals are seasonal NDVI exploration and highlighting relative patches for human scouting. Variable-rate prescriptions, irrigation decisions, and yield estimation are not validated outputs and remain later work.
-- The functional soil field is data-driven Three.js / React Three Fiber on capable devices, with a complete 2D mode for accessibility and devices without WebGL.
+- The current functional soil field uses a keyboard-accessible 2.5D SVG renderer. React Three Fiber is installed for the later optional WebGL enhancement; the accessible renderer remains the required baseline.
 - Field cells, zones, overlays, and sensor markers are generated from geometry or SVG. Twelve lightweight Kenney GLBs are prepared as an optional palette for distant trees, sparse foliage/flowers, rocks, and a short background rail; use only a few at once, and never let them encode simulation data or represent live equipment.
 - Spline may be considered for a decorative scene only after its free-tier export and embedding terms are checked. The scene must be optional and replaceable by a small Three.js hero or SVG.
 - No paid runtime is required. Live CropSight use does require external Google Earth Engine project setup and quota availability; failures are shown honestly rather than replaced by mock results.
