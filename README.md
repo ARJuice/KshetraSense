@@ -26,7 +26,7 @@ Open the local Vite address shown by the second command (normally `http://127.0.
 ### What is working now
 
 - Local deterministic K-means++ and Fuzzy C-means, including normalization, memberships, diagnostics, zone summaries, and validation of incomplete/constant data.
-- Zone-scoped Crop Fit: it evaluates the selected zone only. The current source-backed rule set screens pH and leaves N/P/K, EC, temperature, moisture, and missing land factors explicitly unassessed rather than inventing thresholds.
+- Zone- or cell-scoped Crop Fit: it evaluates the selected zone mean or an explicitly selected cell. The current source-backed rule set screens pH and leaves N/P/K, EC, temperature, moisture, and missing land factors explicitly unassessed rather than inventing thresholds.
 - Soil Investigation with validated manual records, local CSV preview/import, provenance, and a relative coordinate sketch.
 - Honest integration boundaries: SoilGrids and CropSight inputs/status are visible but no external request, imagery, NDVI, recommendation, or measured context is fabricated.
 
@@ -52,11 +52,11 @@ Open the local Vite address shown by the second command (normally `http://127.0.
 
 ## Current product scope
 
-- Soil Zoning and Crop Fit are one user workflow: select a calculated zone, then inspect independent per-crop rule checks for that zone’s mean values. Crop Fit never becomes a three-crop 100% probability split.
+- Soil Zoning and Crop Fit are one user workflow: select a calculated zone or field cell, then inspect independent per-crop rule checks for that exact mean/profile. Crop Fit never becomes a three-crop 100% probability split.
 - Field Monitoring is a separate destination with Soil Investigation (dated measured samples plus optional SoilGrids context) and Vegetation Monitoring (the independent CropSight/Sentinel-2 workflow). CropSight retains its own circle-of-interest and date inputs; it does not consume KshetraSense zoning, Crop Fit, or leaf outputs.
 - The initial vegetation-monitoring goals are seasonal NDVI exploration and highlighting relative patches for human scouting. Variable-rate prescriptions, irrigation decisions, and yield estimation are not validated outputs and remain later work.
-- The current functional soil field uses a keyboard-accessible 2.5D SVG renderer. React Three Fiber is installed for the later optional WebGL enhancement; the accessible renderer remains the required baseline.
-- Field cells, zones, overlays, and sensor markers are generated from geometry or SVG. Twelve lightweight Kenney GLBs are prepared as an optional palette for distant trees, sparse foliage/flowers, rocks, and a short background rail; use only a few at once, and never let them encode simulation data or represent live equipment.
+- The current functional soil field uses an interactive React Three Fiber view: drag to orbit, right-drag to pan, scroll to zoom, and switch to the keyboard-accessible 2.5D SVG map when WebGL is unsuitable. The R3F grid uses instancing and a capped device-pixel ratio.
+- Field cells and zones are procedural data geometry. The R3F scene uses only a few small Kenney GLBs (two trees, grass and a fence rail) as perimeter decoration; they never encode simulation data or represent live equipment.
 - Spline may be considered for a decorative scene only after its free-tier export and embedding terms are checked. The scene must be optional and replaceable by a small Three.js hero or SVG.
 - No paid runtime is required. Live CropSight use does require external Google Earth Engine project setup and quota availability; failures are shown honestly rather than replaced by mock results.
 - Real-time sensor streams, automatic irrigation, prescription rates, yield estimates, crop-success probabilities, fertilizer dosing, and disease treatment remain out of scope for the initial functional release. Synthetic data is permitted for tests and benchmarks, not as a disguised user-visible result.

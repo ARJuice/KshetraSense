@@ -11,6 +11,7 @@ class KMeansResult:
     centers: np.ndarray
     inertia: float
     iterations: int
+    center_history: list[np.ndarray]
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,7 @@ class FcmResult:
     iterations: int
     converged: bool
     fpc: float
+    center_history: list[np.ndarray]
 
 
 def kmeans_plus_plus(data: np.ndarray, cluster_count: int, seed: int, max_iterations: int = 300) -> KMeansResult:
@@ -44,6 +46,9 @@ def kmeans_plus_plus(data: np.ndarray, cluster_count: int, seed: int, max_iterat
         closest_squared = np.minimum(closest_squared, np.sum((data - centers[index]) ** 2, axis=1))
 
     labels = np.full(sample_count, -1, dtype=int)
+    # Retain a bounded, factual convergence trace for the UI. It is not used by
+    # the algorithm and never fabricates intermediate positions.
+    center_history = [centers.copy()]
     for iteration in range(1, max_iterations + 1):
         squared_distances = _squared_distances(data, centers)
         next_labels = np.argmin(squared_distances, axis=1)
@@ -67,11 +72,15 @@ def kmeans_plus_plus(data: np.ndarray, cluster_count: int, seed: int, max_iterat
             break
         centers = next_centers
         labels = next_labels
+        if len(center_history) < 16:
+            center_history.append(centers.copy())
 
     final_distances = _squared_distances(data, centers)
     labels = np.argmin(final_distances, axis=1)
     inertia = float(final_distances[np.arange(sample_count), labels].sum())
-    return KMeansResult(labels=labels, centers=centers, inertia=inertia, iterations=iteration)
+    if not np.array_equal(center_history[-1], centers):
+        center_history.append(centers.copy())
+    return KMeansResult(labels=labels, centers=centers, inertia=inertia, iterations=iteration, center_history=center_history)
 
 
 def fuzzy_c_means(
@@ -90,10 +99,13 @@ def fuzzy_c_means(
     memberships /= memberships.sum(axis=1, keepdims=True)
     exponent = 2.0 / (fuzziness - 1.0)
     converged = False
+    center_history: list[np.ndarray] = []
 
     for iteration in range(1, max_iterations + 1):
         weighted = memberships**fuzziness
         centers = (weighted.T @ data) / weighted.sum(axis=0)[:, None]
+        if len(center_history) < 16:
+            center_history.append(centers.copy())
         distances = np.sqrt(_squared_distances(data, centers))
         next_memberships = np.zeros_like(memberships)
         zero_distance = distances <= np.finfo(float).eps
@@ -112,6 +124,8 @@ def fuzzy_c_means(
 
     weighted = memberships**fuzziness
     centers = (weighted.T @ data) / weighted.sum(axis=0)[:, None]
+    if not center_history or not np.array_equal(center_history[-1], centers):
+        center_history.append(centers.copy())
     distances_squared = _squared_distances(data, centers)
     objective = float((weighted * distances_squared).sum())
     labels = np.argmax(memberships, axis=1)
@@ -124,6 +138,7 @@ def fuzzy_c_means(
         iterations=iteration,
         converged=converged,
         fpc=fpc,
+        center_history=center_history,
     )
 
 

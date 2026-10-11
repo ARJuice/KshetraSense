@@ -34,7 +34,10 @@ export interface ZoningFieldCanvasProps {
   selectedCellId?: string | null;
   selectedZoneId?: string | null;
   disabled?: boolean;
+  interactionMode?: 'inspect' | 'brush';
   onCellSelect?: (cell: ZoningFieldCell) => void;
+  onBrushCell?: (cell: ZoningFieldCell) => void;
+  onBrushEnd?: () => void;
   onCellHover?: (cell: ZoningFieldCell | null) => void;
   onZoneSelect?: (zoneId: string | null) => void;
   className?: string;
@@ -81,13 +84,17 @@ export function ZoningFieldCanvas({
   selectedCellId = null,
   selectedZoneId = null,
   disabled = false,
+  interactionMode = 'inspect',
   onCellSelect,
+  onBrushCell,
+  onBrushEnd,
   onCellHover,
   onZoneSelect,
   className,
 }: ZoningFieldCanvasProps) {
   const [hoveredCellId, setHoveredCellId] = useState<string | null>(null);
   const [keyboardCellId, setKeyboardCellId] = useState<string | null>(null);
+  const [isBrushing, setIsBrushing] = useState(false);
   const titleId = useId();
   const descriptionId = useId();
   const zoneById = useMemo(() => new Map(zones.map((zone) => [zone.id, zone])), [zones]);
@@ -110,6 +117,10 @@ export function ZoningFieldCanvas({
 
   const selectCell = (cell: ZoningFieldCell) => {
     if (disabled) return;
+    if (interactionMode === 'brush') {
+      onBrushCell?.(cell);
+      return;
+    }
     onCellSelect?.(cell);
     if (cell.zoneId) onZoneSelect?.(cell.zoneId);
   };
@@ -191,6 +202,8 @@ export function ZoningFieldCanvas({
         role="group"
         aria-labelledby={`${titleId} ${descriptionId}`}
         style={{ display: 'block', minHeight: 260, touchAction: 'manipulation' }}
+        onMouseUp={() => { setIsBrushing(false); onBrushEnd?.(); }}
+        onMouseLeave={() => { if (isBrushing) { setIsBrushing(false); onBrushEnd?.(); } }}
       >
         <title id={titleId}>{featureLabel} field grid</title>
         <desc id={descriptionId}>Select a cell to inspect it. Use arrow keys to navigate cells, Enter to select, and Escape to clear a zone highlight.</desc>
@@ -216,13 +229,20 @@ export function ZoningFieldCanvas({
               tabIndex={isSelected || (!selectedCellId && cell.id === orderedCells[0]?.id) ? 0 : -1}
               aria-label={label}
               aria-pressed={isSelected}
-              onClick={() => selectCell(cell)}
+              onClick={() => { if (interactionMode === 'inspect') selectCell(cell); }}
+              onMouseDown={(event) => {
+                if (interactionMode !== 'brush') return;
+                event.preventDefault();
+                setIsBrushing(true);
+                onBrushCell?.(cell);
+              }}
               onFocus={() => setKeyboardCellId(cell.id)}
               onBlur={() => setKeyboardCellId(null)}
               onKeyDown={(event) => handleKeyDown(event, cell)}
-              onMouseEnter={() => {
+              onMouseEnter={(event) => {
                 setHoveredCellId(cell.id);
                 onCellHover?.(cell);
+                if (isBrushing && interactionMode === 'brush' && event.buttons === 1) onBrushCell?.(cell);
               }}
               onMouseLeave={() => {
                 setHoveredCellId(null);

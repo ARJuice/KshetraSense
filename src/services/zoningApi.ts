@@ -36,6 +36,7 @@ export async function runZoning(
   field: FieldGrid,
   method: ClusteringMethod,
   clusterCount: number,
+  fuzziness = 2,
 ): Promise<ZoningResult> {
   const response = await fetch(`${SERVICE_URL}/api/v1/zoning/run`, {
     method: 'POST',
@@ -44,6 +45,7 @@ export async function runZoning(
       method,
       cluster_count: clusterCount,
       seed: 42,
+      fcm: { fuzziness },
       cells: field.cells.map((cell) => ({ id: cell.id, row: cell.row, column: cell.column, ...cell.values })),
     }),
   });
@@ -54,20 +56,30 @@ export async function runZoning(
   return response.json() as Promise<ZoningResult>;
 }
 
-export async function evaluateCropFit(zone: ZoneSummary): Promise<CropFitResponse> {
+export interface CropFitMeasurementContext {
+  sourceScope: string;
+  soilTestMethod: string;
+  sampleDepth: string;
+  ecMethod: string;
+}
+
+export async function evaluateCropFit(
+  measurements: ZoneSummary['mean'],
+  context: CropFitMeasurementContext,
+): Promise<CropFitResponse> {
   const response = await fetch(`${SERVICE_URL}/api/v1/crop-fit/evaluate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       measurements: {
-        pH: zone.mean.ph,
-        nitrogen: zone.mean.nitrogen,
-        phosphorus: zone.mean.phosphorus,
-        potassium: zone.mean.potassium,
-        ec: zone.mean.ec,
-        soilTemperature: zone.mean.soilTemperature,
+        pH: measurements.ph,
+        nitrogen: measurements.nitrogen,
+        phosphorus: measurements.phosphorus,
+        potassium: measurements.potassium,
+        ec: measurements.ec,
+        soilTemperature: measurements.soilTemperature,
       },
-      measurementContext: { basis: `zone ${Number(zone.zoneId) + 1} mean values`, scope: 'selected zoning result' },
+      measurementContext: context,
     }),
   });
   if (!response.ok) {

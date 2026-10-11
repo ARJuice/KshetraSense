@@ -8,7 +8,7 @@ Local FastAPI service for deterministic soil zoning and zone-level crop-fit scre
 - Uses a recorded feature-wise z-score normalization policy and returns its parameters.
 - Excludes incomplete cells rather than silently imputing values; excludes constant features because they cannot distinguish zones.
 - Returns assignments, raw and normalized centroids, zone summaries, grid adjacency, a silhouette diagnostic, and FCM memberships when applicable.
-- Evaluates the selected zone's mean values against the limited, versioned crop-profile rules in `app/crop_profiles.py`. It is an independent, per-crop compatibility screen—not a probability, crop ranking, yield estimate, or prescription.
+- Evaluates caller-supplied selected-zone means or a selected-cell profile against the limited, versioned crop-profile rules in `app/crop_profiles.py`. It is an independent, per-crop compatibility screen—not a probability, crop ranking, yield estimate, or prescription.
 
 ## Run locally
 
@@ -37,7 +37,7 @@ python -m pytest -q
 | `POST /v1/zoning/run` | Validate cells and run `kmeans` or `fuzzy-c-means`. |
 | `POST /v1/crop-fit/evaluate` | Evaluate a caller-supplied selected-zone mean profile. |
 
-`/v1/crop-fit/evaluate` intentionally takes only selected-zone measurements and context. It does not accept a zone ID, clustering assignment, or membership value, so it cannot influence or reinterpret zoning.
+`/v1/crop-fit/evaluate` intentionally takes measurements and their declared scope/context, not a zone ID, clustering assignment, or membership value. It therefore cannot influence or reinterpret zoning.
 
 For the host UI, `/api/v1/zoning/run` is a compatibility alias. It accepts both the documented nested-cell request and the UI's compact request: `cluster_count`, `method: "fuzzy-c-means"`, and flat cell measurements. The response exposes the compact `assignments` map, plus `assignmentDetails` with coordinates and FCM memberships.
 

@@ -34,6 +34,7 @@ def run_zoning(request: ZoningRequest) -> dict:
             "inertia": _number(result.inertia),
             "iterations": result.iterations,
             "converged": True,
+            "centerSnapshots": _center_snapshots(result.center_history, means, std_devs, prepared["features"]),
         }
         centers_normalized = result.centers
     else:
@@ -52,6 +53,7 @@ def run_zoning(request: ZoningRequest) -> dict:
             "fuzzyPartitionCoefficient": _number(result.fpc),
             "iterations": result.iterations,
             "converged": result.converged,
+            "centerSnapshots": _center_snapshots(result.center_history, means, std_devs, prepared["features"]),
         }
         centers_normalized = result.centers
 
@@ -229,6 +231,17 @@ def _number(value: float | np.floating) -> float:
 
 def _optional_number(value: float | None) -> float | None:
     return None if value is None else _number(value)
+
+
+def _center_snapshots(history: list[np.ndarray], means: np.ndarray, std_devs: np.ndarray, features: list[str]) -> list[list[dict[str, float]]]:
+    """Return actual center positions in original units for optional UI playback."""
+    return [
+        [
+            {feature: _number(center[index] * std_devs[index] + means[index]) for index, feature in enumerate(features)}
+            for center in snapshot
+        ]
+        for snapshot in history
+    ]
 
 
 def _frontend_feature_names(values: dict[str, float]) -> dict[str, float]:

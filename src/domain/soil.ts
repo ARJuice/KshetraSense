@@ -54,6 +54,14 @@ export interface ZoningResult {
   silhouetteScore?: number;
   inputFingerprint: string;
   createdAt: string;
+  diagnostics?: {
+    iterations: number;
+    converged: boolean;
+    inertia?: number;
+    objective?: number;
+    fuzzyPartitionCoefficient?: number;
+    centerSnapshots?: Array<Array<Record<string, number>>>;
+  };
 }
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
