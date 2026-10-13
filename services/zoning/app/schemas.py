@@ -13,7 +13,7 @@ SUPPORTED_FEATURES = frozenset(
 class SoilCell(BaseModel):
     """One spatially-addressable soil observation used for a zoning request."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     id: Annotated[str, Field(min_length=1, max_length=128)]
     row: Annotated[int, Field(ge=0)]
@@ -31,12 +31,16 @@ class SoilCell(BaseModel):
             measurements = dict(result["values"])
             if "ph" in measurements and "pH" not in measurements:
                 measurements["pH"] = measurements.pop("ph")
+            if "soil_temperature" in measurements and "soilTemperature" not in measurements:
+                measurements["soilTemperature"] = measurements.pop("soil_temperature")
             result["values"] = measurements
             return result
         result = dict(value)
         result["values"] = {feature: result.pop(feature, None) for feature in SUPPORTED_FEATURES if feature in result}
         if "ph" in result:
             result["values"]["pH"] = result.pop("ph")
+        if "soil_temperature" in result:
+            result["values"]["soilTemperature"] = result.pop("soil_temperature")
         return result
 
     @field_validator("values")

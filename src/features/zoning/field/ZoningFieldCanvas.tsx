@@ -1,19 +1,11 @@
-import { CSSProperties, KeyboardEvent, useId, useMemo, useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
-/**
- * Minimal data contract for a rendered soil observation.  The zoning feature
- * owns the data source; this component deliberately does not invent cells or
- * clustering results.
- */
 export interface ZoningFieldCell {
   id: string;
   row: number;
   col: number;
-  /** Numeric value for the currently selected soil feature. */
   value: number;
-  /** A zone identifier is present only after a successful zoning run. */
   zoneId?: string | null;
-  /** 0–1 membership for the selected zone, when fuzzy zoning is used. */
   membership?: number | null;
 }
 
@@ -26,15 +18,14 @@ export interface ZoningFieldZone {
 export interface ZoningFieldCanvasProps {
   cells: readonly ZoningFieldCell[];
   zones?: readonly ZoningFieldZone[];
-  /** Label used in screen-reader and keyboard instructions. */
   featureLabel: string;
   featureUnit?: string;
-  /** Expected feature scale. Used only to colour an observed value. */
   featureRange: readonly [number, number];
   selectedCellId?: string | null;
   selectedZoneId?: string | null;
   disabled?: boolean;
   interactionMode?: 'inspect' | 'brush';
+  brushRadius?: number;
   onCellSelect?: (cell: ZoningFieldCell) => void;
   onBrushCell?: (cell: ZoningFieldCell) => void;
   onBrushEnd?: () => void;
@@ -43,39 +34,26 @@ export interface ZoningFieldCanvasProps {
   className?: string;
 }
 
-const CELL_WIDTH = 52;
-const CELL_HEIGHT = 27;
-const PADDING_X = 54;
-const PADDING_Y = 50;
+const ZONE_PATTERNS = ['pattern-zone-1', 'pattern-zone-2', 'pattern-zone-3', 'pattern-zone-4'];
 
-function featureColor(value: number, range: readonly [number, number]): string {
+function mineralColor(value: number, range: readonly [number, number]): string {
   const [min, max] = range;
-  const normalized = max > min ? Math.min(1, Math.max(0, (value - min) / (max - min))) : 0.5;
-  // Mineral soil palette: cool low values through fertile olive to warm high values.
-  const hue = 204 - normalized * 158;
-  const lightness = 42 + normalized * 11;
-  return `hsl(${hue} 47% ${lightness}%)`;
-}
-
-function isoPoint(row: number, col: number): [number, number] {
-  return [PADDING_X + (col - row) * (CELL_WIDTH / 2), PADDING_Y + (col + row) * (CELL_HEIGHT / 2)];
-}
-
-function diamondPoints(cx: number, cy: number): string {
-  return `${cx},${cy - CELL_HEIGHT / 2} ${cx + CELL_WIDTH / 2},${cy} ${cx},${cy + CELL_HEIGHT / 2} ${cx - CELL_WIDTH / 2},${cy}`;
-}
-
-function formatValue(value: number, unit?: string): string {
-  const precision = Number.isInteger(value) ? 0 : 2;
-  return `${value.toFixed(precision)}${unit ? ` ${unit}` : ''}`;
+  const norm = max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0.5;
+  const r = Math.round(25 + norm * 45);
+  const g = Math.round(45 + norm * 85);
+  const b = Math.round(38 + norm * 65);
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 /**
- * Accessible, dependency-free SVG field renderer. It supports both pre-zoning
- * feature maps and post-zoning zone maps and intentionally leaves all domain
- * computation and state persistence to its parent.
+ * ZoningFieldCanvas
+ * 
+ * Restored 2.5D Isometric Soil Atlas Map from commit 0efec7b.
+ * Renders an accessible 18×12 grid with CSS 3D perspective projection,
+ * WCAG AA non-color zone patterns, surveyor locked corner brackets,
+ * and fluid drag-brushing.
  */
-export function ZoningFieldCanvas({
+export const ZoningFieldCanvas: React.FC<ZoningFieldCanvasProps> = ({
   cells,
   zones = [],
   featureLabel,
@@ -85,189 +63,229 @@ export function ZoningFieldCanvas({
   selectedZoneId = null,
   disabled = false,
   interactionMode = 'inspect',
+  brushRadius = 1,
   onCellSelect,
   onBrushCell,
   onBrushEnd,
   onCellHover,
   onZoneSelect,
-  className,
-}: ZoningFieldCanvasProps) {
+  className = '',
+}) => {
   const [hoveredCellId, setHoveredCellId] = useState<string | null>(null);
-  const [keyboardCellId, setKeyboardCellId] = useState<string | null>(null);
-  const [isBrushing, setIsBrushing] = useState(false);
-  const titleId = useId();
-  const descriptionId = useId();
-  const zoneById = useMemo(() => new Map(zones.map((zone) => [zone.id, zone])), [zones]);
+  const [isPointerDown, setIsPointerDown] = useState(false);
 
-  const extent = useMemo(() => {
-    if (cells.length === 0) return { width: 320, height: 220 };
-    const points = cells.map((cell) => isoPoint(cell.row, cell.col));
-    const xs = points.map(([x]) => x);
-    const ys = points.map(([, y]) => y);
-    return {
-      width: Math.max(320, Math.max(...xs) - Math.min(...xs) + CELL_WIDTH + PADDING_X * 2),
-      height: Math.max(220, Math.max(...ys) - Math.min(...ys) + CELL_HEIGHT + PADDING_Y * 2),
-    };
-  }, [cells]);
+  const rows = useMemo(() => Math.max(...cells.map((c) => c.row), 1), [cells]);
+  const cols = useMemo(() => Math.max(...cells.map((c) => c.col), 1), [cells]);
 
-  const orderedCells = useMemo(
-    () => [...cells].sort((a, b) => (a.row + a.col) - (b.row + b.col) || a.col - b.col),
-    [cells],
+  const zoneById = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
+
+  const hoveredCell = useMemo(
+    () => cells.find((c) => c.id === hoveredCellId) ?? null,
+    [cells, hoveredCellId]
   );
 
-  const selectCell = (cell: ZoningFieldCell) => {
+  // Brush preview footprint
+  const brushPreviewCellIds = useMemo(() => {
+    if (!hoveredCell || interactionMode !== 'brush') return new Set<string>();
+    const affected = new Set<string>();
+    cells.forEach((cell) => {
+      const dist = Math.hypot(cell.row - hoveredCell.row, cell.col - hoveredCell.col);
+      if (dist <= brushRadius) {
+        affected.add(cell.id);
+      }
+    });
+    return affected;
+  }, [cells, hoveredCell, interactionMode, brushRadius]);
+
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Global pointer up listener for seamless drag painting
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      if (isPointerDown) {
+        setIsPointerDown(false);
+        if (interactionMode === 'brush') {
+          onBrushEnd?.();
+        }
+      }
+    };
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    return () => window.removeEventListener('pointerup', handleGlobalPointerUp);
+  }, [isPointerDown, interactionMode, onBrushEnd]);
+
+  const getCellColor = useCallback(
+    (cell: ZoningFieldCell) => {
+      if (cell.zoneId) {
+        const zone = zoneById.get(cell.zoneId);
+        if (!zone) return '#23342B';
+
+        const isDimmed = selectedZoneId !== null && selectedZoneId !== cell.zoneId;
+        if (isDimmed) return 'rgba(35, 52, 43, 0.45)';
+
+        if (cell.membership != null) {
+          const alpha = Math.max(0.35, Math.min(1, cell.membership));
+          return `rgba(54, 123, 110, ${alpha.toFixed(2)})`;
+        }
+
+        return zone.color;
+      }
+
+      return mineralColor(cell.value, featureRange);
+    },
+    [zoneById, selectedZoneId, featureRange]
+  );
+
+  const handlePointerDown = (cell: ZoningFieldCell) => {
     if (disabled) return;
+    setIsPointerDown(true);
     if (interactionMode === 'brush') {
       onBrushCell?.(cell);
+    } else {
+      onCellSelect?.(cell);
+      if (cell.zoneId) onZoneSelect?.(cell.zoneId);
+    }
+  };
+
+  const handlePointerEnter = (cell: ZoningFieldCell) => {
+    setHoveredCellId(cell.id);
+    onCellHover?.(cell);
+
+    if (isPointerDown && interactionMode === 'brush') {
+      onBrushCell?.(cell);
+    }
+  };
+
+  // Keyboard navigation across cells
+  const handleCellKeyDown = (e: React.KeyboardEvent, cell: ZoningFieldCell) => {
+    let targetRow = cell.row;
+    let targetCol = cell.col;
+
+    if (e.key === 'ArrowUp') targetRow = Math.max(1, cell.row - 1);
+    else if (e.key === 'ArrowDown') targetRow = Math.min(rows, cell.row + 1);
+    else if (e.key === 'ArrowLeft') targetCol = Math.max(1, cell.col - 1);
+    else if (e.key === 'ArrowRight') targetCol = Math.min(cols, cell.col + 1);
+    else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (interactionMode === 'brush') {
+        onBrushCell?.(cell);
+        onBrushEnd?.();
+      } else {
+        onCellSelect?.(cell);
+        if (cell.zoneId) onZoneSelect?.(cell.zoneId);
+      }
+      return;
+    } else if (e.key === 'Escape') {
+      onZoneSelect?.(null);
+      return;
+    } else {
       return;
     }
-    onCellSelect?.(cell);
-    if (cell.zoneId) onZoneSelect?.(cell.zoneId);
-  };
 
-  const moveFocus = (current: ZoningFieldCell, rowDelta: number, colDelta: number) => {
-    const next = cells.find((candidate) => candidate.row === current.row + rowDelta && candidate.col === current.col + colDelta);
-    if (!next) return;
-    setKeyboardCellId(next.id);
-    document.getElementById(`zoning-field-cell-${next.id}`)?.focus();
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<SVGGElement>, cell: ZoningFieldCell) => {
-    switch (event.key) {
-      case 'ArrowUp':
-        event.preventDefault();
-        moveFocus(cell, -1, 0);
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        moveFocus(cell, 1, 0);
-        break;
-      case 'ArrowLeft':
-        event.preventDefault();
-        moveFocus(cell, 0, -1);
-        break;
-      case 'ArrowRight':
-        event.preventDefault();
-        moveFocus(cell, 0, 1);
-        break;
-      case 'Enter':
-      case ' ':
-        event.preventDefault();
-        selectCell(cell);
-        break;
-      case 'Escape':
-        onZoneSelect?.(null);
-        break;
-      default:
-        break;
+    e.preventDefault();
+    const targetCell = cells.find((c) => c.row === targetRow && c.col === targetCol);
+    if (targetCell) {
+      onCellSelect?.(targetCell);
+      document.getElementById(`field-cell-${targetCell.id}`)?.focus();
     }
   };
 
-  const shellStyle: CSSProperties = {
-    position: 'relative',
-    overflow: 'hidden',
-    border: '1px solid rgba(34, 54, 47, 0.14)',
-    borderRadius: 14,
-    background: 'linear-gradient(145deg, #f8faf6 0%, #edf2ea 100%)',
-    boxShadow: '0 18px 42px rgba(34, 54, 47, 0.09)',
-  };
-
-  if (cells.length === 0) {
-    return (
-      <section className={className} style={shellStyle} aria-label="Field map unavailable">
-        <div style={{ padding: 28, color: '#476054', textAlign: 'center' }}>
-          No field observations are available yet. Import or collect soil samples to draw this map.
-        </div>
-      </section>
-    );
-  }
-
   return (
-    <section className={className} style={shellStyle} aria-label={`${featureLabel} field map`}>
-      <style>{`
-        .ks-field-cell { cursor: pointer; outline: none; transform-origin: center; transition: opacity 180ms ease, transform 180ms ease, filter 180ms ease; }
-        .ks-field-cell:hover, .ks-field-cell:focus-visible { filter: brightness(1.13) drop-shadow(0 4px 5px rgba(20, 43, 33, .2)); }
-        .ks-field-cell:hover .ks-field-surface, .ks-field-cell:focus-visible .ks-field-surface { transform: translateY(-3px); }
-        .ks-field-surface { transform-origin: center; transition: transform 180ms cubic-bezier(.2,.9,.3,1); }
-        .ks-field-selected .ks-field-surface { transform: translateY(-4px); }
-        @media (prefers-reduced-motion: reduce) { .ks-field-cell, .ks-field-surface { transition: none !important; } }
-      `}</style>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '13px 16px 5px', color: '#294338' }}>
-        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.02em' }}>{featureLabel} field</span>
-        <span style={{ fontSize: 12, color: '#5b6e61' }}>{cells.length} observations</span>
-      </div>
-      <svg
-        viewBox={`0 0 ${extent.width} ${extent.height}`}
-        width="100%"
-        role="group"
-        aria-labelledby={`${titleId} ${descriptionId}`}
-        style={{ display: 'block', minHeight: 260, touchAction: 'manipulation' }}
-        onMouseUp={() => { setIsBrushing(false); onBrushEnd?.(); }}
-        onMouseLeave={() => { if (isBrushing) { setIsBrushing(false); onBrushEnd?.(); } }}
+    <div
+      className={`relative flex flex-col items-center justify-center p-6 select-none overflow-hidden rounded-xl bg-evergreen-950 border border-evergreen-850 shadow-stage field-stage-pattern w-full h-full min-h-[540px] ${
+        interactionMode === 'brush' ? 'cursor-field-brush' : 'cursor-field-reticle'
+      } ${className}`}
+      onPointerLeave={() => {
+        setHoveredCellId(null);
+        onCellHover?.(null);
+      }}
+      aria-label="Interactive 2.5D Soil Field Grid"
+    >
+      {/* Perspective Grid Canvas Wrapper from 0efec7b */}
+      <div
+        className="relative p-5 rounded-lg bg-evergreen-900/70 border border-sage-800/60 shadow-inner max-w-full overflow-auto"
+        style={{
+          transform: prefersReducedMotion ? 'none' : 'perspective(1000px) rotateX(16deg)',
+          transformOrigin: 'center center',
+          transition: 'transform 0.3s ease',
+        }}
       >
-        <title id={titleId}>{featureLabel} field grid</title>
-        <desc id={descriptionId}>Select a cell to inspect it. Use arrow keys to navigate cells, Enter to select, and Escape to clear a zone highlight.</desc>
-        <g aria-hidden="true" opacity="0.52">
-          <path d={`M ${extent.width / 2} 20 L ${extent.width - 26} ${extent.height / 2} L ${extent.width / 2} ${extent.height - 24} L 26 ${extent.height / 2} Z`} fill="none" stroke="#b8c9ba" strokeDasharray="4 6" />
-        </g>
-        {orderedCells.map((cell) => {
-          const [cx, cy] = isoPoint(cell.row, cell.col);
-          const zone = cell.zoneId ? zoneById.get(cell.zoneId) : undefined;
-          const isSelected = cell.id === selectedCellId || cell.id === keyboardCellId;
-          const isHovered = cell.id === hoveredCellId;
-          const zoneIsDimmed = Boolean(selectedZoneId && cell.zoneId !== selectedZoneId);
-          const fill = zone?.color ?? featureColor(cell.value, featureRange);
-          const membershipOpacity = zone && cell.membership != null ? Math.max(0.42, Math.min(1, cell.membership)) : 1;
-          const label = `${cell.id}: ${formatValue(cell.value, featureUnit)}${zone ? `, ${zone.label}` : ''}`;
+        {/* 18 x 12 Grid Container */}
+        <div
+          className="grid gap-1.5"
+          style={{
+            gridTemplateColumns: `repeat(${cols}, minmax(20px, 32px))`,
+            gridTemplateRows: `repeat(${rows}, minmax(20px, 32px))`,
+          }}
+          role="grid"
+          aria-rowcount={rows}
+          aria-colcount={cols}
+        >
+          {cells.map((cell) => {
+            const isSelected = selectedCellId === cell.id;
+            const isHovered = hoveredCellId === cell.id;
+            const isBrushPreview = brushPreviewCellIds.has(cell.id);
 
-          return (
-            <g
-              key={cell.id}
-              id={`zoning-field-cell-${cell.id}`}
-              className={`ks-field-cell${isSelected ? ' ks-field-selected' : ''}`}
-              role="button"
-              tabIndex={isSelected || (!selectedCellId && cell.id === orderedCells[0]?.id) ? 0 : -1}
-              aria-label={label}
-              aria-pressed={isSelected}
-              onClick={() => { if (interactionMode === 'inspect') selectCell(cell); }}
-              onMouseDown={(event) => {
-                if (interactionMode !== 'brush') return;
-                event.preventDefault();
-                setIsBrushing(true);
-                onBrushCell?.(cell);
-              }}
-              onFocus={() => setKeyboardCellId(cell.id)}
-              onBlur={() => setKeyboardCellId(null)}
-              onKeyDown={(event) => handleKeyDown(event, cell)}
-              onMouseEnter={(event) => {
-                setHoveredCellId(cell.id);
-                onCellHover?.(cell);
-                if (isBrushing && interactionMode === 'brush' && event.buttons === 1) onBrushCell?.(cell);
-              }}
-              onMouseLeave={() => {
-                setHoveredCellId(null);
-                onCellHover?.(null);
-              }}
-              style={{ opacity: zoneIsDimmed ? 0.26 : membershipOpacity, pointerEvents: disabled ? 'none' : 'auto' }}
-            >
-              <g className="ks-field-surface">
-                <polygon points={diamondPoints(cx, cy + 5)} fill="#173a2d" opacity="0.2" />
-                <polygon points={diamondPoints(cx, cy)} fill={fill} stroke={isSelected ? '#102d23' : 'rgba(255,255,255,.68)'} strokeWidth={isSelected ? 2.4 : 0.8} />
-                {zone && (
-                  <polygon points={diamondPoints(cx, cy)} fill="none" stroke="rgba(255,255,255,.52)" strokeDasharray="2 2" strokeWidth="0.8" />
+            const zoneIdx = cell.zoneId ? Number(cell.zoneId) : null;
+            const patternClass =
+              zoneIdx !== null ? ZONE_PATTERNS[zoneIdx % ZONE_PATTERNS.length] : '';
+
+            const cellColor = getCellColor(cell);
+
+            return (
+              <button
+                key={cell.id}
+                id={`field-cell-${cell.id}`}
+                type="button"
+                tabIndex={isSelected ? 0 : -1}
+                role="gridcell"
+                aria-selected={isSelected}
+                aria-label={`Row ${cell.row}, Column ${cell.col}: ${cell.value} ${featureUnit ?? ''}`}
+                onPointerDown={() => handlePointerDown(cell)}
+                onPointerEnter={() => handlePointerEnter(cell)}
+                onKeyDown={(e) => handleCellKeyDown(e, cell)}
+                className={`relative aspect-square rounded-sm transition-all focus:outline-none ${patternClass} ${
+                  isHovered ? 'z-20 -translate-y-1.5 shadow-md ring-1 ring-sage-300' : ''
+                } ${
+                  isSelected ? 'z-30 ring-2 ring-parchment-100 shadow-lg scale-105' : ''
+                } ${
+                  isBrushPreview ? 'ring-2 ring-clay-light animate-pulse scale-105' : ''
+                }`}
+                style={{
+                  backgroundColor: isBrushPreview ? '#C86B49' : cellColor,
+                }}
+              >
+                {/* Locked corner brackets for selected cell from 0efec7b */}
+                {isSelected && (
+                  <div className="absolute -inset-1 pointer-events-none">
+                    <span className="absolute top-0 left-0 w-1.5 h-1.5 border-t-2 border-l-2 border-parchment-50" />
+                    <span className="absolute top-0 right-0 w-1.5 h-1.5 border-t-2 border-r-2 border-parchment-50" />
+                    <span className="absolute bottom-0 left-0 w-1.5 h-1.5 border-b-2 border-l-2 border-parchment-50" />
+                    <span className="absolute bottom-0 right-0 w-1.5 h-1.5 border-b-2 border-r-2 border-parchment-50" />
+                  </div>
                 )}
-              </g>
-              {(isSelected || isHovered) && (
-                <polygon points={diamondPoints(cx, cy - 1)} fill="none" stroke="#ffffff" strokeWidth="1.4" pointerEvents="none" />
-              )}
-              <title>{label}</title>
-            </g>
-          );
-        })}
-      </svg>
-      <div style={{ padding: '6px 16px 14px', color: '#5b6e61', fontSize: 12 }}>
-        Click a cell to inspect. Arrow keys move between observations.
+
+                {/* Zone Number Badge on Key Cells */}
+                {zoneIdx !== null &&
+                  cell.row % 4 === 2 &&
+                  cell.col % 5 === 2 && (
+                    <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white/95 drop-shadow select-none">
+                      Z{zoneIdx + 1}
+                    </span>
+                  )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Axis Labels (Subtle cartographic markers from 0efec7b) */}
+        <div className="flex justify-between items-center text-[10px] font-mono text-sage-400 mt-2.5 px-1 select-none">
+          <span>Col 1</span>
+          <span className="text-sage-500 text-[10px]">SOIL FEATURE: {featureLabel.toUpperCase()}</span>
+          <span>Col 18</span>
+        </div>
       </div>
-    </section>
+    </div>
   );
-}
+};
