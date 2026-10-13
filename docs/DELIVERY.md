@@ -93,3 +93,30 @@ If a required provider is unavailable during demonstration, show the explicit un
 | Spline export or embed is restricted/heavy. | Keep optional, lazy, decorative, and replaceable by SVG/Three.js. |
 
 Do not publish accuracy without the audited split/evaluation report; crop compatibility without sourced thresholds and tests; or VRA, irrigation, and yield estimates without dedicated validation. Do not enable production 3D by default for a device class without profiling and an equivalent accessible path. Do not add an asset before it passes the [TRD asset gate](TRD.md#asset-policy). The CropSight academic-use decision is recorded in Decision 0004; it does not establish a public redistribution right.
+
+## Soil zoning module: known follow-up items and refinement punch list
+
+The following items are tracked for progressive refinement and verification in subsequent passes:
+
+### 1. Canvas & Viewport Responsiveness
+- **Camera Aspect & Viewport Refocus:** When collapsing or expanding the Left Config or Right Inspector panels, or toggling the "Focus" full-width mode, ensure OrbitControls and camera frustum smoothly adapt without requiring manual zoom re-centering.
+- **Brush Pointer Lock vs Orbit Dragging:** In 3D mode while Brush tool is active, enforce strict event isolation so rapid drag-painting strokes never trigger accidental camera orbit rotation.
+- **High-DPI / Retinal Screen Canvas Scaling:** Verify `<ClickSpark>` overlay canvas pixel ratio syncs accurately with window device pixel ratio (`window.devicePixelRatio`) during browser zoom levels (125%, 150%).
+- **Non-Color Zone Discrimination in 3D:** While the 2.5D Atlas Map uses SVG patterns (`pattern-zone-1` through `4`), evaluate adding procedural top-face texture stripes or discrete elevation tiers in 3D mode so zones are immediately distinguishable without relying on color alone per WCAG 2.2 AA.
+- **Perimeter Scenery Draw-Call Profiling:** Continuously profile instanced mesh and GLB clone draw calls for the 12 Kenney assets against TRD mobile and constrained GPU budgets (maintaining $\ge$ 60 FPS).
+
+### 2. Service & Algorithm Integration
+- **Automated Service Health Polling:** Add a periodic lightweight health check (`GET /health`) with an automatic reconnect status indicator so the UI recovers automatically when the local FastAPI server starts after the browser shell.
+- **Environment & Port Documentation:** Ensure `.env.example` documents `VITE_ZONING_API_URL` and `CORS_ORIGINS` to support custom local ports (e.g. Vite port 3000 vs 5173).
+- **Attribute Key Normalization:** Maintain test coverage for both camelCase and snake_case aliases (`soil_temperature` $\leftrightarrow$ `soilTemperature`, `ph` $\leftrightarrow$ `pH`) across all zoning endpoints.
+- **Iterative Convergence Diagnostics:** Surface additional diagnostic telemetry (e.g. iteration progression curve, inertia reduction) in an expandable panel for agronomy researchers.
+
+### 3. Field Editing & History
+- **Grid Boundary Clamping:** Verify drag-brush strokes that exit the 18×12 perimeter cleanly release the active pointer without leaving dangling hover indicators on edge cells.
+- **Batch Preset Undo Granularity:** Ensure single-click presets (Low nitrogen patch, High EC pocket, Acidic wash) are stamped with descriptive labels in the undo stack.
+- **Detailed CSV Import Validation Tooltips:** Display line-by-line validation errors if user-supplied soil CSV files have missing columns or out-of-range values.
+
+### 4. Crop Fit Sourced Evidence
+- **Agronomic Threshold Expansion:** When verified, peer-reviewed agronomic ranges for N/P/K and EC become available, expand rules beyond pH while keeping explicit "Not assessed" states for unverified parameters.
+- **Methodology & Limitation Disclosures:** Keep evidence disclosures prominent to reinforce that zoning and crop-fit screening provide spatial decision support, not automatic fertilizer prescriptions or yield guarantees.
+

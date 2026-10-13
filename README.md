@@ -21,14 +21,18 @@ npm install
 npm run dev
 ```
 
-Open the local Vite address shown by the second command (normally `http://127.0.0.1:5173`). The first run starts on the clearly labeled **Practice field**; its zones are calculated live. Import a real grid CSV to replace it. Required columns are `row`, `column`, `ph`, `nitrogen`, `phosphorus`, `potassium`, `ec`, and `soil_temperature`.
+Open the local Vite address shown by the second command (`http://localhost:3000/` or `http://127.0.0.1:3000/`). The first run starts on the clearly labeled **Practice field**; its zones are calculated live. Import a real grid CSV to replace it. Required columns are `row`, `column`, `ph`, `nitrogen`, `phosphorus`, `potassium`, `ec`, and `soil_temperature`.
 
 ### What is working now
 
-- Local deterministic K-means++ and Fuzzy C-means, including normalization, memberships, diagnostics, zone summaries, and validation of incomplete/constant data.
-- Zone- or cell-scoped Crop Fit: it evaluates the selected zone mean or an explicitly selected cell. The current source-backed rule set screens pH and leaves N/P/K, EC, temperature, moisture, and missing land factors explicitly unassessed rather than inventing thresholds.
-- Soil Investigation with validated manual records, local CSV preview/import, provenance, and a relative coordinate sketch.
-- Honest integration boundaries: SoilGrids and CropSight inputs/status are visible but no external request, imagery, NDVI, recommendation, or measured context is fabricated.
+- **Panoramic Soil Workspace:** Expansive hero field canvas (`clamp(580px, 74vh, 840px)`) with collapsible Run Config (left) and Inspector (right) panels, and a single-click "Focus" zen mode expanding the canvas to 100% width.
+- **Unified 3D & 2.5D Field Modes:** Seamless toggle between 3D Realistic (instanced low-relief soil pedestals framed by 12 Kenney Nature Kit models in a seeded natural perimeter) and 2.5D Atlas Map (isometric grid with WCAG AA patterns and locked survey brackets from commit `0efec7b`).
+- **Tactile Micro-Interactions:** Cartographic guidelines and surveyor corner brackets (`FieldReticle`), tactile radial spark bursts on clicks and brush dabs (`ClickSpark`), live coordinate HUD with glyph descramble (`DecryptedText`), and custom cursors (`cursor-field-reticle`, `cursor-field-brush`).
+- **Local Deterministic Zoning:** Real K-means++ and Fuzzy C-means execution with normalization, membership matrices, silhouette diagnostic, iterations count, and zone profiles.
+- **Zone- or Cell-Scoped Crop Fit:** Sourced evidence checks for Apple, Tomato, and Potato evaluated against exact zone means or cell profiles.
+- **Soil Investigation:** Validated manual records, local CSV preview/import, provenance metadata, and relative coordinates.
+- **Honest Integration Boundaries:** SoilGrids and CropSight inputs/status are clearly labeled; no external telemetry or recommendation is fabricated.
+- **Refinement Punch List:** Known items for continuous polish and optimization are tracked in [Delivery plan: follow-up punch list](docs/DELIVERY.md#soil-zoning-module-known-follow-up-items-and-refinement-punch-list).
 
 ## Documentation map
 
