@@ -1,6 +1,6 @@
 # UX specification
 
-**Status:** historical UX contract for the previous grid-painting workflow. It is superseded for the current Soil Zoning workflow by the implemented boundary/sample UI in [Phase 2](plans/phase-2-soil-zoning-ui-redesign.md), which uses the `/v2` API. Do not use brush/preset interactions below as the current implementation spec. Product scope remains in the [PRD](PRD.md); backend contracts are in the [TRD](TRD.md) and phase plans.
+**Status:** historical UX contract for the previous grid-painting workflow. It is superseded for the current Soil Zoning workflow by the implemented boundary/sample UI in [Phase 2](plans/phase-2-soil-zoning-ui-redesign.md), which uses the `/v2` API. Its two-view Field Monitoring section is also superseded by the three-view design in [Phase 4](plans/phase-4-field-monitoring-transformation.md). Do not use brush/preset interactions below as the current implementation spec. Product scope remains in the [PRD](PRD.md); backend contracts are in the [TRD](TRD.md) and phase plans.
 
 The existing prototype UI is not the design baseline. Rebuild the experience from the user's jobs and real module boundaries. There is no presentation-only mock phase, no canned result, and no fake algorithm progress. Use synthetic fixtures only for tests/benchmarks or an explicitly labeled development diagnostic.
 
@@ -20,7 +20,7 @@ The existing prototype UI is not the design baseline. Rebuild the experience fro
 | Field Lab | Inspect/edit soil data and run K-means or Fuzzy C-means Soil Zoning. |
 | Crop Fit | A contextual panel within Field Lab for three separate, source-backed per-crop soil assessments. It is not a new global destination. |
 | Leaf Diagnosis | Submit a leaf image to the shared MobileNetV3-Small classifier and inspect its actual result. |
-| Field Monitoring | Separate workspace with Soil Investigation and Vegetation Monitoring. |
+| Field Monitoring | Separate workspace with Soil Investigation, historical telemetry replay, and independent Vegetation Monitoring. |
 | Evidence & Methods | Explain datasets, algorithms, provenance, actual evaluation, and limitations. |
 
 Keep one clear global status for the active field/project and data source where relevant. Do not use a global agronomic score or collapse module outputs into one “farm health” indicator.
@@ -54,7 +54,7 @@ Crop Fit remains a separate rules calculation accessed in the Field Lab context.
 
 ### Field Monitoring
 
-Field Monitoring has two separate views. Do not display SoilGrids as a sample or present NDVI as a soil measurement.
+Field Monitoring has three separate views; use the detailed current design in [Phase 4](plans/phase-4-field-monitoring-transformation.md). Do not display SoilGrids as a sample or present NDVI as a soil measurement.
 
 #### Soil Investigation
 
@@ -63,6 +63,10 @@ The user creates an investigation and enters a dated sample or imports a validat
 An optional SoilGrids panel accepts a location/area, supported property, and depth layer. Show the modeled estimate and available uncertainty quantiles, native 250 m resolution, product/date provenance, and the label **Regional modeled context — not a field sample**. Keep this layer visually and semantically distinct from user-measured samples. It does not feed Soil Zoning or Crop Fit automatically.
 
 Useful outputs are a sample register, sample-location map, parameter history where comparable repeat observations exist, missing-context cues, and the separate broad SoilGrids context panel. The initial experience is manual/imported investigations; it does not imply a live sensor network.
+
+#### Historical Telemetry Replay
+
+Show a persistent attribution/time-period/not-live badge for the Parma 2023 trial. Preserve its 100%/60%/30% treatment labels, raw source timestamps, units, and missing values. Soil humidity is `%RH` sensor signal, not VWC. Display the GRU only as an experimental comparison, alongside holdout-versus-persistence metrics; the current model loses to persistence at all horizons. Isolation Forest produces review candidates, not faults. No KshetraSense zone, live gateway, irrigation action, valve, or flow is implied. The calibrated-VWC FAO-56 advisory is a separate optional form with explicit user-provided site parameters and human-review wording.
 
 #### Vegetation Monitoring — CropSight
 

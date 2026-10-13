@@ -1,0 +1,306 @@
+{
+  "modelVersion": "soil-signal-gru-v1",
+  "framework": "Keras 3 / PyTorch CPU backend",
+  "kerasVersion": "3.15.1",
+  "torchVersion": "2.14.0+cpu",
+  "featureOrder": [
+    "soilHumiditySignalPctRh",
+    "soilTemperatureC",
+    "soilElectricalConductivityUsCm",
+    "airTemperatureC",
+    "airRelativeHumidityPctRh"
+  ],
+  "featureUnits": {
+    "soilHumiditySignalPctRh": "%RH sensor signal; not VWC",
+    "soilTemperatureC": "\u00b0C at 20 cm",
+    "soilElectricalConductivityUsCm": "\u00b5S/cm",
+    "airTemperatureC": "\u00b0C; one shared environmental station",
+    "airRelativeHumidityPctRh": "%RH; one shared environmental station"
+  },
+  "target": "soilHumiditySignalPctRh",
+  "targetUnit": "%RH sensor signal; not VWC",
+  "windowSteps": 144,
+  "nominalStepMinutes": 10,
+  "horizonsHours": [
+    6,
+    12,
+    24
+  ],
+  "architecture": [
+    "GRU(64, return_sequences=True)",
+    "Dropout(0.1)",
+    "GRU(32)",
+    "Dense(3) residual head, zero initialized"
+  ],
+  "outputHead": "scaled future-minus-current sensor signal residual, added to persistence baseline",
+  "loss": "Huber(delta=1.0)",
+  "optimizer": "Adam(learning_rate=0.001)",
+  "seed": 42,
+  "trainingStrideSteps": 12,
+  "trainingOriginIntervalMinutes": 120,
+  "maximumEpochs": 40,
+  "batchSize": 256,
+  "earlyStopping": {
+    "monitor": "val_loss",
+    "patience": 10,
+    "restoreBestWeights": true
+  },
+  "shuffleWithinTrainingSplit": true,
+  "splitRatios": {
+    "train": 0.7,
+    "validation": 0.15,
+    "test": 0.15
+  },
+  "splitBoundaries": {
+    "trainEndExclusiveUtc": "2023-08-22T01:00:00Z",
+    "validationEndExclusiveUtc": "2023-09-02T11:30:00Z"
+  },
+  "sampleCounts": {
+    "train": 1804,
+    "validation": 358,
+    "test": 352
+  },
+  "minMaxScaler": {
+    "fitOn": "complete training-period feature rows only",
+    "minimum": [
+      0.2985791563987732,
+      19.600000381469727,
+      2.8843271732330322,
+      10.100000381469727,
+      18.080759048461914
+    ],
+    "maximum": [
+      56.810001373291016,
+      32.599998474121094,
+      1759.1982421875,
+      41.75907897949219,
+      97.0
+    ],
+    "targetMinimum": 0.2985791563987732,
+    "targetMaximum": 56.810001373291016
+  },
+  "holdoutMetrics": {
+    "6h": {
+      "sampleCount": 352,
+      "gru": {
+        "maePctRh": 0.3781103789806366,
+        "rmsePctRh": 0.4432227611541748,
+        "r2": 0.9304660558700562
+      },
+      "persistenceBaseline": {
+        "maePctRh": 0.08344358950853348,
+        "rmsePctRh": 0.12700891494750977,
+        "r2": 0.9942901730537415
+      },
+      "beatsPersistenceByMae": false,
+      "byLine": {
+        "1": {
+          "sampleCount": 125,
+          "gru": {
+            "maePctRh": 0.3655187487602234,
+            "rmsePctRh": 0.4246427118778229,
+            "r2": 0.6949677467346191
+          },
+          "persistenceBaseline": {
+            "maePctRh": 0.09683123975992203,
+            "rmsePctRh": 0.17114852368831635,
+            "r2": 0.9504498839378357
+          }
+        },
+        "2": {
+          "sampleCount": 125,
+          "gru": {
+            "maePctRh": 0.3679823875427246,
+            "rmsePctRh": 0.4478791058063507,
+            "r2": -1.9214873313903809
+          },
+          "persistenceBaseline": {
+            "maePctRh": 0.08193473517894745,
+            "rmsePctRh": 0.10012560337781906,
+            "r2": 0.85399329662323
+          }
+        },
+        "3": {
+          "sampleCount": 102,
+          "gru": {
+            "maePctRh": 0.40595293045043945,
+            "rmsePctRh": 0.4594807028770447,
+            "r2": -0.3294018507003784
+          },
+          "persistenceBaseline": {
+            "maePctRh": 0.06888625025749207,
+            "rmsePctRh": 0.08652240037918091,
+            "r2": 0.9528611898422241
+          }
+        }
+      }
+    },
+    "12h": {
+      "sampleCount": 352,
+      "gru": {
+        "maePctRh": 1.2650020122528076,
+        "rmsePctRh": 1.3883934020996094,
+        "r2": 0.30038177967071533
+      },
+      "persistenceBaseline": {
+        "maePctRh": 0.13961796462535858,
+        "rmsePctRh": 0.19535967707633972,
+        "r2": 0.9861482381820679
+      },
+      "beatsPersistenceByMae": false,
+      "byLine": {
+        "1": {
+          "sampleCount": 125,
+          "gru": {
+            "maePctRh": 1.2824273109436035,
+            "rmsePctRh": 1.4480314254760742,
+            "r2": -3.078892230987549
+          },
+          "persistenceBaseline": {
+            "maePctRh": 0.18288110196590424,
+            "rmsePctRh": 0.2677050530910492,
+            "r2": 0.8605882525444031
+          }
+        },
+        "2": {
+          "sampleCount": 125,
+          "gru": {
+            "maePctRh": 1.1808239221572876,
+            "rmsePctRh": 1.2817846536636353,
+            "r2": -27.662952423095703
+          },
+          "persistenceBaseline": {
+            "maePctRh": 0.12495339661836624,
+            "rmsePctRh": 0.1484050303697586,
+            "r2": 0.6157728433609009
+          }
+        },
+        "3": {
+          "sampleCount": 102,
+          "gru": {
+            "maePctRh": 1.3468068838119507,
+            "rmsePctRh": 1.4384667873382568,
+            "r2": -13.366891860961914
+          },
+          "persistenceBaseline": {
+            "maePctRh": 0.10457070916891098,
+            "rmsePctRh": 0.1299685388803482,
+            "r2": 0.8827157616615295
+          }
+        }
+      }
+    },
+    "24h": {
+      "sampleCount": 352,
+      "gru": {
+        "maePctRh": 0.9798390865325928,
+        "rmsePctRh": 1.2090710401535034,
+        "r2": 0.44222891330718994
+      },
+      "persistenceBaseline": {
+        "maePctRh": 0.20365649461746216,
+        "rmsePctRh": 0.2841742932796478,
+        "r2": 0.96918785572052
+      },
+      "beatsPersistenceByMae": false,
+      "byLine": {
+        "1": {
+          "sampleCount": 125,
+          "gru": {
+            "maePctRh": 1.3944084644317627,
+            "rmsePctRh": 1.6517071723937988,
+            "r2": -6.403415679931641
+          },
+          "persistenceBaseline": {
+            "maePctRh": 0.34267088770866394,
+            "rmsePctRh": 0.4217764437198639,
+            "r2": 0.5172406435012817
+          }
+        },
+        "2": {
+          "sampleCount": 125,
+          "gru": {
+            "maePctRh": 0.6545229554176331,
+            "rmsePctRh": 0.797402024269104,
+            "r2": -14.839286804199219
+          },
+          "persistenceBaseline": {
+            "maePctRh": 0.11098039150238037,
+            "rmsePctRh": 0.15252533555030823,
+            "r2": 0.420484721660614
+          }
+        },
+        "3": {
+          "sampleCount": 102,
+          "gru": {
+            "maePctRh": 0.8704599142074585,
+            "rmsePctRh": 0.9603608846664429,
+            "r2": -7.3504791259765625
+          },
+          "persistenceBaseline": {
+            "maePctRh": 0.14686942100524902,
+            "rmsePctRh": 0.17934668064117432,
+            "r2": 0.7087746858596802
+          }
+        }
+      }
+    }
+  },
+  "qualityDisposition": {
+    "6h": "does_not_beat_persistence",
+    "12h": "does_not_beat_persistence",
+    "24h": "does_not_beat_persistence"
+  },
+  "dataset": {
+    "title": "IoT-based Dataset of a Tomato Cultivation Under Different Irrigation Regimes",
+    "version": 2,
+    "doi": "10.17632/35wh56287y.2",
+    "sourceUrl": "https://data.mendeley.com/datasets/35wh56287y/2",
+    "license": "CC BY 4.0",
+    "authors": [
+      "Laura Belli",
+      "Luca Davoli",
+      "Giulia Oddi",
+      "Luca Preite",
+      "Martina Galaverni",
+      "Tommaso Ganino",
+      "Gianluigi Ferrari"
+    ],
+    "collectedPeriodLocal": "2023-06-29/2023-09-13",
+    "publishedPaperDoi": "10.1016/j.dib.2025.111521"
+  },
+  "datasetSourceFiles": [
+    {
+      "path": "raw/indicators.csv",
+      "sizeBytes": 4336,
+      "sha256": "1ece7aea2a87cb8c645762e9579c2032f43338f5eaaf2508ee5be7d3366997c1"
+    },
+    {
+      "path": "raw/README.TXT",
+      "sizeBytes": 2147,
+      "sha256": "5de3dce8fcb0d2a6e7fdbee9249d83e163a0ab6221cc0259415fec158fb9f73c"
+    },
+    {
+      "path": "raw/stuard_environmental_data.csv",
+      "sizeBytes": 1206822,
+      "sha256": "282c2e5366510416e7e9de8c1750cb67d6c773ce0d985aae54206f50a7743ead"
+    },
+    {
+      "path": "raw/stuard_soil_data.csv",
+      "sizeBytes": 3500782,
+      "sha256": "b6ec194a052863a17c57ad2303e93afe12ea101ffd8773865903e95f2186f9dc"
+    },
+    {
+      "path": "raw/stuard_water_meter_data.csv",
+      "sizeBytes": 3038311,
+      "sha256": "aa128bd3d3fc9ca971326870555c9eadd8f76c054611a87b90bc7c45e591057c"
+    }
+  ],
+  "createdUtc": "2026-10-13T23:19:42.873421Z",
+  "limitations": [
+    "Historical Parma trial only; no KshetraSense farm validation.",
+    "Target is the sensor-reported soil humidity %RH signal, not volumetric water content.",
+    "Point forecast only; no calibrated uncertainty interval or irrigation recommendation."
+  ],
+  "bestValidationLoss": 0.002015845850110054
+}

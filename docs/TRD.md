@@ -1,12 +1,12 @@
 # Technical requirements
 
-**Status:** Phases 1–2 are implemented: the sparse-sample zoning API and its boundary/sample workspace, returned-result maps, diagnostics, and selected-cell/zone Crop Fit. The five-phase architecture and current implementation status are indexed in [plans/README.md](plans/README.md); product behavior is defined by the [PRD](PRD.md), domain terms by [GLOSSARY](../GLOSSARY.md), and user-facing interactions by the [UX specification](UX-SPEC.md).
+**Status:** Phases 1–3 are implemented: field-scale sparse-sample zoning and selected-cell/zone Crop Fit, plus a provenance-checked historical telemetry service with a trained but non-actionable GRU benchmark. The five-phase architecture and current implementation status are indexed in [plans/README.md](plans/README.md); product behavior is defined by the [PRD](PRD.md), domain terms by [GLOSSARY](../GLOSSARY.md), and user-facing interactions by the [UX specification](UX-SPEC.md). Phase 4 owns the telemetry replay UI.
 
 ## System boundary
 
-The product shell is a local browser application. User-authored soil state and each analysis module's view state remain isolated. Clustering, crop-rule evaluation, and image inference use isolated, versioned modules/services behind stable request/result contracts. Field Monitoring owns its sample records, optional SoilGrids context, and independent vegetation-monitoring session. It has no implicit read/write path to Soil Zoning, Crop Fit, or Leaf Diagnosis.
+The product shell is a local browser application. User-authored soil state and each analysis module's view state remain isolated. Clustering, crop-rule evaluation, image inference, and historical telemetry use versioned modules/services behind stable request/result contracts. Field Monitoring owns its sample records, optional SoilGrids context, historical replay controls, and independent vegetation-monitoring session. These flows have no implicit read/write path to Soil Zoning, Crop Fit, or Leaf Diagnosis.
 
-Keep React, TypeScript, and Vite for the host UI, with Three.js/React Three Fiber for the functional field and a complete 2D path. The local FastAPI zoning service currently uses the repository's NumPy K-means++/FCM implementations and rule-based crop-fit module; the image-model runtime and Keras/TensorFlow deployment remain a separate Phase 5 decision and are not changed by Phase 1. Run the pinned CropSight Streamlit application as a separate local sub-application with its own dependencies, configuration, and state. Preserve its files as-is; connect it through a separate Field Monitoring route/launch boundary rather than importing its UI code into the host React tree. SoilGrids access is optional and should use a downloaded/cached supported product subset, not require its currently paused REST endpoint.
+Keep React, TypeScript, and Vite for the host UI, with Three.js/React Three Fiber for the functional field and a complete 2D path. The local FastAPI service uses the repository's NumPy K-means++/FCM implementations and rule-based crop-fit module. Historical replay is mounted in the same FastAPI process under `/v1/telemetry/`, isolated from zoning state. Its trained GRU uses Keras 3 with the CPU PyTorch backend; the distinct image-model runtime remains part of Phase 5 and is not selected here. Run the pinned CropSight Streamlit application as a separate local sub-application with its own dependencies, configuration, and state. Preserve its files as-is; connect it through a separate Field Monitoring route/launch boundary rather than importing its UI code into the host React tree. SoilGrids access is optional and should use a downloaded/cached supported product subset, not require its currently paused REST endpoint.
 
 ```text
 Browser UI
@@ -19,6 +19,7 @@ Browser UI
 Field Monitoring
   ├─ soil investigation records ─> local persistence / validated import
   ├─ optional SoilGrids context ─> cached/downloaded coarse raster adapter
+  ├─ historical telemetry replay ─> pinned local data + isolated replay/model service
   └─ vegetation monitoring ─────> isolated CropSight Streamlit sub-application
                                     (own circular AOI, date window, and provider auth)
 
@@ -76,9 +77,26 @@ CropSightSession {
   startDate, endDate, cropContext?, growthStage?,
   selectedSupportedMethod?, providerProjectReference?
 }
+
+HistoricalTelemetryReplay {
+  datasetVersion, sourceHashes, trialPeriod, replayTimestampUtc,
+  treatmentLineId, treatmentLabel,
+  sourceObservations, originalUnits,
+  experimentalSignalForecast { status, targetUnit, inputResamplingCount, holdoutDisposition }?,
+  anomalyReviewCandidate?,
+  capabilities: { liveTelemetry: false, zoneBinding: false, actuation: false }
+}
 ```
 
 Soil samples support manual entry and validated CSV import. Keep original values/units and record any explicit conversion. SoilGrids output is a separate contextual result; never create synthetic fine-resolution cells from its 250 m raster or feed it to the default soil-zoning feature matrix. CropSight keeps a circular AOI and its own date/result state; no cadastral parcel, soil samples, zoning assignments, Crop Fit results, or leaf results are passed into it. The as-is workflow depends on its configured Earth Engine access; optional rainfall remains independently sourced and labeled. The current FastAPI endpoint does not expose map-ready NDVI rasters/zone polygons, so the initial reuse target is the standalone Streamlit application, not that API as a shared-map contract.
+
+### Historical telemetry service
+
+The service loads the CC BY 4.0 Mendeley v2 Parma tomato-trial files from `services/telemetry/data/raw/` and verifies each pinned file's SHA-256 and size before parsing. The source spans 2023-06-29 through 2023-09-13 and provides three 100/60/30%-of-Irriframe treatment lines, one shared environment stream, soil humidity `%RH` signal (not VWC), soil EC `µS/cm`, temperatures in °C, and a source-reported meter field. Raw source observations/timestamps remain distinct from the nominal 10-minute model grid; the latter bridges only valid gaps of at most 30 minutes and does not extrapolate.
+
+`GET /v1/telemetry/health` verifies service readiness; `/metadata`, `/state`, `/stream`, `/history`, and read-only `/ws` expose provenance and historical playback. `POST /control` accepts bounded seek, play/pause, and speeds 1/10/60/360. Playback state is in-memory and process-local, so it resets on restart and is intended for the local single-worker demo. Treatment line IDs are not zoning IDs; the API exposes no live sensor connection, device identity, valve, actuation, or implicit soil-sample handoff.
+
+The GRU consumes a complete 24-hour, five-feature window and emits `%RH` sensor-signal point estimates at +6/+12/+24 hours. Its metadata includes chronological split boundaries, train-only scaler parameters, source hashes, MAE/RMSE/R², and a per-horizon persistence comparison. The current artifact fails to beat persistence at every horizon; these predictions are research/evaluation output only. An Isolation Forest fitted on the first 70% of the timeline produces review candidates without fault probability/diagnosis semantics. The separate `/water-balance/advisory` endpoint accepts explicit VWC fractions and calibrated field parameters for FAO-56 TAW/RAW screening; it cannot consume the `%RH` replay or actuate hardware.
 
 The new sample records must persist across application restarts so users can review investigations over time. The exact local storage engine and migrations are an implementation choice, but data must stay local by default and be exportable/erasable. Provider credentials must never be embedded in frontend code or committed.
 
@@ -171,6 +189,7 @@ Use `.glb` as the runtime interchange format for a justified imported model. The
 | Soil investigation | Manual/CSV validation, original-unit preservation, sample metadata completeness, local persistence, export/delete behavior. |
 | SoilGrids | Product/depth/property/quantile/resolution provenance and explicit modeled-context display; no coupling into zoning/crop rules. |
 | CropSight | Pinned source startup, Earth Engine configuration and failure handling, date/AOI correctness, supported map/time-series consistency, no KshetraSense module-data dependency. |
+| Historical telemetry | Source-hash verification, strict parser, unit/source timestamp fidelity, bounded interpolation, deterministic playback, API bounds, GRU shape/split/holdout-vs-persistence metrics, anomaly-candidate semantics, FAO-56 hand calculation, and no zone/actuation coupling. |
 | UI/renderer | Returned-geometry parity, 2D keyboard path, 3D selection/orbit/fit, reduced motion, scene-budget guard, and fallback behavior. |
 | Performance | Trace against all budgets above on named desktop and constrained/mobile reference devices. |
 
@@ -179,7 +198,7 @@ Use `.glb` as the runtime interchange format for a justified imported model. The
 These choices remain for implementation and benchmarking; they do not change the accepted product or module boundaries:
 
 - Local service topology and transport for zoning/rules/inference.
-- Final local inference runtime, model artifact size, and distribution strategy after benchmark.
+- Leaf-classifier inference runtime, audited weights, artifact size, and distribution strategy after its Phase 5 evaluation; the model architecture remains MobileNetV3-Small.
 - Device-specific 3D performance after profiling on named hardware.
 - Whether to include Spline after current free-tier/export verification. Its absence must not block any task.
 - Exact local persistence mechanism and validated sample-import file format.

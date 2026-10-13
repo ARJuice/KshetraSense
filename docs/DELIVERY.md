@@ -1,6 +1,6 @@
 # Delivery plan and acceptance
 
-**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phases 1–2 are complete, with Phases 3–5 remaining. No visual-only or fixture-output product phase is planned.
+**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phases 1–3 are complete, Phase 4 UI and Phase 5 leaf contract/verification remain. No visual-only or fixture-output product phase is planned.
 
 ## Delivery principles
 
@@ -16,13 +16,15 @@
 | --- | --- | --- |
 | 1. Backend Algorithmic Core — complete | GeoJSON/UTM grid, IDW, KshetraSense SHI, Auto-K K-means/FCM, adjacent-profile merge, contiguous components, source-sample sensitivity, and WSN/gateway candidates at `/v2/zoning/run`. | Backend tests pass; estimates, provisional score, sensitivity assumptions, and geometry-only candidates are labeled honestly. |
 | 2. Soil Zoning UI Redesign — complete | Boundary/sample input, real `/v2` integration, returned clipped-cell layers/diagnostics, and selected-cell/zone Crop Fit via the existing rules endpoint. | Frontend/service tests pass; no canned result; edits mark prior runs stale; 2D/3D use the same response geometry; 3D obeys cell and triangle limits. |
-| 3. WSN Telemetry Service & Edge AI — planned | Verify the selected replay data, implement a provenance-aware playback API, GRU moisture forecast, FAO-56 MAD logic, and anomaly filtering. | Dataset/schema/split and forecasting tests pass; no hardware actuation claim unless validated separately. |
-| 4. Field Monitoring UI Transformation — planned | Build monitoring views for the telemetry workflow and the isolated CropSight vegetation workflow; preserve Soil Investigation and SoilGrids boundaries. | Provider/data failures are honest; no monitoring output silently changes zoning or Crop Fit. |
+| 3. Historical Telemetry Replay & Soil-Signal Forecast — complete | Pinned Parma research data, provenance-aware playback API, experimental `%RH`-signal GRU, candidate-only anomaly screen, and separate calibrated-VWC FAO-56 advisory. | 62 Python tests pass; model/data metadata and source hashes are recorded. The GRU fails to beat persistence at all horizons and is explicitly evaluation-only; no live/zone/actuation claim. |
+| 4. Field Monitoring UI Transformation — next | Build the dedicated historical replay view alongside Soil Investigation and the isolated CropSight workflow; preserve module boundaries. | Replay provenance, raw units, data quality, and weak model performance are visible; provider/data failures are honest; no monitoring output silently changes zoning or Crop Fit. |
 | 5. Leaf Contract, Verification & Defense — planned | Freeze and verify the 17-class MobileNetV3-Small interface and evaluation/data contract; prepare demonstration and defense materials. | Model, preprocessing, class map, evaluation report, and inference interface agree; image bytes are not persisted by default. |
 
 The sequence permits independent work on the crop model, soil processing, or CropSight environment, but user-visible completion gates remain in order. A visual element may be polished during its functional phase; it must never be used to disguise an unimplemented computation.
 
 ## Monitoring acceptance
+
+Phase 3 backend acceptance is verified by `services/zoning/tests/test_telemetry_data.py`, `test_telemetry_playback.py`, `test_telemetry_water_balance.py`, and `test_telemetry_api.py`, together with the existing zoning tests. This verifies the API/data/model contract only; the dedicated replay screen remains Phase 4 work.
 
 | ID | Pass condition | Evidence | Status |
 | --- | --- | --- | --- |
@@ -65,10 +67,11 @@ The sequence permits independent work on the crop model, soil processing, or Cro
 1. Open Field Lab with a real supplied dataset; identify its source and measurement context before running Soil Zoning.
 2. Change one source sample value, show that the previous run is stale but retained, rerun zoning, then inspect the returned summaries and diagnostics.
 3. Open Crop Fit for a selected cell/zone and explain the independent source-backed assessment and any unassessed factors.
-4. Submit an eligible leaf photo and inspect the actual classifier result and review limitations.
-5. In Field Monitoring, inspect dated soil samples, compare only compatible repeated measurements, and view SoilGrids separately as coarse modeled context.
+4. In Field Monitoring, inspect dated soil samples, compare only compatible repeated measurements, and view SoilGrids separately as coarse modeled context.
+5. After Phase 4, replay the Parma research series and explain its `%RH` units, source/treatment labels, model-versus-persistence holdout result, anomaly-candidate semantics, and lack of live/actuation behavior.
 6. Open CropSight, enter its own circular AOI and date window, view the actual imagery/NDVI/time-series result, and identify a patch to scout without claiming a diagnosis or prescription.
-7. Show Evidence & Methods, the provenance chain, real evaluation reports, and unavailable/deferred features.
+7. Show the Leaf Diagnosis contract and Evidence & Methods; run a leaf classifier only after its separately built model and inference service pass Phase 5 acceptance.
+8. Show the provenance chain, measured evaluation reports, and unavailable/deferred features.
 
 If a required provider is unavailable during demonstration, show the explicit unavailable state and setup requirement. Do not substitute a canned screen as if the provider ran.
 

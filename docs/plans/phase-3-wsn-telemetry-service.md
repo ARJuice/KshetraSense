@@ -1,228 +1,122 @@
-# Phase 3: WSN Telemetry Service & Edge AI Engine
+# Phase 3: Historical Telemetry Replay & Soil-Signal Forecast
 
-**Scope:** `services/telemetry/` (or `services/zoning/app/telemetry/`) — Python backend service & Edge AI inference  
-**Depends on:** Preprocessed Belli et al. (2022) tomato dataset & trained lightweight GRU model  
-**Produces:** Playback REST/WebSocket API, continuous multi-node telemetry stream, 12h soil moisture forecast, FAO-56 irrigation actuation decisions, and sensor anomaly filtering  
-**Estimated effort:** Week 3
+**Status:** Implemented and verified on 2026-10-14.
+**Scope:** `services/telemetry/`, mounted under the existing local FastAPI service.
+**Depends on:** Phase 1–2 zoning service; the attributed Mendeley tomato telemetry dataset.
+**Produces:** A clearly labeled historical replay, a trained two-layer GRU for a raw soil-sensor humidity signal, unsupervised anomaly candidates, and a separate unit-checked FAO-56 MAD advisory calculator.
+**Decision records:** [Decision 0007](../decisions/0007-phase-3-telemetry-evidence-and-boundaries.md) · [Decision 0008](../decisions/0008-gru-holdout-quality-and-use.md)
 
----
-
-## 3.1 Overview & Agronomic Rationale
-
-In the project thesis and presentation:
-$$\textbf{Sense (WSN Nodes)} \longrightarrow \textbf{Decide (Edge AI)} \longrightarrow \textbf{Act (Precision Irrigation)}$$
-
-Because physical ESP32/LoRa hardware cannot be attached to every grading station during academic evaluation, Phase 3 provides an **authentic Hardware-in-the-Loop Telemetry Replay Service** powered by real-world commercial LoRaWAN farm observations.
-
-Rather than synthesizing random sine waves, the service replays the **Belli et al. (2022)** dataset (*Mendeley Data DOI: 10.17632/35wh56287y*), recorded on an open-field tomato farm in Parma, Italy across three distinct irrigation lines. 
-
-The service couples this data stream with an **Edge AI Predictive Engine** (2-layer GRU) and an **Agronomic Decision Engine** based on FAO-56 Management Allowed Depletion (MAD) to execute automated solenoid valve irrigation decisions.
+The implementation is mounted in the existing FastAPI service. The pinned source/model artifacts are present, and the current Python suite passes **62 tests** (including telemetry API, parser, playback, FAO-56, and the existing zoning tests). The trained GRU was worse than persistence on all three holdout horizons: MAE 0.378/1.265/0.980 `%RH` at +6/+12/+24h versus 0.083/0.140/0.204 for persistence. It remains an evaluation artifact only; see Decision 0008.
 
 ---
 
-## 3.2 Dataset Pipeline & Preprocessing
+## 3.1 User and product contract
 
-### 3.2.1 Raw Data Sources (Belli et al. 2022)
-The dataset comprises continuous 10-minute records across a commercial tomato growing season (~11,000 timestamps):
-- **Line 1 (Node 1):** 100% of optimal *Irriframe* water requirement (Well-watered control).
-- **Line 2 (Node 2):** 60% of water requirement (Moderate deficit irrigation).
-- **Line 3 (Node 3):** 30% of water requirement (Severe deficit stress).
+Field Monitoring will let a user replay a real, published research dataset and see what a local telemetry/forecasting pipeline does. It is a historical benchmark, not a live KshetraSense farm connection. It must carry a persistent label such as **“Historical research replay · Parma tomato trial · 2023 · not live telemetry.”**
 
-### 3.2.2 Extraction & Preprocessing Pipeline
-1. **Time Synchronization:** Resample raw asynchronous LoRa packets into a uniform 10-minute grid across all three nodes using linear interpolation for gaps $<30\text{ min}$.
-2. **Feature Curation:** Extract the essential agronomic feature vector per node:
-   - `soil_moisture_vwc`: Volumetric Water Content ($\%$ or $\text{m}^3/\text{m}^3$)
-   - `soil_temperature`: Soil temperature at $15\text{ cm}$ depth ($^\circ\text{C}$)
-   - `soil_ec`: Bulk soil electrical conductivity ($\text{mS/cm}$ or $\text{dS/m}$)
-   - `air_temperature`: Ambient microclimate temperature ($^\circ\text{C}$)
-   - `air_humidity`: Relative humidity ($\%$)
-   - `water_volume_liters`: Actual cumulative water applied per regime (L)
-   - `battery_volts`: LoRaWAN node battery health ($3.0 - 4.2\text{ V}$)
-3. **Storage Format:** Package the unified multi-node time-series as a high-performance, compressed Parquet file (`services/data/telemetry_tomato.parquet`, $\approx 1.8\text{ MB}$), accompanied by SQLite for fast temporal range indexing.
+The replay has three measured soil-sensor lines and one shared environmental station. Dataset treatment line IDs are retained as research identifiers; they are **not** mapped to the user's KshetraSense zones or WSN placement suggestions. A future deployment can replace the replay adapter with actual validated sensors without changing the forecast/advisory data contracts.
+
+The forecast predicts only the source sensor's soil-humidity `%RH` signal. It must not be presented as volumetric water content (VWC), root-zone water storage, an irrigation quantity, or a crop-success prediction. The FAO-56 calculator is independently usable only with explicitly supplied/calibrated VWC and site parameters. It returns an advisory, never a valve command.
 
 ---
 
-## 3.3 Temporal ML: Root-Zone Soil Moisture Forecasting (GRU)
+## 3.2 Source dataset and evidence
 
-### 3.3.1 Model Architecture & Justification
-- **Why GRU over standard LSTM or Linear Regression:**
-  - Soil moisture exhibits non-linear diurnal cycles (daytime transpiration vs. nighttime capillary rise) and lag responses to irrigation/rainfall that linear models miss.
-  - Gated Recurrent Units (GRU) contain fewer parameters than LSTM (no separate cell state), reducing inference latency and memory footprint to run effectively on resource-constrained Edge gateways (e.g. Raspberry Pi 4 / Jetson Nano).
-- **Network Architecture:**
-  - **Input Layer:** Sequence length $W = 144$ timesteps ($24\text{ hours}$ at $10\text{-minute}$ steps) $\times 5$ features:
-    $$x_t = [\theta_t, T_{\text{soil}, t}, \sigma_{\text{EC}, t}, T_{\text{air}, t}, \text{RH}_t]$$
-  - **Layer 1:** GRU ($64\text{ hidden units}$, return sequences = True)
-  - **Dropout:** $0.1$
-  - **Layer 2:** GRU ($32\text{ hidden units}$, return sequences = False)
-  - **Dense Output Head:** Linear layer emitting 3 future predictions:
-    $$\hat{y} = [\hat{\theta}_{t+6\text{h}}, \hat{\theta}_{t+12\text{h}}, \hat{\theta}_{t+24\text{h}}] \quad (\text{steps } 36, 72, 144)$$
+Use [Mendeley dataset version 2](https://data.mendeley.com/datasets/35wh56287y/2), DOI `10.17632/35wh56287y.2`, published 5 November 2024, CC BY 4.0. Cite Laura Belli, Luca Davoli, Giulia Oddi, Luca Preite, Martina Galaverni, Tommaso Ganino, and Gianluigi Ferrari. The associated source paper is *Smart agriculture dataset in a tomato cultivation under different irrigation regimes*, Data in Brief 60 (2025), DOI `10.1016/j.dib.2025.111521`.
 
-### 3.3.2 Training & Validation Protocol
-- **Strict Chronological Data Split:**
-  - **Train:** First $70\%$ of the growing season.
-  - **Validation:** Next $15\%$ (used for early stopping, patience = 10 epochs).
-  - **Out-of-Sample Test:** Final $15\%$ of the season.
-  - *No temporal shuffling:* Cross-validation shuffling is strictly prohibited to prevent future autocorrelation leakage.
-- **Normalization:** `MinMaxScaler` fitted **strictly on the training split** and persisted as `scaler.json`.
-- **Loss Function:** Huber Loss ($\delta = 1.0$), minimizing sensitivity to transient sensor noise.
-- **Target Metrics:**
-  - $\text{RMSE} < 1.8\%$ VWC
-  - $\text{MAE} < 1.3\%$ VWC
-  - $R^2 \ge 0.88$
+The trial is a HEINZ 1301 tomato crop at Azienda Sperimentale Stuard, Parma, Italy. The published trial period is 29 June–13 September 2023. Experimental lines received 100%, 60%, and 30% of the Irriframe-recommended water quantity. The paper describes one environmental sensor, one soil sensor and one water meter per line, 10-minute sampling, and once-daily agronomic indicators. It identifies soil sensors at 20 cm depth and soil humidity as `%RH`; source tables list soil EC in µS/cm, soil/air temperature in °C, air RH in `%RH`, and the meter field in m³.
+
+### Source-to-app data contract
+
+| Source | Use | Canonical display name/unit | Known limitation |
+|---|---|---|---|
+| `stuard_soil_data.csv` | Three line-specific soil records | Soil humidity signal `%RH`, EC `µS/cm`, soil temperature `°C` at 20 cm | `%RH` is not VWC. Battery `%` is absent in nearly all rows. |
+| `stuard_environmental_data.csv` | Shared weather context for all lines | Air humidity `%RH`, air temperature `°C` | One station; not three independent readings. Battery `%` is mostly absent. |
+| `stuard_water_meter_data.csv` | Optional raw meter observation only | `current_volume`, source-reported `m³` | Values are not converted to L/min or liters. Do not infer valve state, irrigation rate, or use for model features until scale/semantics are verified. |
+| `indicators.csv` | Dataset provenance/context only | Daily GDD and heat-unit fields as supplied | Does not provide rainfall, ETc time series, root-zone VWC, or field-specific hydraulic parameters. |
+
+The unchanged source files live in `services/telemetry/data/raw/`; `services/telemetry/data/README.md` records attribution, CC BY 4.0, original file sizes, and verified SHA-256 values. The downloaded files are about 7.8 MB total, small enough to load locally; do not add a database or Parquet conversion without a measured need. The source files include repeated header rows inside two CSVs; the loader must reject/count malformed rows rather than silently treating them as observations. Device identifiers must not be returned by the API.
 
 ---
 
-## 3.4 Edge Decision Engine: FAO-56 Precision Irrigation Law
+## 3.3 Preprocessing and replay integrity
 
-To prevent unconstrained black-box ML models from directly actuating physical water valves, the predictive output feeds into the deterministic **FAO-56 Management Allowed Depletion (MAD)** framework:
-
-```
-┌────────────────────────────────────────────────────────┐
-│ Current Soil Moisture (θ_t)                            │
-│ + GRU Forecasted Moisture (θ_{t+6h})                   │
-└──────────────────────────┬─────────────────────────────┘
-                           │
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│ FAO-56 Soil Water Balance                              │
-│ - Soil Texture: Clay Loam                              │
-│ - Field Capacity (θ_FC): 32.0% VWC                     │
-│ - Permanent Wilting Point (θ_PWP): 14.0% VWC           │
-│ - Total Available Water (TAW) = θ_FC - θ_PWP = 18.0%   │
-│ - Crop Depletion Factor (p): 0.40 (Tomato)             │
-│ - Readily Available Water (RAW) = p × TAW = 7.2%       │
-│ - Critical Threshold: θ_crit = θ_FC - RAW = 24.8% VWC  │
-└──────────────────────────┬─────────────────────────────┘
-                           │
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│ Deterministic Actuation Law:                           │
-│ IF (θ_t ≤ 24.8% OR θ_{t+6h} ≤ 24.8%):                  │
-│    ➔ OPEN Solenoid Valve                               │
-│    ➔ Calculate Required Volume:                        │
-│      V = (θ_FC - θ_t) × RootDepth(0.3m) × ZoneArea     │
-│ ELSE:                                                  │
-│    ➔ KEEP Valve CLOSED (Conserve Water)                │
-└────────────────────────────────────────────────────────┘
-```
+1. Parse `ts_generation` as Unix milliseconds and expose normalized API timestamps as timezone-aware UTC; display the original trial date in Europe/Rome in the UI.
+2. Validate required headers, numeric fields, and line IDs; count excluded malformed rows and expose data-quality metadata.
+3. Keep a time-aligned 10-minute model grid. Linear interpolation resamples the nominal 10-minute sensor cadence onto UTC grid boundaries; bridge only valid bracketing observations no more than 30 minutes apart and never extrapolate at dataset edges. The interpolation count includes cadence alignment as well as short-gap bridging. Keep replayed source observations and their timestamps distinguishable from model-preprocessing values.
+4. Join the single environmental stream as shared context. If an input is unavailable or an input window crosses a longer gap, return `forecast: unavailable` with a reason instead of filling it with zero or fabricating continuity.
+5. Preserve line 1/2/3 as historical treatment groups (100/60/30% Irriframe recommendation). Never auto-bind them to KshetraSense zoning IDs or sensor-placement candidates.
+6. Keep source-meter readings in the source-stated m³ unit and include only when an observed value is available near the selected replay time. No differencing, conversion, or inferred flow/valve state is part of Phase 3.
 
 ---
 
-## 3.5 Sensor Anomaly Detection (Isolation Forest)
+## 3.4 GRU: forecast the instrument signal
 
-In real farm deployments, sensors frequently suffer from hardware faults:
-- Cable damage causing immediate drops to $0\%$.
-- Sensor pullout or air pockets causing high-frequency spikes.
-- Battery drain causing false low voltage readings.
+### Model contract
 
-To prevent erratic sensors from triggering catastrophic over-irrigation:
-- An **Isolation Forest** model (contamination rate $\nu = 0.02$) evaluates instantaneous sensor feature gradients:
-  $$g_t = \left[\left|\frac{d\theta}{dt}\right|, \left|\frac{d\text{EC}}{dt}\right|, V_{\text{battery}}, \text{Plausibility}\right]$$
-- If an anomaly is detected:
-  1. The anomaly flag `sensor_fault: true` is emitted.
-  2. The automated actuation is **suppressed/locked out**.
-  3. An advisory alert is posted to the operator: *"Sensor fault detected on Node 2 (unphysical moisture gradient). Irrigation locked out pending verification."*
+- **Target:** soil-humidity `%RH` sensor output only (the published sensor signal, not VWC).
+- **Input window:** last 144 grid steps (24 hours at a nominal 10-minute interval) for one line.
+- **Feature order:** soil humidity `%RH`, soil temperature `°C`, soil EC `µS/cm`, shared air temperature `°C`, shared air humidity `%RH`.
+- **Architecture:** GRU(64, `return_sequences=True`) → dropout 0.1 → GRU(32) → zero-initialized linear Dense(3) residual head. The head predicts future-minus-current signal deltas and adds them to a persistence baseline; outputs are point estimates for +6h, +12h, and +24h. This baseline-centered head prevents an untrained model from starting far from the last observation.
+- **Runtime:** Keras 3 with the CPU PyTorch backend for the repository's Python 3.14 Windows environment. This is a local CPU implementation; Raspberry Pi, Jetson, GPU, and edge-latency claims are out of scope until measured.
+- **Scaling:** train-only MinMax fit, persisted with model metadata; target inversion returns `%RH` signal units.
+- **Training:** chronological 70/15/15 season split by timestamp, no random temporal split; deterministic seed; Huber loss; early stopping against the validation segment. Mini-batch shuffling is allowed only inside the training split. Do not let windows/targets cross the split boundary.
+- **Training efficiency:** use forecast origins every 12 grid steps (two hours) because 10-minute overlapping windows are highly redundant; replay and inference remain on the full 10-minute grid.
+- **Evaluation:** record MAE, RMSE, and R² separately at each horizon and by line where sample counts permit; compare with a persistence baseline (last observed humidity signal). Record split dates, sample counts, package versions, feature order, dataset hashes, seed, and training parameters in a versioned JSON sidecar.
+- **Presentation:** show the held-out metrics and baseline comparison. No unmeasured target such as “RMSE < 1.8% VWC” is an acceptance criterion. No confidence interval or probability is emitted. If the GRU does not outperform persistence for a horizon, disclose that and do not call that horizon operationally predictive.
 
----
-
-## 3.6 Playback API Specification
-
-Mounted on the FastAPI backend under `/v1/telemetry/`:
-
-### 3.6.1 Playback Control
-```http
-POST /v1/telemetry/control
-Content-Type: application/json
-
-{
-  "action": "play" | "pause" | "seek" | "set_speed",
-  "speed": 1 | 10 | 60 | 360,
-  "timestamp": "2022-06-15T08:00:00Z"
-}
-```
-
-### 3.6.2 State & Telemetry Polling / Streaming
-```http
-GET /v1/telemetry/stream?node_id=node-1
-```
-**Response JSON:**
-```json
-{
-  "simulatedTimestamp": "2022-06-15T08:30:00Z",
-  "speed": 60,
-  "isPlaying": true,
-  "nodes": [
-    {
-      "nodeId": "node-1",
-      "zoneId": 0,
-      "zoneLabel": "Zone 1 (High Moisture Retention)",
-      "telemetry": {
-        "moistureVwc": 31.4,
-        "temperatureC": 23.2,
-        "ecDsM": 1.15,
-        "batteryVolts": 3.92
-      },
-      "forecast": {
-        "moisturePlus6h": 29.8,
-        "moisturePlus12h": 28.1,
-        "moisturePlus24h": 25.4,
-        "model": "GRU-2L-64"
-      },
-      "actuator": {
-        "valveOpen": false,
-        "irrigationNeeded": false,
-        "criticalThresholdVwc": 24.8,
-        "flowRateLMin": 0.0,
-        "waterAppliedLiters": 1240.0
-      },
-      "anomaly": {
-        "isFaulty": false,
-        "confidence": 0.99
-      }
-    },
-    {
-      "nodeId": "node-3",
-      "zoneId": 2,
-      "zoneLabel": "Zone 3 (Sandy Deficit Patch)",
-      "telemetry": {
-        "moistureVwc": 22.1,
-        "temperatureC": 26.8,
-        "ecDsM": 2.10,
-        "batteryVolts": 3.85
-      },
-      "forecast": {
-        "moisturePlus6h": 20.4,
-        "moisturePlus12h": 18.9,
-        "moisturePlus24h": 17.2,
-        "model": "GRU-2L-64"
-      },
-      "actuator": {
-        "valveOpen": true,
-        "irrigationNeeded": true,
-        "criticalThresholdVwc": 24.8,
-        "flowRateLMin": 15.5,
-        "waterAppliedLiters": 3480.0
-      },
-      "anomaly": {
-        "isFaulty": false,
-        "confidence": 0.98
-      }
-    }
-  ]
-}
-```
+Keep the compact trained `.keras` model and its metadata under `services/telemetry/models/`. Provide one reproducible training command/script; the API loads the committed artifact and must fail with a clear health state if it is missing/incompatible rather than silently retraining on user startup.
 
 ---
 
-## 3.7 Verification & Unit Testing (`tests/test_telemetry.py`)
+## 3.5 Optional FAO-56 MAD advisory (separate from replay)
 
-| Test Case | Scenario | Expected Result |
-|---|---|---|
-| **Data Integrity** | Load Parquet file | 11,000+ consecutive records across 3 nodes; no missing NaNs. |
-| **Playback Control** | Send `action: "pause"`, then poll status | Timestamp halts; `isPlaying: false`. |
-| **Time Scrubbing** | Seek to `"2022-07-01T12:00:00Z"` | Telemetry values immediately reflect July 1 midday conditions. |
-| **Speed Scaling** | Set speed = `60x` | 1 real second advances 1 simulated minute. |
-| **Forecast Consistency** | Test GRU inference on validation window | Forecast outputs follow diurnal drying curve; RMSE $< 1.8\%$. |
-| **Actuator Logic** | Set $\theta = 22.0\%$ ($< 24.8\%$) | `valveOpen: true`, volume $> 0$. |
-| **Actuator Hold** | Set $\theta = 28.0\%$ ($> 24.8\%$) and $\hat{\theta}_{+6\text{h}} = 26.0\%$ | `valveOpen: false`, flow rate = 0. |
-| **Anomaly Lockout** | Inject sudden spike $\theta = 95.0\%$ | Isolation forest flags `isFaulty: true`; valve forced `false`. |
+FAO-56 defines `TAW = 1000(θFC − θWP) Zr` (mm) and `RAW = p × TAW`, where field-capacity and wilting-point water contents are in m³/m³, root depth is in metres, and `p` depends on crop and atmospheric demand. This service must implement the formula only from an explicit, unit-validated request. It must not use the replay's `%RH` target as `θ`, nor fill in generic clay-loam values, a fixed root depth, ETc, or field area.
+
+The advisory request supplies current/forecast VWC fractions, field capacity, wilting point, effective rooting depth, depletion fraction `p`, and a calibration/source note. Validate `0 ≤ θWP < θFC ≤ 1`, all VWC values in `[0,1]`, and positive rooting depth. Return TAW, RAW, the threshold `θFC − p(θFC−θWP)`, whether the measured or forecast value crosses that threshold, and an explicit human-review advisory status. No liters, flow rate, valve state, actuation, or irrigation schedule is returned. The API rejects incomplete requests with 422; the UI must show “not configured” until complete explicit inputs are supplied, never defaults.
+
+---
+
+## 3.6 Isolation Forest: review candidates, not diagnoses
+
+Fit a deterministic Isolation Forest on training-period sensor values and absolute changes. Emit `anomalyCandidate` plus its non-probabilistic model score and a review explanation. Since there are no fault labels, the output must not say a node **is faulty**, claim confidence/probability, suppress an actuator, or imply that every candidate is a hardware defect. Document the configured contamination fraction as a ranking threshold, not measured failure prevalence.
+
+---
+
+## 3.7 Playback/API contract
+
+Mount an `APIRouter` below `/v1/telemetry/` in the existing local FastAPI process, preserving the current zoning API and one local backend command. Playback state is in-memory and process-local; it resets on restart and is intended for the single-worker local demo.
+
+| Route | Contract |
+|---|---|
+| `GET /health` and `GET /v1/telemetry/health` | Existing backend health stays lightweight/compatible; the telemetry health route verifies its data/model readiness without requiring external provider setup. |
+| `GET /v1/telemetry/metadata` | Dataset identity, historical period, line treatment labels, feature units, model version/metrics, quality counts, and the historical-not-live banner text. |
+| `GET /v1/telemetry/state` | Current playback timestamp, play/pause, speed, and available range. |
+| `POST /v1/telemetry/control` | `play`, `pause`, `seek`, or `set_speed`; speeds are `1`, `10`, `60`, and `360`; reject timestamps outside the available range. |
+| `GET /v1/telemetry/stream?line_id=1` | Current raw soil observation and source timestamp, shared air observation, optional source-meter reading, GRU point forecasts with input-resampling count and holdout disposition, and anomaly review candidate. Omit `line_id` to return all three lines. |
+| `GET /v1/telemetry/history?line_id=1&start=…&end=…` | Bounded historical observations for charts; cap returned points and preserve source units/status. |
+| `WS /v1/telemetry/ws` | Read-only snapshots while connected; playback changes still use the REST control endpoint. Disconnects must release the loop cleanly. |
+| `POST /v1/telemetry/water-balance/advisory` | Independent calibrated-VWC FAO-56 calculation; never fed by the `%RH` benchmark replay. |
+
+At end-of-data, playback stops without wrapping. Seeking is deterministic and does not mutate source data. The API must not expose device identifiers, emit a “live gateway connected” badge, or report an actuator state.
+
+---
+
+## 3.8 Verification and acceptance
+
+1. **Provenance:** source URL/DOI/license/attribution are present; each downloaded file matches the recorded SHA-256; raw CSVs remain unchanged.
+2. **Parsing:** repeated header rows are counted/excluded, invalid line IDs/timestamps are rejected, original units survive JSON serialization, and battery/meter missingness is represented as missing.
+3. **Alignment:** timestamps are UTC and sorted; only ≤30-minute interpolation bridges are allowed; long gaps/end extrapolation stay unavailable; interpolation flags match the transformed input.
+4. **Replay:** pause freezes time; each allowed speed advances by the correct simulated duration; seek range validation works; end-of-data stops; each line keeps the source 100/60/30 label and never acquires a zoning ID.
+5. **Forecast:** model loads from its artifact; input shape/feature order is checked; insufficient history or long gaps return unavailable; target units remain `%RH`; the temporal split is disjoint; metrics and persistence baseline are regenerated from the pinned data.
+6. **FAO-56:** test formula and units against hand calculations; reject VWC/unit/range inversion; threshold crossing is only an advisory; missing config never becomes a default.
+7. **Anomalies:** deterministic fit and candidate output; no field named `confidence`, `faultProbability`, `sensorFault`, or `valveOpen` in the contract.
+8. **Regression:** all current zoning, Crop Fit, SoilGrids, and CropSight health tests/build checks remain passing.
+
+### Explicitly out of scope for Phase 3
+
+- Real WSN hardware, radio coverage validation, physical or simulated valve actuation, live IoT credentials, and operational safety interlocks.
+- Applying the Parma research lines to KshetraSense cadastral parcels, management zones, or a user's farm.
+- VWC conversion/calibration, field-capacity/wilting-point estimates, crop-specific ET scheduling, application volume, liters/minute, water savings, or yield estimation.
+- Google Earth Engine authentication/setup; it remains a later manual user step for CropSight and is not needed to run this local replay.
+- Field Monitoring UI replacement; Phase 4 owns that work and must follow these corrected data semantics.

@@ -1,6 +1,6 @@
 # KshetraSense zoning service
 
-Local FastAPI service for legacy grid zoning, field-scale sparse-sample zoning, and zone-level crop-fit screening. It is deliberately independent from the browser UI and from leaf diagnosis / field monitoring.
+Local FastAPI service for legacy grid zoning, field-scale sparse-sample zoning, zone-level crop-fit screening, and the isolated historical telemetry replay API. It is deliberately independent from the browser UI and does not share state between zoning, Crop Fit, and telemetry.
 
 ## What it does
 
@@ -35,6 +35,11 @@ python -m pytest -q
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /health` | Local service status and algorithm/rule versions. |
+| `GET /v1/telemetry/health` | Verify pinned historical data and model readiness; does not indicate a live sensor connection. |
+| `GET /v1/telemetry/metadata`, `/state`, `/stream`, `/history` | Dataset provenance, replay state, current historical observations, and bounded history. |
+| `POST /v1/telemetry/control` | Play/pause, bounded UTC seek, or set playback speed (1/10/60/360). |
+| `WS /v1/telemetry/ws` | Read-only historical snapshots. |
+| `POST /v1/telemetry/water-balance/advisory` | Independent FAO-56 TAW/RAW screen; requires explicit VWC fractions and site calibration inputs. |
 | `POST /v1/zoning/run` | Validate cells and run `kmeans` or `fuzzy-c-means`. |
 | `POST /v2/zoning/run` | Run the boundary + sparse-sample field pipeline and return per-cell estimates, contiguous zones, diagnostics, and candidate locations. |
 | `POST /v1/crop-fit/evaluate` | Evaluate a caller-supplied selected-cell or selected-zone profile. |
@@ -54,5 +59,7 @@ The frontend displays all supported cells in 2D. Its optional 3D scene is lazy-l
 The crop profiles currently assess only pH. N/P/K, EC, soil temperature, moisture, drainage, texture, rooting depth, climate, cultivar, and management are returned as **not assessed** rather than invented rules. The documented pH ranges are contextual examples retained with source URLs; they are not a complete land-suitability evaluation. See `docs/research/crop-suitability-probability.md` in the repository for the product evidence boundary.
 
 The KshetraSense SHI is a versioned provisional score, not an official USDA/NRCS index, a crop-specific score, or a probability. The stability report is sensitivity under declared noise assumptions, not a confidence interval. Medoid and gateway outputs are geometric suggestions; `radioCoverageValidated` is false.
+
+The telemetry routes replay the pinned [Mendeley v2 Parma tomato trial](../telemetry/data/README.md), not a user's field or live devices. Soil humidity remains the source-reported `%RH` signal—not VWC—and the current GRU does not beat persistence at 6/12/24 hours, so it is evaluation-only. Isolation Forest output is a review candidate, not a fault diagnosis. No route controls a valve or binds trial lines to zones. See [`services/telemetry/README.md`](../telemetry/README.md) for route, model, data, and safety details.
 
 All results are request-local: this service neither persists field data nor calls external APIs. A production host must decide persistence, access control, and audit storage separately.

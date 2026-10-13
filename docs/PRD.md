@@ -1,6 +1,6 @@
 # Product requirements document
 
-**Status:** current product requirements. Phases 1–2 are implemented: the Soil Zoning workspace accepts a WGS84 boundary and measured samples, runs the field-scale backend, and shows the returned zones and selected-scope Crop Fit. No real-farm validation, calibrated agronomic score, radio coverage, or measured production performance is claimed. The five-phase implementation status is in [plans/README.md](plans/README.md).
+**Status:** current product requirements. Phases 1–3 are implemented: the Soil Zoning workspace runs from a WGS84 boundary and measured samples; selected-scope Crop Fit is available; and the local service exposes a provenance-checked historical telemetry replay. The replay's GRU failed to beat persistence at every evaluated horizon and is not decision-grade. No real-farm validation, calibrated agronomic score, radio coverage, or production forecast performance is claimed. The five-phase implementation status is in [plans/README.md](plans/README.md).
 
 ## Product statement
 
@@ -26,21 +26,22 @@ The product is educational and exploratory. It is not a farm-control system or a
 5. One shared, 17-label crop-condition image classifier using the fixed MobileNetV3-Small architecture, transfer-learned from ImageNet. Evaluate it on the audited, group-preserving split; model selection does not include alternative-backbone comparison.
 6. Evidence and methodology information, with actual metrics only after they have been measured.
 7. A functional Three.js / React Three Fiber field on capable devices, paired with a complete 2D workflow.
-8. A separate **Field Monitoring** destination with two independent areas: Soil Investigation and Vegetation Monitoring.
+8. A separate **Field Monitoring** destination with three independent areas: Soil Investigation, Historical Telemetry Replay, and Vegetation Monitoring.
 9. Soil Investigation records dated, located, user-entered or imported field/laboratory soil samples with parameter values, original units, depth, method, collection time, and provenance. It may show SoilGrids predictions as optional regional context, with the product's resolution, depth, uncertainty, and source visible.
 10. Vegetation Monitoring uses the pinned CropSight application as an independent sub-application. It accepts CropSight's own circular area (center latitude/longitude and radius) and date window, retrieves imagery through its configured provider, and exposes only source outputs that pass a verification gate. It does not read or write Soil Zoning, Crop Fit, or Leaf Diagnosis state.
-11. The first intended monitoring outcomes are seasonal NDVI exploration and relative underperforming-patch flagging for human scouting. No causal diagnosis or prescription follows from NDVI alone.
+11. Historical Telemetry Replay exposes the attributed Parma 2023 trial with explicit source units, line-treatment labels, deterministic playback/history, an experimental sensor-signal GRU with persistence comparison, unsupervised review candidates, and a separate calibrated-VWC FAO-56 advisory. It does not represent the user's farm, connect to live sensors, or actuate hardware.
+12. The first intended CropSight monitoring outcomes are seasonal NDVI exploration and relative underperforming-patch flagging for human scouting. No causal diagnosis or prescription follows from NDVI alone.
 
 ## Out of scope
 
-- Real-time sensor streams, pumps, irrigation controls/replay, temporal soil-moisture forecasting, or automatic actuation.
+- Live sensor streams, pumps, real-farm soil-moisture forecasting, or automatic actuation. The historical benchmark replay is implemented, but its GRU targets `%RH` sensor output (not VWC) and does not beat persistence; it is evaluation-only.
 - A trained soil-to-crop recommender, yield prediction, planting certification, fertilizer quantities, deficiency diagnosis, or treatment/cure advice.
 - Validated variable-rate input prescriptions, irrigation decisions, and yield estimation from the initial Field Monitoring module. These remain later research/build goals requiring dedicated data, agronomic rules or crop-specific models, field validation, and separate acceptance criteria.
 - A crop-cultivation probability or a normalized apple/tomato/potato percentage split in the MVP. The current input/result contracts contain no representative crop-outcome labels, and soil-only features are insufficient for full land-suitability assessment.
 - Interpreting cluster IDs as crop identity, soil quality, or a prescription.
 - Any required paid asset, API, model, or runtime. CropSight's live imagery workflow does require an external Earth Engine project/configuration and quota; the user-visible product must report unavailable access rather than invent a result.
 
-A weather-driven soil-water-balance simulator is a possible later rules module. It requires sourced crop-stage parameters, explicit assumptions, deterministic tests, and a separate scope decision before any implementation.
+An independent FAO-56 MAD calculator is implemented for explicit calibrated VWC inputs; it is advisory-only, does not consume the historical `%RH` signal, and does not calculate irrigation volume or operate hardware. A weather-driven soil-water-balance simulator remains future work and requires sourced crop-stage parameters, explicit assumptions, deterministic tests, and separate acceptance criteria.
 
 ## Product requirements
 
@@ -63,6 +64,12 @@ A weather-driven soil-water-balance simulator is a possible later rules module. 
 | PR-15 | CropSight remains a separate vegetation workflow with its own AOI/date state. It cannot consume Soil Zoning/Crop Fit/Leaf results by default. Displayed algorithms, raster layers, time series, and rainfall comparison must match the actual source output; known mismatches are unavailable until verified. |
 | PR-16 | Initial monitoring language is limited to relative vegetation patterns, seasonal change, and scouting priorities. NDVI alone is not called water stress, disease, nutrient deficiency, yield, or a prescription. |
 | PR-17 | No fixture-only or canned sample output is presented as a product result. Synthetic fixtures are allowed only for tests, benchmark evaluation, and explicit internal development diagnostics. |
+| PR-18 | Historical telemetry is persistently labeled with source, trial, period, and “not live” status; treatment lines are never mapped to KshetraSense zones or sensor-placement suggestions. |
+| PR-19 | Telemetry preserves source units and timestamps. Soil `%RH` is not called VWC; source meter values are not converted to flow/volume; missing values stay missing; resampled model inputs are distinguishable from source observations. |
+| PR-20 | GRU output is labeled as an experimental sensor-signal estimate and is shown with temporal holdout metrics and a persistence baseline. A horizon that fails to beat persistence is not described as operationally predictive or used for irrigation decisions. |
+| PR-21 | Isolation Forest results are unsupervised review candidates, not fault labels, confidence, or probabilities; they never suppress or trigger physical actions. |
+| PR-22 | FAO-56 MAD accepts only explicit unit-bounded VWC fractions and site parameters, reports its source note and unverified calibration limitation, and emits an advisory only. |
+| PR-23 | Historical playback, Soil Investigation, CropSight, zoning, Crop Fit, and leaf diagnosis have no implicit state or data handoff. Any future handoff must be deliberate, visible, and validated. |
 
 ## ML, data, and domain boundaries
 
@@ -97,14 +104,21 @@ A weather-driven soil-water-balance simulator is a possible later rules module. 
 
 ### Field Monitoring: Soil Investigation and Vegetation Monitoring
 
-Field Monitoring is a separate destination, not an extension of Soil Zoning. It contains two explicitly separated evidence views:
+Field Monitoring is a separate destination, not an extension of Soil Zoning. It contains three explicitly separated evidence views:
 
 **Soil Investigation** answers: “What did we measure at this location and time, and what broad regional soil context is available?” It is useful for organizing field/lab results, spotting gaps in sampling, and comparing observations across dates. It is not a sensor-control system or an automatic zoning input.
 
 - **Inputs:** a user-named investigation/location; one or more soil sample records with coordinates, collection date/time, sampling depth, collection/lab method, source, parameter/value/original unit, and optional notes; or a validated CSV import using the same fields. Supported parameters should align with the project schema (pH, N/P/K, EC, soil temperature, and moisture only when its unit/depth/method/time are supplied). Do not silently infer missing values or convert units without a documented conversion.
 - **Optional SoilGrids context:** a selected location or investigation area, a product-supported soil property, and a supported depth layer. Show the predicted estimate and available uncertainty quantiles, native 250 m scale, retrieval date, product version/source, and a visible “modeled regional context—not a field measurement” label. Use cached/downloaded data when available; the paused REST endpoint is not a required runtime dependency.
 - **Outputs:** a dated sample register and map pins, parameter timelines only where repeated comparable measurements exist, completeness/method metadata, and a separate SoilGrids context panel. Do not create a single quality score or automatically pass observations into Soil Zoning/Crop Fit.
-- **Limit:** no live sensors or sensor telemetry in the initial release. A future explicit export/handoff may be designed, but this module does not change existing zoning/crop/image calculations implicitly.
+- **Limit:** investigation records are not live sensor telemetry and do not change existing zoning/crop/image calculations implicitly.
+
+**Historical Telemetry Replay** answers: “What does an attributed research telemetry series look like over time, and how does our local replay/modeling pipeline handle it?” It is useful as an explainable engineering benchmark, not as an operational view of the user's farm.
+
+- **Inputs:** the version-pinned Parma tomato-trial files bundled under `services/telemetry/data/raw/`. The UI offers a historical timeline and line selector; the user does not upload or bind trial rows to a cadastral field.
+- **Processing:** parse and verify source hashes; preserve source measurements and original units; resample to the 10-minute modeling grid with only bounded interpolation and no edge extrapolation; run a deterministic playback controller, a trained GRU and a training-only-fit Isolation Forest.
+- **Outputs:** raw soil/environment observations and source timestamps; treatment line and provenance; replay controls; bounded history; GRU point estimates at +6/+12/+24 hours with held-out persistence comparison; anomaly review candidates; and model/data-quality metadata. A separate FAO-56 endpoint accepts explicit calibrated VWC inputs and returns TAW/RAW and a human-review advisory.
+- **Limitations:** the soil target is `%RH` sensor signal, not VWC. The bundled GRU does not beat the persistence baseline at 6, 12, or 24 hours and must be presented as evaluation-only, not as a usable irrigation forecast. The trial's treatment lines are not zones; battery/meter meanings remain as reported with missingness; there is no live connectivity, pump, valve, flow inference, or actuation.
 
 **Vegetation Monitoring** answers: “Where and how did satellite-observed vegetation patterns change during this date window, and where might a person scout?” It is useful for prioritizing field inspection, not identifying the cause of a pattern.
 
@@ -118,12 +132,13 @@ The inspected CropSight revision's README advertises use cases beyond what its c
 
 ## Evaluation and success measures
 
-The project is ready for a college demonstration when a reviewer can use each functional module, trace outputs to data/method/version, reproduce reported metrics, and distinguish user measurements, external imagery, modeled context, model output, and rule output. The existence of a visually complete screen is not sufficient evidence that its analysis ran correctly.
+The project is ready for a college demonstration when a reviewer can use each functional module, trace outputs to data/method/version, reproduce reported metrics, and distinguish user measurements, external imagery, modeled context, historical replay, model output, and rule output. The existence of a visually complete screen is not sufficient evidence that its analysis ran correctly.
 
 - **Vision:** macro-F1, balanced accuracy, per-class precision/recall, confusion matrix, crop-level accuracy, class counts, artifact size, and warmed batch-one CPU median/p95 latency. Report PlantVillage test and eligible PlantDoc results separately.
 - **Zoning:** recovery on planted synthetic regions, silhouette, stability across seeds/noise, contiguity, and moisture ablation on the same benchmark.
 - **Rules:** tests for every published source/range/unit, boundary, missing value, and independence from zone labels. This verifies rule behavior, not crop-yield accuracy.
 - **Soil Investigation:** sample import/entry validation, unit/context retention, time-series comparability rules, and clear distinction from SoilGrids estimates.
+- **Historical Telemetry Replay:** raw file hashes, parse/exclusion counts, source-unit fidelity, temporal gaps/interpolation behavior, deterministic controls, model input-window gating, per-horizon holdout-vs-persistence metrics, and clear “not live/not VWC/not actionable” labeling.
 - **Vegetation Monitoring:** repeatable AOI/date request, source/method/output consistency, image coverage and invalid-pixel handling as actually available, request/error behavior, and an explicit audit that displayed map/algorithm matches returned data.
 - **Rendering:** capture frame timing, draw calls, triangles, texture memory, transfer bytes, and load time on named desktop/mobile devices before claiming performance.
 

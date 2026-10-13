@@ -7,6 +7,12 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+project_root = Path(__file__).resolve().parents[3]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+from services.telemetry.app.router import router as telemetry_router
+
 from app.crop_fit import evaluate_crop_fit
 from app.crop_profiles import PROFILE_VERSION
 from app.schemas import (
@@ -40,7 +46,7 @@ def _cors_origins() -> list[str]:
 app = FastAPI(
     title="KshetraSense Analysis & Monitoring Service",
     version=ALGORITHM_VERSION,
-    description="Local deterministic K-means/FCM zoning, zone-level crop-fit, SoilGrids context, and CropSight integration.",
+    description="Local soil zoning and crop-fit, SoilGrids context, independent CropSight integration, and historical telemetry replay.",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -49,13 +55,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(telemetry_router)
 
 # Mount CropSight as an independent sub-application if available
 cropsight_mounted = False
 try:
-    project_root = Path(__file__).resolve().parent.parent.parent.parent
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
     from services.cropsight.main import app as cropsight_app
     app.mount("/cropsight", cropsight_app)
     app.mount("/api/v1/cropsight", cropsight_app)

@@ -9,6 +9,8 @@ Before implementing the five-phase redesign, three consequential questions were 
 
 ## Questions and decisions
 
+**User confirmation (2026-10-14):** The user answered yes to all three questions below and explicitly confirmed use of SHI. The accepted decisions and boundaries are recorded here rather than duplicated in a new decision file.
+
 ### Q1 — Should the pipeline use SHI, and what does clustering consume?
 
 **Decision:** Use the full standardized pH, EC, nitrogen, phosphorus, and potassium feature vector for Auto-K clustering. Calculate the weighted, nonlinear composite separately and retain the name **KshetraSense Soil Health Index (SHI)** because it is part of the requested product. Clearly label it as a project-defined, provisional screening score—not an official USDA/NRCS index, crop-specific suitability, or probability. Crop Fit remains a separate crop-specific assessment. The API uses pH (dimensionless), EC (dS/m), and N/P/K (mg/kg), while preserving sample depth and laboratory-method provenance when supplied.

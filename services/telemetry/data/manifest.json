@@ -1,0 +1,44 @@
+{
+  "title": "IoT-based Dataset of a Tomato Cultivation Under Different Irrigation Regimes",
+  "version": 2,
+  "doi": "10.17632/35wh56287y.2",
+  "sourceUrl": "https://data.mendeley.com/datasets/35wh56287y/2",
+  "license": "CC BY 4.0",
+  "collectedPeriodLocal": "2023-06-29/2023-09-13",
+  "authors": [
+    "Laura Belli",
+    "Luca Davoli",
+    "Giulia Oddi",
+    "Luca Preite",
+    "Martina Galaverni",
+    "Tommaso Ganino",
+    "Gianluigi Ferrari"
+  ],
+  "files": [
+    {
+      "path": "raw/indicators.csv",
+      "sizeBytes": 4336,
+      "sha256": "1ece7aea2a87cb8c645762e9579c2032f43338f5eaaf2508ee5be7d3366997c1"
+    },
+    {
+      "path": "raw/README.TXT",
+      "sizeBytes": 2147,
+      "sha256": "5de3dce8fcb0d2a6e7fdbee9249d83e163a0ab6221cc0259415fec158fb9f73c"
+    },
+    {
+      "path": "raw/stuard_environmental_data.csv",
+      "sizeBytes": 1206822,
+      "sha256": "282c2e5366510416e7e9de8c1750cb67d6c773ce0d985aae54206f50a7743ead"
+    },
+    {
+      "path": "raw/stuard_soil_data.csv",
+      "sizeBytes": 3500782,
+      "sha256": "b6ec194a052863a17c57ad2303e93afe12ea101ffd8773865903e95f2186f9dc"
+    },
+    {
+      "path": "raw/stuard_water_meter_data.csv",
+      "sizeBytes": 3038311,
+      "sha256": "aa128bd3d3fc9ca971326870555c9eadd8f76c054611a87b90bc7c45e591057c"
+    }
+  ]
+}
