@@ -1,6 +1,6 @@
 # KshetraSense UI/UX and frontend implementation plan
 
-**Status:** production-intended implementation brief. Replace the existing prototype UX with a fresh design and working feature flows. This plan supersedes the mock-first instructions in [Decision 0002](decisions/0002-mock-data-demo-first.md); see [Decision 0004](decisions/0004-field-monitoring-and-direct-build.md).
+**Status:** historical broad frontend brief; superseded for current execution by [plans/phase-2-soil-zoning-ui-redesign.md](plans/phase-2-soil-zoning-ui-redesign.md) and the five-phase [master plan](plans/README.md). In particular, the earlier brush-based Soil Zoning journey is no longer current; Phase 2 uses a real boundary + sparse-sample request to `/v2/zoning/run`.
 
 **Audience:** the implementing agent and project maintainers. **Purpose:** turn the product and technical requirements into a coherent, aesthetically strong application without inventing analytical results or coupling independent modules.
 

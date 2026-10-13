@@ -9,8 +9,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.crop_fit import evaluate_crop_fit
 from app.crop_profiles import PROFILE_VERSION
-from app.schemas import CropFitRequest, CropFitResponse, ZoningRequest, ZoningRunResponse
-from app.service import ALGORITHM_VERSION, ZoningValidationError, run_zoning
+from app.schemas import (
+    CropFitRequest,
+    CropFitResponse,
+    FieldZoningRequest,
+    FieldZoningResponse,
+    ZoningRequest,
+    ZoningRunResponse,
+)
+from app.service import ALGORITHM_VERSION, ZoningValidationError, run_field_zoning, run_zoning
 from app.soilgrids import (
     SOILGRIDS_VERSION,
     SoilGridsContextResponse,
@@ -74,6 +81,14 @@ def health() -> dict:
 def zoning_run(request: ZoningRequest) -> ZoningRunResponse:
     try:
         return run_zoning(request)
+    except ZoningValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/v2/zoning/run", response_model=FieldZoningResponse)
+def field_zoning_run(request: FieldZoningRequest) -> FieldZoningResponse:
+    try:
+        return run_field_zoning(request)
     except ZoningValidationError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 

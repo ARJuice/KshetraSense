@@ -1,10 +1,10 @@
 # Product requirements document
 
-**Status:** current product requirements. The repository contains an earlier UI prototype/scaffold, but no production ML, field-monitoring workflow, real-farm validation, or measured performance result is claimed. The mock-first milestone is superseded by [Decision 0004](decisions/0004-field-monitoring-and-direct-build.md).
+**Status:** current product requirements. Phase 1's field-scale zoning backend is implemented; the existing frontend still uses the legacy grid endpoint until Phase 2. No real-farm validation, calibrated agronomic score, radio coverage, or measured production performance is claimed. The five-phase implementation status is in [plans/README.md](plans/README.md).
 
 ## Product statement
 
-KshetraSense is a local, interactive smart-farming application for apple, tomato, and potato. A user can inspect/edit a soil field and run crop-neutral clustering, compare independent soil-to-crop compatibility assessments, submit a leaf image to one shared crop-condition classifier, and investigate soil/satellite observations in a separate Field Monitoring module. Every result must make its source, date, method, resolution, quality, and limitations clear.
+KshetraSense is a local, interactive smart-farming application for apple, tomato, and potato. A user can define or import a field boundary, enter georeferenced soil samples, inspect crop-neutral management zones, and compare independent per-crop assessments for a selected cell or zone. Leaf-image diagnosis and soil/satellite investigation remain separate workflows. Every result must make its source, date, method, resolution, quality, and limitations clear.
 
 The product is educational and exploratory. It is not a farm-control system or a substitute for agronomic advice.
 
@@ -12,16 +12,16 @@ The product is educational and exploratory. It is not a farm-control system or a
 
 | User | Desired outcome |
 | --- | --- |
-| Student or demonstrator | Edit a field patch, run a real clustering method, and explain what changed. |
+| Student or demonstrator | Enter a field boundary and measured soil samples, run a real zoning method, and explain how returned zones were formed. |
 | Reviewer or teacher | Trace an output to its input, method, configuration, version, and evaluation evidence. |
 | Curious non-specialist | Explore working features while distinguishing user measurements, modeled context, model output, and sourced rules. |
 | Farmer or field demonstrator | Review dated soil observations and relative vegetation patterns to decide where to inspect or sample next. |
 
 ## MVP scope
 
-1. A fixed-seed synthetic grid for repeatable tests/benchmarks, with unit-labelled pH, soil temperature, EC, N/P/K, and optional moisture with measurement context. Synthetic benchmark values are not shown as actual field results.
-2. Cell and zone inspection; localized edits; previewed deterministic presets; undo/redo; and visible stale-result state after edits.
-3. Crop-neutral K-means and Fuzzy C-means (FCM) zoning on valid, standardized soil features. Show zone summaries, adjacency, and FCM membership strengths where applicable.
+1. Synthetic soil fields may be used for tests and benchmark evaluation only; never present them as user field data or a current analysis result.
+2. Field boundary and georeferenced sample entry/import with measurement units, common sampling depth, provenance, validation, and visible stale-result state when inputs change.
+3. Crop-neutral K-means++ or Fuzzy C-means (FCM) zoning on the IDW-interpolated, standardized pH/EC/N/P/K surfaces. Show contiguous zone summaries, adjacency/post-processing, Auto-K diagnostics, and FCM membership strengths where applicable.
 4. A separate apple/tomato/potato pre-plant soil-compatibility view using versioned, sourced rules and supported measurements. Assess each crop independently; this is not a three-way probability split.
 5. One shared, 17-label crop-condition image classifier using the fixed MobileNetV3-Small architecture, transfer-learned from ImageNet. Evaluate it on the audited, group-preserving split; model selection does not include alternative-backbone comparison.
 6. Evidence and methodology information, with actual metrics only after they have been measured.
@@ -48,8 +48,8 @@ A weather-driven soil-water-balance simulator is a possible later rules module. 
 | --- | --- |
 | PR-01 | A named scenario and seed reproduce the same initial grid. |
 | PR-02 | Cell and zone inspectors show values, units, source, and applicable measurement context. Missing values remain missing. |
-| PR-03 | Edits and presets are reversible and identify affected cells; each edit marks existing zoning results stale. |
-| PR-04 | A zoning run records its method, parameters, seed, feature schema, exclusions, version, timing, diagnostics, and result. |
+| PR-03 | Boundary, sample, or analysis-parameter changes preserve the prior immutable run and mark it stale; the sparse-sample field workflow does not imply cell-brush editing. |
+| PR-04 | A field-scale zoning run records its method, parameters, seed, feature schema, exclusions, pipeline versions, processing duration, diagnostics, and result. |
 | PR-05 | K-means and FCM outputs are described correctly; FCM membership is never called model confidence. |
 | PR-06 | Crop compatibility is independently computed for each crop with reasons, sources, units, version, and missing-data states. It cannot alter cluster assignments. |
 | PR-07 | Leaf inference uses image pixels only. Selected crop, soil values, zone, and SHI are UI context and never model inputs. |
@@ -78,14 +78,13 @@ A weather-driven soil-water-balance simulator is a possible later rules module. 
 
 ### Soil zoning
 
-- Use pH, soil temperature, EC, N, P, K, and optional comparable moisture. Record moisture unit, depth, method, and timestamp; exclude stale or incomparable readings and show the reason.
-- Coordinates locate cells and define adjacency; raw latitude/longitude are not soil features for Euclidean clustering. For real data, use a suitable local metric projection for spatial operations.
-- Before a later real-field run, require cleaned georeferenced samples and a field boundary, map samples to cells, and choose cell size from sample spacing and intended use. Validate IDW or any alternative interpolation against held-out samples and label interpolated values as estimates.
-- Synthetic grids must be fixed-seed and spatially coherent, not independently randomized cell by cell. Keep a separate synthetic benchmark with known planted regions.
-- Evaluate cluster count using multiple diagnostics: synthetic recovery (such as adjusted Rand index), silhouette, seed/noise stability, contiguity, and minimum useful zone size. Silhouette alone does not select an agronomically useful result.
-- Perturb inputs using documented measurement uncertainty when evaluating stability. Compare runs with a label-invariant score, and report a same-benchmark moisture ablation.
-- Implement FCM with its own fuzzy objective and preserve the membership matrix. If zones are merged, merge only adjacent regions with an explicit multivariate distance rule and report that post-processing.
-- A static moisture snapshot is not a water-balance state and is not a crop-fit factor by default. An SHI is included only after its formula and source are documented and double-counting is checked.
+- The implemented field-scale request requires a valid WGS84 GeoJSON Polygon and 3–50 in-boundary samples (5–10 recommended), all with the same explicit sampling-depth interval and exactly pH, EC, N, P, and K. Units are pH (dimensionless), EC (dS/m), N/P/K (mg/kg). Soil temperature and moisture are not inputs to this Phase 1 field pipeline.
+- Project the boundary/samples to local UTM for distance and adjacency operations; raw latitude/longitude are never clustering features.
+- IDW with fixed power p=2 produces per-cell estimates. Return LOOCV RMSE/MAE and nearest-sample distance; these diagnose interpolation but do not validate it against field truth.
+- Standardize varying soil properties, exclude constant features with a reason, and select K by the maximum silhouette over K=2 through maxK (2–6); ties choose the smaller K. FPC is diagnostic only. FCM preserves cell-to-source-cluster memberships.
+- Merge only adjacent clusters below the explicit multivariate standardized-centroid distance threshold, then split disconnected components; do not silently drop small components. Silhouette and ARI describe internal structure/sensitivity, not agronomic usefulness.
+- Perturb the measured source samples using reported standard uncertainty when present and declared project assumptions otherwise. Report fixed-K ARI/flip/sensitivity metrics without a calibrated grade or 0.85 pass threshold.
+- The KshetraSense SHI is a separate, project-defined provisional score with explicit nonlinear functions and weights. It is not an official USDA/NRCS index, not locally calibrated, not a crop-fit input, and not a probability.
 
 ### Crop compatibility
 

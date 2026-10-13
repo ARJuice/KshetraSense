@@ -1,6 +1,6 @@
 # UX specification
 
-**Status:** current user-facing contract for the production-intended build. The [PRD](PRD.md) owns product scope and claims; the [TRD](TRD.md) owns service/data contracts. The earlier mock-first UX is superseded by [Decision 0004](decisions/0004-field-monitoring-and-direct-build.md).
+**Status:** historical UX contract for the previous grid-painting workflow. It is superseded for the current Soil Zoning redesign by [Phase 2](plans/phase-2-soil-zoning-ui-redesign.md), which uses boundary + sparse samples and the implemented `/v2` API. Do not use brush/preset interactions below as the Phase 2 implementation spec. Product scope remains in the [PRD](PRD.md); backend contracts are in the [TRD](TRD.md) and phase plans.
 
 The existing prototype UI is not the design baseline. Rebuild the experience from the user's jobs and real module boundaries. There is no presentation-only mock phase, no canned result, and no fake algorithm progress. Use synthetic fixtures only for tests/benchmarks or an explicitly labeled development diagnostic.
 

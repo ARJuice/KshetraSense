@@ -1,6 +1,6 @@
 # Delivery plan and acceptance
 
-**Status:** current functional implementation sequence. This plan replaces the mock-first milestone in [Decision 0002](decisions/0002-mock-data-demo-first.md); see [Decision 0004](decisions/0004-field-monitoring-and-direct-build.md). No visual-only or fixture-output product phase is planned.
+**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phase 1 backend is complete, and the Phase 2 UI migration is next. No visual-only or fixture-output product phase is planned.
 
 ## Delivery principles
 
@@ -14,15 +14,11 @@
 
 | Phase | Deliverable | Exit condition |
 | --- | --- | --- |
-| 0. Contracts, provenance, and environment | Confirm feature/input schemas, audited leaf labels/splits, supported crop-profile sources, service boundaries, local persistence approach, CropSight pinned source/dependencies, Earth Engine setup, SoilGrids download/cache path, and reference devices. | Inputs, units, errors, provenance, data rights caveats, and setup steps are documented. The project can start each required service or show an honest configuration error. |
-| 1. Production shell and Soil Zoning vertical slice | Replace the old prototype UX with the new React/TypeScript product shell. Implement a complete 2D Soil Zoning flow over real user-entered/imported data plus the documented synthetic benchmark for tests. Implement K-means and FCM contracts, immutable run state, stale-result behavior, and evidence labels. | A user can provide valid input, run a real algorithm, inspect the returned zones, understand limitations, and complete the task without WebGL. No canned zone result is displayed. |
-| 2. Crop Fit | Implement independent sourced soil-to-crop rules, per-crop factors, missing-data states, and zone summaries. | Source/unit/profile tests pass; Crop Fit results do not vary with cluster labels and are never presented as a 100%-sum probability. |
-| 3. Leaf Diagnosis | Audit data labels and physical-leaf split, train/evaluate the fixed shared MobileNetV3-Small 17-class model, and connect real inference/review states. | Model, preprocessing, class map, evaluation report, and inference contract agree; image bytes are not persisted by default. |
-| 4. Soil Investigation | Add persistent, dated manual/CSV soil sample records with location, units, depth, source, and method; show sample map/history and completeness. | Imported and manually entered records validate, preserve original values/units, survive restart, and clearly distinguish measurements from model estimates. |
-| 5. SoilGrids context | Add an optional cached/downloaded SoilGrids view for supported properties/depths and available uncertainty quantiles. | Resolution, source/version/date, property/depth, and uncertainty context are visible; no generated field-cell precision or automatic feed into zoning/Crop Fit. |
-| 6. CropSight vegetation sub-application | Run the pinned CropSight source independently with its own circular AOI and date window, its own provider configuration, and verified display outputs. | The supported source path is reproducible; Earth Engine/imagery failure and quality/coverage states are honest; no KshetraSense module data are read or changed. |
-| 7. 2.5D/R3F integration and profiling | Add the data-responsive Three.js/R3F field treatment alongside the complete 2D path, with real selection/edit/result transitions and optional decorative assets. | Accessibility, fallback, reduced motion, and all TRD performance budgets pass on named references. |
-| 8. Final integration and demonstration readiness | Cross-module state/privacy review, supported-device checks, reproducibility audit, release walkthrough, limitations and setup documentation. | A reviewer can trace each displayed output to source, request, method/version, and actual evidence; failures never become fake success. |
+| 1. Backend Algorithmic Core — complete | GeoJSON/UTM grid, IDW, KshetraSense SHI, Auto-K K-means/FCM, adjacent-profile merge, contiguous components, source-sample sensitivity, and WSN/gateway candidates at `/v2/zoning/run`. | Backend tests pass; estimates, provisional score, sensitivity assumptions, and geometry-only candidates are labeled honestly. |
+| 2. Soil Zoning UI Redesign — planned | Replace the legacy grid/painting path with boundary/sample input, real `/v2` integration, returned layers/diagnostics, and selected-cell/zone Crop Fit via the existing rules endpoint. | No canned result; edits make prior runs stale; 2D and WebGL paths agree with actual response data and expose limitations. |
+| 3. WSN Telemetry Service & Edge AI — planned | Verify the selected replay data, implement a provenance-aware playback API, GRU moisture forecast, FAO-56 MAD logic, and anomaly filtering. | Dataset/schema/split and forecasting tests pass; no hardware actuation claim unless validated separately. |
+| 4. Field Monitoring UI Transformation — planned | Build monitoring views for the telemetry workflow and the isolated CropSight vegetation workflow; preserve Soil Investigation and SoilGrids boundaries. | Provider/data failures are honest; no monitoring output silently changes zoning or Crop Fit. |
+| 5. Leaf Contract, Verification & Defense — planned | Freeze and verify the 17-class MobileNetV3-Small interface and evaluation/data contract; prepare demonstration and defense materials. | Model, preprocessing, class map, evaluation report, and inference interface agree; image bytes are not persisted by default. |
 
 The sequence permits independent work on the crop model, soil processing, or CropSight environment, but user-visible completion gates remain in order. A visual element may be polished during its functional phase; it must never be used to disguise an unimplemented computation.
 
@@ -45,10 +41,10 @@ The sequence permits independent work on the crop model, soil processing, or Cro
 | --- | --- | --- |
 | AC-01 | Same named seed creates the same synthetic test grid and units on repeated loads. | Determinism test and benchmark manifest. |
 | AC-02 | Cell/zone inspection shows value, unit, source, and measurement context; missing data is not rendered as zero. | UI test and capture. |
-| AC-03 | Edits/presets affect only declared cells; undo/redo restores exact input state. | Domain test. |
-| AC-04 | A soil change marks a prior real zoning result stale and retains the prior immutable run. | Integration test. |
+| AC-03 | Boundary/sample edits preserve exact prior input state and identify the changed source records. | Domain test. |
+| AC-04 | A boundary, sample, or run-parameter change marks a prior real zoning result stale and retains the prior immutable run. | Integration test. |
 | AC-05 | K-means/FCM runs record parameters, seed, features/exclusions, versions, timing, diagnostics, and assignments. | Serialized real-run record. |
-| AC-06 | Incomparable moisture is excluded with a visible reason; comparable moisture may be included. | Context-validation test. |
+| AC-06 | The Phase 1 field run uses only pH, EC, N, P, and K with fixed units and a common explicit depth; unsupported properties are not silently mixed in. | Request-schema and UI validation tests. |
 | AC-07 | FCM memberships are correctly mapped and described as membership strength, not confidence. | Algorithm/UI tests. |
 | AC-08 | Soil, zoning, and membership modes have distinct titles/legends; zone meaning does not rely on color alone. | Accessibility/visual review. |
 | AC-09 | Crop Fit shows factor status, value/unit when present, source/profile version, and missing-data state. | Rules/UI integration test. |
@@ -67,7 +63,7 @@ The sequence permits independent work on the crop model, soil processing, or Cro
 ## College demonstration walkthrough
 
 1. Open Field Lab with a real supplied dataset; identify its source and measurement context before running Soil Zoning.
-2. Apply a deliberate local soil edit, undo it, rerun zoning, then inspect the actual returned zone summaries and diagnostics.
+2. Change one source sample value, show that the previous run is stale but retained, rerun zoning, then inspect the returned summaries and diagnostics.
 3. Open Crop Fit for a selected cell/zone and explain the independent source-backed assessment and any unassessed factors.
 4. Submit an eligible leaf photo and inspect the actual classifier result and review limitations.
 5. In Field Monitoring, inspect dated soil samples, compare only compatible repeated measurements, and view SoilGrids separately as coarse modeled context.
@@ -94,29 +90,7 @@ If a required provider is unavailable during demonstration, show the explicit un
 
 Do not publish accuracy without the audited split/evaluation report; crop compatibility without sourced thresholds and tests; or VRA, irrigation, and yield estimates without dedicated validation. Do not enable production 3D by default for a device class without profiling and an equivalent accessible path. Do not add an asset before it passes the [TRD asset gate](TRD.md#asset-policy). The CropSight academic-use decision is recorded in Decision 0004; it does not establish a public redistribution right.
 
-## Soil zoning module: known follow-up items and refinement punch list
+## Soil zoning frontend migration
 
-The following items are tracked for progressive refinement and verification in subsequent passes:
-
-### 1. Canvas & Viewport Responsiveness
-- **Camera Aspect & Viewport Refocus:** When collapsing or expanding the Left Config or Right Inspector panels, or toggling the "Focus" full-width mode, ensure OrbitControls and camera frustum smoothly adapt without requiring manual zoom re-centering.
-- **Brush Pointer Lock vs Orbit Dragging:** In 3D mode while Brush tool is active, enforce strict event isolation so rapid drag-painting strokes never trigger accidental camera orbit rotation.
-- **High-DPI / Retinal Screen Canvas Scaling:** Verify `<ClickSpark>` overlay canvas pixel ratio syncs accurately with window device pixel ratio (`window.devicePixelRatio`) during browser zoom levels (125%, 150%).
-- **Non-Color Zone Discrimination in 3D:** While the 2.5D Atlas Map uses SVG patterns (`pattern-zone-1` through `4`), evaluate adding procedural top-face texture stripes or discrete elevation tiers in 3D mode so zones are immediately distinguishable without relying on color alone per WCAG 2.2 AA.
-- **Perimeter Scenery Draw-Call Profiling:** Continuously profile instanced mesh and GLB clone draw calls for the 12 Kenney assets against TRD mobile and constrained GPU budgets (maintaining $\ge$ 60 FPS).
-
-### 2. Service & Algorithm Integration
-- **Automated Service Health Polling:** Add a periodic lightweight health check (`GET /health`) with an automatic reconnect status indicator so the UI recovers automatically when the local FastAPI server starts after the browser shell.
-- **Environment & Port Documentation:** Ensure `.env.example` documents `VITE_ZONING_API_URL` and `CORS_ORIGINS` to support custom local ports (e.g. Vite port 3000 vs 5173).
-- **Attribute Key Normalization:** Maintain test coverage for both camelCase and snake_case aliases (`soil_temperature` $\leftrightarrow$ `soilTemperature`, `ph` $\leftrightarrow$ `pH`) across all zoning endpoints.
-- **Iterative Convergence Diagnostics:** Surface additional diagnostic telemetry (e.g. iteration progression curve, inertia reduction) in an expandable panel for agronomy researchers.
-
-### 3. Field Editing & History
-- **Grid Boundary Clamping:** Verify drag-brush strokes that exit the 18×12 perimeter cleanly release the active pointer without leaving dangling hover indicators on edge cells.
-- **Batch Preset Undo Granularity:** Ensure single-click presets (Low nitrogen patch, High EC pocket, Acidic wash) are stamped with descriptive labels in the undo stack.
-- **Detailed CSV Import Validation Tooltips:** Display line-by-line validation errors if user-supplied soil CSV files have missing columns or out-of-range values.
-
-### 4. Crop Fit Sourced Evidence
-- **Agronomic Threshold Expansion:** When verified, peer-reviewed agronomic ranges for N/P/K and EC become available, expand rules beyond pH while keeping explicit "Not assessed" states for unverified parameters.
-- **Methodology & Limitation Disclosures:** Keep evidence disclosures prominent to reinforce that zoning and crop-fit screening provide spatial decision support, not automatic fertilizer prescriptions or yield guarantees.
+The prior grid-brush refinement list is superseded by the [Phase 2 sparse-sample UI contract](plans/phase-2-soil-zoning-ui-redesign.md). Do not implement brush-specific work against the new field-scale pipeline.
 

@@ -2,6 +2,12 @@
 
 KshetraSense is a local, desktop-first smart-farming application for soil zoning, zone-scoped crop-fit screening, and field monitoring. The current build replaces the former mock UX with a functional local zoning service and a clean three-module workspace. Leaf-image classification is intentionally not included in this build and will be developed separately.
 
+## Current architecture status
+
+Phase 1's sparse-sample backend is implemented at `POST /v2/zoning/run`: WGS84 field polygon + georeferenced pH/EC/N/P/K samples → UTM grid → IDW estimates → project-defined SHI → Auto-K K-means/FCM → contiguous zones and diagnostics. It requires 3–50 samples (5–10 recommended), a common explicit depth interval, and uses pH dimensionless, EC dS/m, and N/P/K mg/kg. The current UI still calls the legacy `/v1/zoning/run`; migrating the field workflow and connecting selected-zone Crop Fit is Phase 2, not yet complete. See the [five-phase plan](docs/plans/README.md) and [Phase 1 contract](docs/plans/phase-1-backend-algorithmic-core.md).
+
+SHI is a provisional KshetraSense screen, not an official USDA/NRCS index or crop-success probability. IDW outputs are estimates from sparse samples; WSN/gateway coordinates are geometric suggestions, not radio-validated installation locations. No field-validation claim is made.
+
 ## Run the current build
 
 The zoning page needs both local processes. The browser app never falls back to a prepared zoning or crop-fit result if the service is unavailable.
@@ -32,17 +38,20 @@ Open the local Vite address shown by the second command (`http://localhost:3000/
 - **Zone- or Cell-Scoped Crop Fit:** Sourced evidence checks for Apple, Tomato, and Potato evaluated against exact zone means or cell profiles.
 - **Soil Investigation:** Validated manual records, local CSV preview/import, provenance metadata, and relative coordinates.
 - **Honest Integration Boundaries:** SoilGrids and CropSight inputs/status are clearly labeled; no external telemetry or recommendation is fabricated.
-- **Refinement Punch List:** Known items for continuous polish and optimization are tracked in [Delivery plan: follow-up punch list](docs/DELIVERY.md#soil-zoning-module-known-follow-up-items-and-refinement-punch-list).
+- **Phase 1 backend:** The new field-scale request/response is tested; the existing user interface has not yet migrated to it.
 
 ## Documentation map
 
 | File | Owns |
 | --- | --- |
 | [Product requirements](docs/PRD.md) | Product goals, MVP scope, ML/data plan, evidence boundaries, and success measures. |
-| [UX specification](docs/UX-SPEC.md) | Screens, journeys, interactions, visual behavior, accessibility, and responsive behavior. |
-| [Technical requirements](docs/TRD.md) | Architecture, domain contracts, 3D implementation, performance and asset budgets, and technical verification. |
-| [Delivery plan](docs/DELIVERY.md) | Functional build sequence, release acceptance criteria, evidence needed, and risks. |
-| [Frontend implementation plan](docs/FRONTEND-IMPLEMENTATION-PLAN.md) | Agent-ready contract for building the real React/R3F experience directly, with no fixture-only product phase. |
+| [UX specification](docs/UX-SPEC.md) | Historical grid-UI spec; Phase 2 plan is the current Soil Zoning interaction contract. |
+| [Technical requirements](docs/TRD.md) | Current architecture, domain contracts, 3D implementation, performance/asset budgets, and technical verification. |
+| [Delivery plan](docs/DELIVERY.md) | Release acceptance criteria and link to the current five-phase implementation sequence. |
+| [Five-phase master plan](docs/plans/README.md) | Current backend/UI/telemetry/monitoring/leaf phase sequence and status. |
+| [Phase 1 backend contract](docs/plans/phase-1-backend-algorithmic-core.md) | Field boundary, sample, IDW, SHI, clustering, stability, and WSN-candidate API details. |
+| [Phase 2 soil UI plan](docs/plans/phase-2-soil-zoning-ui-redesign.md) | Frontend migration contract for `/v2` and zone-scoped Crop Fit. |
+| [Frontend implementation plan](docs/FRONTEND-IMPLEMENTATION-PLAN.md) | Historical broad brief, superseded by the current phase plans. |
 | [Glossary](GLOSSARY.md) | Canonical meanings for Field Monitoring, soil samples, SoilGrids context, vegetation zones, and NDVI. |
 | [Crop-suitability research](docs/research/crop-suitability-probability.md) | Evidence on suitability classes, percentages, probability semantics, and the data needed for cultivation probabilities. |
 | [Open-source architecture landscape](docs/research/open-source-architecture-landscape.md) | Backend, soil-mapping, zoning, crop-suitability, and agricultural-ML references with implementation lessons and caveats. |

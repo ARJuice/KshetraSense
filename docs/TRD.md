@@ -1,12 +1,12 @@
 # Technical requirements
 
-**Status:** current architecture contract for direct functional implementation. Product behavior is defined by the [PRD](PRD.md), domain terms by [GLOSSARY](../GLOSSARY.md), and user-facing interactions by the [UX specification](UX-SPEC.md). The earlier mock-first implementation is superseded by [Decision 0004](decisions/0004-field-monitoring-and-direct-build.md).
+**Status:** Phase 1 field-scale zoning backend is implemented; the Phase 2 frontend migration is pending. The five-phase architecture and current implementation status are indexed in [plans/README.md](plans/README.md); product behavior is defined by the [PRD](PRD.md), domain terms by [GLOSSARY](../GLOSSARY.md), and user-facing interactions by the [UX specification](UX-SPEC.md).
 
 ## System boundary
 
 The product shell is a local browser application. User-authored soil state and each analysis module's view state remain isolated. Clustering, crop-rule evaluation, and image inference use isolated, versioned modules/services behind stable request/result contracts. Field Monitoring owns its sample records, optional SoilGrids context, and independent vegetation-monitoring session. It has no implicit read/write path to Soil Zoning, Crop Fit, or Leaf Diagnosis.
 
-Keep React, TypeScript, and Vite for the host UI, with Three.js/React Three Fiber for the functional field and a complete 2D path. A local Python service using scikit-learn, scikit-fuzzy, and TensorFlow/Keras remains the proposed path for clustering, crop rules, and image inference; verify its runtime against model size and latency. Run the pinned CropSight Streamlit application as a separate local sub-application with its own dependencies, configuration, and state. Preserve its files as-is; connect it through a separate Field Monitoring route/launch boundary rather than importing its UI code into the host React tree. SoilGrids access is optional and should use a downloaded/cached supported product subset, not require its currently paused REST endpoint.
+Keep React, TypeScript, and Vite for the host UI, with Three.js/React Three Fiber for the functional field and a complete 2D path. The local FastAPI zoning service currently uses the repository's NumPy K-means++/FCM implementations and rule-based crop-fit module; the image-model runtime and Keras/TensorFlow deployment remain a separate Phase 5 decision and are not changed by Phase 1. Run the pinned CropSight Streamlit application as a separate local sub-application with its own dependencies, configuration, and state. Preserve its files as-is; connect it through a separate Field Monitoring route/launch boundary rather than importing its UI code into the host React tree. SoilGrids access is optional and should use a downloaded/cached supported product subset, not require its currently paused REST endpoint.
 
 ```text
 Browser UI
@@ -82,13 +82,17 @@ The new sample records must persist across application restarts so users can rev
 
 ### Zoning
 
-Request: `scenarioId`, `gridRevision`, method (`kmeans` or `fcm`), cluster count, seed, requested feature set, feature context, and normalization version.
+The legacy `POST /v1/zoning/run` remains available while the current grid frontend is migrated. The field-scale `POST /v2/zoning/run` accepts a WGS84 GeoJSON Polygon and 3–50 georeferenced soil samples (5–10 recommended). Each sample supplies exactly pH, EC, N, P, and K, an explicit common sampling-depth interval, and optional collection date, laboratory method, and standard uncertainty. Units are pH (dimensionless), EC (dS/m), and N/P/K (mg/kg). Cell size is 5 or 10 m; sample locations must lie within the polygon.
 
-Result: immutable run ID/revision, method and parameters, included/excluded features with reasons, preprocessing/algorithm versions, timestamps, diagnostics, assignments, centers, summaries, adjacency, and optional FCM membership matrix.
+The v2 service chooses a local UTM CRS, discretizes cells whose centers are within the polygon, clips cell/zone areas to the boundary, and caps the request at 5,000 cells (and 100,000 bounding-box candidates). It runs IDW with fixed power p=2 over projected metres and returns per-property leave-one-out RMSE/MAE, nearest-sample distances, and explicitly labeled interpolated estimates. Sampling depth mismatch is rejected; incomplete or mixed date/method context is surfaced as warnings.
 
-Build a stable samples × features matrix from valid cells. Apply a declared, versioned feature-wise normalization policy before either distance-based algorithm; record its feature order and parameters and retain raw values for display. Do not normalize incompatible moisture measurements together. If a feature has no variation across the current cells, flag that it cannot distinguish zones. Start with equal feature weights; any weighting control is explicit run configuration, never an automatic change to other feature values.
+For clustering, standardize the varying pH/EC/N/P/K interpolated fields separately, exclude constant features with reasons, and run K-means++ or Bezdek FCM (NumPy; samples × features). Auto-K tests K=2 through the requested maximum (at most 6) and selects the maximum silhouette; ties choose smaller K. FPC is an FCM diagnostic, not an Auto-K criterion. FCM membership orientation is cells × source clusters and is not model confidence or crop probability.
 
-K-means input follows the selected implementation's samples × features convention. The scikit-fuzzy `cmeans` adapter must transpose the same normalized matrix to its features × samples convention and preserve the returned membership orientation when mapping it back to cells. Both methods use recorded seeds. FCM uses its own fuzzy objective and is not K-means with soft colors. Any spatial merge is an explicit adjacency-based post-process with a recorded threshold and distance definition.
+Merge only adjacent clusters whose standardized multivariate centroid distance is at most the configured threshold (default 0.5); then assign separate zone IDs to disconnected four-connected components and keep small components. The independent KshetraSense SHI uses provisional project-defined curves/weights and is not an official USDA/NRCS score, a Crop Fit input, or a calibrated agronomic threshold. Sample perturbation reruns IDW and clustering at fixed selected K (10 runs by default, configurable from 0–50), reports ARI/flip/sensitivity diagnostics, and labels noise values as project assumptions unless per-sample standard uncertainty is provided. It does not assign a universal pass/fail grade.
+
+The field result includes a measured `processingDurationMs`, cells, zone polygons/profiles, diagnostics, pipeline versions, and suggested per-zone medoids/geometric gateway candidates. Gateway `radioCoverageValidated` is false; no deployment, storage, link budget, or Field Monitoring hand-off is implemented. See the [Phase 1 plan](plans/phase-1-backend-algorithmic-core.md) for the full schema and method details.
+
+The v1 and v2 zoning routes use the repository's own NumPy implementations rather than a scikit-fuzzy adapter. FCM uses its own fuzzy objective and is not K-means with soft colors. Both methods use recorded seeds; any future normalization/weighting control must be explicit, versioned run configuration.
 
 ### Crop compatibility
 

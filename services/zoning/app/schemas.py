@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+from datetime import date
 from typing import Annotated, Any, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -8,6 +10,97 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 SUPPORTED_FEATURES = frozenset(
     {"pH", "nitrogen", "phosphorus", "potassium", "ec", "soilTemperature", "moisture"}
 )
+PIPELINE_FEATURES = ("pH", "ec", "nitrogen", "phosphorus", "potassium")
+
+
+class FcmOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    fuzziness: Annotated[float, Field(gt=1.0, le=5.0)] = 2.0
+    maxIterations: Annotated[int, Field(ge=1, le=1000)] = 150
+    tolerance: Annotated[float, Field(gt=0.0, le=0.1)] = 1e-5
+
+
+class FieldBoundaryInput(BaseModel):
+    """A GeoJSON WGS84 field polygon; coordinates are longitude/latitude pairs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["Polygon"] = "Polygon"
+    coordinates: list[list[list[float]]] = Field(min_length=1)
+    crs: Literal["EPSG:4326", "OGC:CRS84"] = "EPSG:4326"
+
+
+class SoilSampleInput(BaseModel):
+    """A measured laboratory sample in the fixed Phase 1 property units."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: Annotated[str, Field(min_length=1, max_length=128)]
+    latitude: Annotated[float, Field(ge=-80, le=84)]
+    longitude: Annotated[float, Field(ge=-180, le=180)]
+    measurements: dict[str, float]
+    standardUncertainty: dict[str, float] = Field(default_factory=dict)
+    depthCm: Annotated[str, Field(min_length=1, max_length=32)]
+    collectionDate: date | None = None
+    labMethod: Annotated[str, Field(max_length=128)] | None = None
+
+    @field_validator("depthCm")
+    @classmethod
+    def non_blank_depth(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("depthCm must not be blank")
+        return value.strip()
+
+    @field_validator("measurements")
+    @classmethod
+    def valid_soil_measurements(cls, measurements: dict[str, float]) -> dict[str, float]:
+        if set(measurements) != set(PIPELINE_FEATURES):
+            raise ValueError("measurements must include exactly pH, ec, nitrogen, phosphorus, and potassium")
+        for feature, value in measurements.items():
+            if not math.isfinite(value):
+                raise ValueError(f"{feature} must be finite")
+            if feature == "pH" and not 0 <= value <= 14:
+                raise ValueError("pH must be between 0 and 14")
+            if feature != "pH" and value < 0:
+                raise ValueError(f"{feature} must be non-negative")
+        return measurements
+
+    @field_validator("standardUncertainty")
+    @classmethod
+    def valid_measurement_uncertainties(cls, values: dict[str, float]) -> dict[str, float]:
+        unknown = set(values) - set(PIPELINE_FEATURES)
+        if unknown:
+            raise ValueError(f"unsupported uncertainty features: {', '.join(sorted(unknown))}")
+        if any(not math.isfinite(value) or value < 0 for value in values.values()):
+            raise ValueError("standardUncertainty values must be finite and non-negative")
+        return values
+
+
+class FieldZoningRequest(BaseModel):
+    """Complete spatial zoning request built from a boundary and sparse samples."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    boundary: FieldBoundaryInput
+    samples: list[SoilSampleInput] = Field(min_length=3, max_length=50)
+    cellSizeM: Literal[5.0, 10.0] = 10.0
+    method: Literal["kmeans", "fcm"] = "fcm"
+    maxK: Annotated[int, Field(ge=2, le=6)] = 6
+    seed: Annotated[int, Field(ge=0, le=4_294_967_295)] = 42
+    mergeThresholdZ: Annotated[float, Field(ge=0, le=2)] = 0.5
+    perturbationRuns: Annotated[int, Field(ge=0, le=50)] = 10
+    fcm: FcmOptions = Field(default_factory=FcmOptions)
+
+    @model_validator(mode="after")
+    def unique_sample_ids(self) -> "FieldZoningRequest":
+        ids = [sample.id for sample in self.samples]
+        if len(ids) != len(set(ids)):
+            raise ValueError("sample IDs must be unique")
+        depths = {sample.depthCm.strip().casefold() for sample in self.samples}
+        if len(depths) != 1:
+            raise ValueError("all samples in a zoning run must use the same sampling depth")
+        return self
 
 
 class SoilCell(BaseModel):
@@ -54,14 +147,6 @@ class SoilCell(BaseModel):
             if value is not None and not math.isfinite(value):
                 raise ValueError(f"{feature} must be a finite number or null")
         return values
-
-
-class FcmOptions(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    fuzziness: Annotated[float, Field(gt=1.0, le=5.0)] = 2.0
-    maxIterations: Annotated[int, Field(ge=1, le=1000)] = 150
-    tolerance: Annotated[float, Field(gt=0.0, le=0.1)] = 1e-5
 
 
 class ZoningRequest(BaseModel):
@@ -160,6 +245,35 @@ class ZoningRunResponse(BaseModel):
     silhouetteScore: float | None
     inputFingerprint: str
     createdAt: str
+
+
+class FieldZoningResponse(BaseModel):
+    """Versioned field-scale result; nested fields retain algorithm diagnostics."""
+
+    model_config = ConfigDict(extra="allow")
+
+    runId: str
+    inputFingerprint: str
+    createdAt: str
+    processingDurationMs: Annotated[float, Field(ge=0)]
+    method: Literal["kmeans", "fcm"]
+    selectedK: int
+    zoneCount: int
+    parameters: dict[str, Any]
+    versions: dict[str, str]
+    field: dict[str, Any]
+    samples: list[dict[str, Any]]
+    sampleWarnings: list[str]
+    interpolation: dict[str, Any]
+    featureSchema: dict[str, Any]
+    shi: dict[str, Any]
+    cells: list[dict[str, Any]]
+    zones: list[dict[str, Any]]
+    autoK: dict[str, Any]
+    mergeLog: list[dict[str, Any]]
+    stability: dict[str, Any]
+    wsnNodes: list[dict[str, Any]]
+    clusterHead: dict[str, Any]
 
 
 class CropFitResponse(BaseModel):

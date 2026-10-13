@@ -12,6 +12,18 @@ _Avoid_: Combined farm score
 A dated, located set of soil measurements collected by a field method or laboratory, with units and sampling context.
 _Avoid_: SoilGrids value, sensor reading (unless actually measured by a sensor)
 
+**Interpolated soil estimate**:
+A modeled estimate of a soil property between measured sample locations. It is not a laboratory measurement, and its apparent map resolution does not imply equivalent measurement accuracy.
+_Avoid_: measured cell value
+
+**KshetraSense Soil Health Index (SHI)**:
+A project-defined composite screening score made from soil-property indicator scores. It is not an official USDA/NRCS index, a crop-specific suitability assessment, or a probability of yield or success.
+_Avoid_: USDA SHI, crop-fit probability
+
+**Management zone**:
+A contiguous field area grouped by similarity in its standardized soil-property profile. The numeric cluster label is an algorithm output, not a crop, quality grade, or treatment prescription.
+_Avoid_: crop zone, prescription zone
+
 **SoilGrids context**:
 A coarse-resolution modeled estimate of soil properties for regional reference, not a measurement of a particular field cell.
 _Avoid_: Soil test, field measurement
