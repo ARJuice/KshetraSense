@@ -11,6 +11,11 @@ export const SOIL_CSV_HEADERS = [
   'phosphorus_mg_kg',
   'potassium_mg_kg',
   'temperature_c',
+  'moisture_pct',
+  'moisture_unit',
+  'depth_cm',
+  'depth_interval',
+  'method',
   'source',
   'lab_report_id',
   'notes',
@@ -66,9 +71,10 @@ const within = (
 };
 
 const validDate = (value: string) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  if (!/^\d{4}-\d{2}-\d{2}/.test(value)) return false;
+  const isoPrefix = value.slice(0, 10);
+  const date = new Date(`${isoPrefix}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === isoPrefix;
 };
 
 export const validateSoilSampleRow = (
@@ -85,15 +91,25 @@ export const validateSoilSampleRow = (
   if (!collectedAt || !validDate(collectedAt)) errors.push('collected_at must be an ISO date (YYYY-MM-DD).');
   if (!source) errors.push('source is required.');
 
-  const latitude = parseFiniteNumber(row.latitude, 'latitude', errors);
-  const longitude = parseFiniteNumber(row.longitude, 'longitude', errors);
-  const ph = parseFiniteNumber(row.ph, 'ph', errors);
-  const ecDsM = parseFiniteNumber(row.ec_ds_m, 'ec_ds_m', errors);
-  const nitrogenMgKg = parseFiniteNumber(row.nitrogen_mg_kg, 'nitrogen_mg_kg', errors);
-  const phosphorusMgKg = parseFiniteNumber(row.phosphorus_mg_kg, 'phosphorus_mg_kg', errors);
-  const potassiumMgKg = parseFiniteNumber(row.potassium_mg_kg, 'potassium_mg_kg', errors);
+  const latitude = parseFiniteNumber(row.latitude ?? '', 'latitude', errors);
+  const longitude = parseFiniteNumber(row.longitude ?? '', 'longitude', errors);
+  const ph = parseFiniteNumber(row.ph ?? '', 'ph', errors);
+  const ecDsM = parseFiniteNumber(row.ec_ds_m ?? '', 'ec_ds_m', errors);
+  const nitrogenMgKg = parseFiniteNumber(row.nitrogen_mg_kg ?? '', 'nitrogen_mg_kg', errors);
+  const phosphorusMgKg = parseFiniteNumber(row.phosphorus_mg_kg ?? '', 'phosphorus_mg_kg', errors);
+  const potassiumMgKg = parseFiniteNumber(row.potassium_mg_kg ?? '', 'potassium_mg_kg', errors);
+
   const temperatureInput = row.temperature_c?.trim();
   const temperatureC = temperatureInput ? parseFiniteNumber(temperatureInput, 'temperature_c', errors) : undefined;
+
+  const moistureInput = row.moisture_pct?.trim();
+  const moisturePercentage = moistureInput ? parseFiniteNumber(moistureInput, 'moisture_pct', errors) : undefined;
+  const moistureUnit = row.moisture_unit?.trim() || (moisturePercentage !== undefined ? '% gravimetric' : undefined);
+
+  const depthInput = row.depth_cm?.trim();
+  const depthCm = depthInput ? parseFiniteNumber(depthInput, 'depth_cm', errors) : undefined;
+  const depthInterval = row.depth_interval?.trim() || (depthCm !== undefined ? `0-${depthCm} cm` : undefined);
+  const method = row.method?.trim() || undefined;
 
   within(latitude, -90, 90, 'latitude', errors);
   within(longitude, -180, 180, 'longitude', errors);
@@ -103,8 +119,22 @@ export const validateSoilSampleRow = (
   within(phosphorusMgKg, 0, 10000, 'phosphorus_mg_kg', errors);
   within(potassiumMgKg, 0, 10000, 'potassium_mg_kg', errors);
   within(temperatureC, -50, 80, 'temperature_c', errors);
+  within(moisturePercentage, 0, 100, 'moisture_pct', errors);
+  within(depthCm, 0, 300, 'depth_cm', errors);
 
-  if (errors.length > 0 || latitude === undefined || longitude === undefined || ph === undefined || ecDsM === undefined || nitrogenMgKg === undefined || phosphorusMgKg === undefined || potassiumMgKg === undefined || !sampleId || !collectedAt || !source) {
+  if (
+    errors.length > 0 ||
+    latitude === undefined ||
+    longitude === undefined ||
+    ph === undefined ||
+    ecDsM === undefined ||
+    nitrogenMgKg === undefined ||
+    phosphorusMgKg === undefined ||
+    potassiumMgKg === undefined ||
+    !sampleId ||
+    !collectedAt ||
+    !source
+  ) {
     return { errors };
   }
 
@@ -121,6 +151,11 @@ export const validateSoilSampleRow = (
       phosphorusMgKg,
       potassiumMgKg,
       temperatureC,
+      moisturePercentage,
+      moistureUnit,
+      depthCm,
+      depthInterval,
+      method,
       source,
       labReportId: row.lab_report_id?.trim() || undefined,
       notes: row.notes?.trim() || undefined,

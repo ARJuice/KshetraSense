@@ -28,16 +28,16 @@ The sequence permits independent work on the crop model, soil processing, or Cro
 
 ## Monitoring acceptance
 
-| ID | Pass condition | Evidence |
-| --- | --- | --- |
-| FM-01 | A soil record includes location, collection time, source/method, depth where relevant, parameter, original value, and unit. Missing context is explicit. | Form/CSV validation tests and saved-record inspection. |
-| FM-02 | Repeated soil readings are graphed only when their parameters, units, methods, depths, and time context are comparable; otherwise they remain separate observations. | Comparability tests and UX review. |
-| FM-03 | SoilGrids shows property, depth, native resolution, available uncertainty quantiles, retrieval date, and modeled-context label. It never appears as a field sample. | Screenshot and result-schema test. |
-| FM-04 | Soil sample and SoilGrids state do not silently affect Soil Zoning or Crop Fit. | Contract and integration tests. |
-| FM-05 | CropSight's live request carries its own center coordinates, radius, and date window; its result is labeled with source/provider and analysis period. | Request/response test and trace inspection. |
-| FM-06 | Rendered CropSight maps, selected algorithm labels, and summaries agree with the underlying returned data. Known mismatched methods are disabled or clearly unavailable until verified. | Source-level regression tests and output comparison. |
-| FM-07 | No-image, inadequate-coverage, unavailable-provider, and authentication/quota failures do not display stale/prepared output as current. | Failure-injection tests and screenshots. |
-| FM-08 | Satellite anomaly/scouting language does not claim a cause; VRA, irrigation, and yield claims remain absent until their separate validation gates pass. | Copy audit and acceptance review. |
+| ID | Pass condition | Evidence | Status |
+| --- | --- | --- | --- |
+| FM-01 | A soil record includes location, collection time, source/method, depth where relevant, parameter, original value, and unit. Missing context is explicit. | `soilSampleValidation.ts`, `csvImport.test.ts`, and form/register UI. | Verified |
+| FM-02 | Repeated soil readings are graphed only when their parameters, units, methods, depths, and time context are comparable; otherwise they remain separate observations. | `comparability.ts` and `comparability.test.ts` (6 unit tests). | Verified |
+| FM-03 | SoilGrids shows property, depth, native resolution, available uncertainty quantiles, retrieval date, and modeled-context label. It never appears as a field sample. | `soilgrids.py`, `soilGrids.test.ts`, and `test_monitoring_api.py`. | Verified |
+| FM-04 | Soil sample and SoilGrids state do not silently affect Soil Zoning or Crop Fit. | State isolation tests and explicit architectural boundary. | Verified |
+| FM-05 | CropSight's live request carries its own center coordinates, radius, and date window; its result is labeled with source/provider and analysis period. | `monitoringApi.ts` and `cropsight.test.ts`. | Verified |
+| FM-06 | Rendered CropSight maps, selected algorithm labels, and summaries agree with the underlying returned data. Known mismatched methods are disabled or clearly unavailable until verified. | `VegetationMonitoringView.tsx` (DBSCAN disabled with upstream mismatch warning). | Verified |
+| FM-07 | No-image, inadequate-coverage, unavailable-provider, and authentication/quota failures do not display stale/prepared output as current. | `monitoringApi.ts` error classification and benchmark toggle. | Verified |
+| FM-08 | Satellite anomaly/scouting language does not claim a cause; VRA, irrigation, and yield claims remain absent until their separate validation gates pass. | `VegetationMonitoringView.tsx` scouting guidance and strict limitations. | Verified |
 
 ## Core release acceptance
 

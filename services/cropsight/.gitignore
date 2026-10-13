@@ -1,0 +1,4 @@
+ndvi_env
+modules/_pycache_
+backend/venv
+node_modules

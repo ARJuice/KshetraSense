@@ -50,4 +50,23 @@ describe('createCsvImportPreview', () => {
     expect(preview.accepted[0].source).toBe('Lab, A');
     expect(preview.accepted[0].notes).toBe('Composite sample, 0-15 cm');
   });
+
+  it('parses optional depth, method, and moisture context correctly', () => {
+    const preview = createCsvImportPreview(
+      `${HEADER},depth_cm,method,moisture_pct,moisture_unit\nSE-015,2026-10-12,12.9716,77.5946,6.8,0.85,55,30,210,Lab B,15,Mehlich-3,22.5,% gravimetric`,
+      'extended.csv',
+    );
+
+    expect(preview.issues).toEqual([]);
+    expect(preview.accepted).toHaveLength(1);
+    expect(preview.accepted[0]).toMatchObject({
+      sampleId: 'SE-015',
+      depthCm: 15,
+      depthInterval: '0-15 cm',
+      method: 'Mehlich-3',
+      moisturePercentage: 22.5,
+      moistureUnit: '% gravimetric',
+    });
+  });
 });
+
