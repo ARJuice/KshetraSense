@@ -91,7 +91,7 @@ src/features/monitoring/
 
 ### Remaining manual/provider gates
 
-- The user will configure Earth Engine project/authentication and start the CropSight service later. Until then, live imagery analysis has not been verified.
+- The user will configure Earth Engine project/authentication and ensure the CropSight sub-application is mounted with its required dependencies later. Until then, live imagery analysis has not been verified.
 - Implement and verify a real SoilGrids WCS/WebDAV-backed adapter before showing estimates. ISRIC currently reports the beta REST API paused and documents WCS for subsets and WebDAV for global VRT data ([ISRIC access FAQ](https://docs.isric.org/globaldata/soilgrids/SoilGrids_faqs_02.html)).
 - A separately scoped UI may expose the calibrated-VWC FAO-56 endpoint later; never connect it to the replay's `%RH` signal.
 - Manually verify browser accessibility/layout and profile the oversized 3D bundle in a later review.

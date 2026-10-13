@@ -1,6 +1,6 @@
 # Delivery plan and acceptance
 
-**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phases 1–4 are implemented, and Phase 5 leaf contract/verification remains. SoilGrids and live Earth Engine use have honest provider/setup gates. No visual-only or fixture-output product phase is planned.
+**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phases 1–4 are implemented, Phase 5 contract/defense materials are prepared, and the leaf classifier release gate remains open. SoilGrids and live Earth Engine use have honest provider/setup gates. No visual-only or fixture-output product phase is planned.
 
 ## Delivery principles
 
@@ -18,7 +18,7 @@
 | 2. Soil Zoning UI Redesign — complete | Boundary/sample input, real `/v2` integration, returned clipped-cell layers/diagnostics, and selected-cell/zone Crop Fit via the existing rules endpoint. | Frontend/service tests pass; no canned result; edits mark prior runs stale; 2D/3D use the same response geometry; 3D obeys cell and triangle limits. |
 | 3. Historical Telemetry Replay & Soil-Signal Forecast — complete | Pinned Parma research data, provenance-aware playback API, experimental `%RH`-signal GRU, candidate-only anomaly screen, and separate calibrated-VWC FAO-56 advisory. | 62 Python tests pass; model/data metadata and source hashes are recorded. The GRU fails to beat persistence at all horizons and is explicitly evaluation-only; no live/zone/actuation claim. |
 | 4. Field Monitoring UI Transformation — complete | Add the historical replay view alongside empty-by-default Soil Investigation and independent CropSight aggregate analysis; preserve module boundaries. | Frontend/API tests pass; replay provenance, raw units, data quality, and weak model performance are visible; no fake SoilGrids values or CropSight zones; provider/setup failures are honest; no output silently changes zoning or Crop Fit. |
-| 5. Leaf Contract, Verification & Defense — planned | Freeze and verify the 17-class MobileNetV3-Small interface and evaluation/data contract; prepare demonstration and defense materials. | Model, preprocessing, class map, evaluation report, and inference interface agree; image bytes are not persisted by default. |
+| 5. Leaf Contract, Verification & Defense — contract prepared | Freeze the image-only 17-class MobileNetV3-Small API boundary, cross-module test matrix, demonstration narrative, and defense guide. | **Documentation complete; classifier release gate remains open.** The future route/model must pass dataset audit, preprocessing/class-map agreement, measured evaluation, calibration/review policy, resource-limit and image-privacy tests before inference is enabled. No leaf model, route, or weights are currently included. |
 
 The sequence permits independent work on the crop model, soil processing, or CropSight environment, but user-visible completion gates remain in order. A visual element may be polished during its functional phase; it must never be used to disguise an unimplemented computation.
 
@@ -70,7 +70,7 @@ Phase 3 backend acceptance is verified by its data, playback, water-balance, and
 3. Open Crop Fit for a selected cell/zone and explain the independent source-backed assessment and any unassessed factors.
 4. In Field Monitoring, create/import dated soil samples and compare only compatible repeated measurements. Show the explicit SoilGrids-unavailable state; do not present an estimate until a real provider is configured.
 5. Replay the Parma research series and explain its `%RH` units, source/treatment labels, model-versus-persistence holdout result, anomaly-candidate semantics, and lack of live/actuation behavior.
-6. After the user configures Earth Engine and starts the CropSight service, enter its independent circular AOI/date window and review only returned aggregate NDVI statistics/time series. Explain that the current response has no map-ready raster or zone outputs; do not claim a patch-level prescription or scouting coordinate.
+6. After the user configures Earth Engine and ensures the CropSight sub-application/dependencies are available, enter its independent circular AOI/date window and review only returned aggregate NDVI statistics/time series. Explain that the current response has no map-ready raster or zone outputs; do not claim a patch-level prescription or scouting coordinate.
 7. Show the Leaf Diagnosis contract and Evidence & Methods; run a leaf classifier only after its separately built model and inference service pass Phase 5 acceptance.
 8. Show the provenance chain, measured evaluation reports, and unavailable/deferred features.
 

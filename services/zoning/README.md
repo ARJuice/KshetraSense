@@ -40,6 +40,7 @@ python -m pytest -q
 | `POST /v1/telemetry/control` | Play/pause, bounded UTC seek, or set playback speed (1/10/60/360). |
 | `WS /v1/telemetry/ws` | Read-only historical snapshots. |
 | `POST /v1/telemetry/water-balance/advisory` | Independent FAO-56 TAW/RAW screen; requires explicit VWC fractions and site calibration inputs. |
+| `GET /cropsight/health`, `POST /cropsight/analyze-field` | Optional CropSight sub-application, mounted only when its Python imports are available; live Earth Engine access still requires user configuration. Aliased under `/api/v1/cropsight/`. |
 | `GET /v1/monitoring/soilgrids` | Validates coordinates/property/depth; returns HTTP 503 until a real, verified ISRIC data provider is configured. It never estimates from coordinates. |
 | `POST /v1/zoning/run` | Validate cells and run `kmeans` or `fuzzy-c-means`. |
 | `POST /v2/zoning/run` | Run the boundary + sparse-sample field pipeline and return per-cell estimates, contiguous zones, diagnostics, and candidate locations. |
@@ -48,6 +49,8 @@ python -m pytest -q
 `/v1/crop-fit/evaluate` intentionally takes measurements and their declared scope/context, not a zone ID, clustering assignment, or membership value. It therefore cannot influence or reinterpret zoning.
 
 SoilGrids is intentionally unavailable in the current build. The previous local coordinate-derived formula was not backed by SoilGrids data and has been removed. ISRIC currently reports the beta REST API paused and points users to WCS for spatial subsets or WebDAV for global VRT products ([ISRIC access FAQ](https://docs.isric.org/globaldata/soilgrids/SoilGrids_faqs_02.html)). Do not return a successful prediction until a real provider path, property/depth/unit mapping, source metadata, and uncertainty handling have been verified.
+
+CropSight is mounted as a sub-application under `/cropsight` (and `/api/v1/cropsight`) only if its imports succeed in the zoning environment; `GET /health` exposes `cropsightMounted` for this mount state. That flag means the app mounted, not that Earth Engine authentication, project access, quota, or imagery coverage is valid. Install/configure its dependencies and Earth Engine access before attempting live analysis. The current API response does not return raster or spatial-zone outputs; the host UI intentionally shows only validated aggregate/time-series fields.
 
 For the host UI, `/api/v1/zoning/run` is a compatibility alias. It accepts both the documented nested-cell request and the UI's compact request: `cluster_count`, `method: "fuzzy-c-means"`, and flat cell measurements. The response exposes the compact `assignments` map, plus `assignmentDetails` with coordinates and FCM memberships.
 
