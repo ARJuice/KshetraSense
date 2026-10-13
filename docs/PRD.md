@@ -1,6 +1,6 @@
 # Product requirements document
 
-**Status:** current product requirements. Phase 1's field-scale zoning backend is implemented; the existing frontend still uses the legacy grid endpoint until Phase 2. No real-farm validation, calibrated agronomic score, radio coverage, or measured production performance is claimed. The five-phase implementation status is in [plans/README.md](plans/README.md).
+**Status:** current product requirements. Phases 1–2 are implemented: the Soil Zoning workspace accepts a WGS84 boundary and measured samples, runs the field-scale backend, and shows the returned zones and selected-scope Crop Fit. No real-farm validation, calibrated agronomic score, radio coverage, or measured production performance is claimed. The five-phase implementation status is in [plans/README.md](plans/README.md).
 
 ## Product statement
 
@@ -36,7 +36,7 @@ The product is educational and exploratory. It is not a farm-control system or a
 - Real-time sensor streams, pumps, irrigation controls/replay, temporal soil-moisture forecasting, or automatic actuation.
 - A trained soil-to-crop recommender, yield prediction, planting certification, fertilizer quantities, deficiency diagnosis, or treatment/cure advice.
 - Validated variable-rate input prescriptions, irrigation decisions, and yield estimation from the initial Field Monitoring module. These remain later research/build goals requiring dedicated data, agronomic rules or crop-specific models, field validation, and separate acceptance criteria.
-- A crop-cultivation probability or a normalized apple/tomato/potato percentage split in the MVP. The synthetic field has no crop outcome labels, and the current soil features are insufficient for full land-suitability assessment.
+- A crop-cultivation probability or a normalized apple/tomato/potato percentage split in the MVP. The current input/result contracts contain no representative crop-outcome labels, and soil-only features are insufficient for full land-suitability assessment.
 - Interpreting cluster IDs as crop identity, soil quality, or a prescription.
 - Any required paid asset, API, model, or runtime. CropSight's live imagery workflow does require an external Earth Engine project/configuration and quota; the user-visible product must report unavailable access rather than invent a result.
 
@@ -46,7 +46,7 @@ A weather-driven soil-water-balance simulator is a possible later rules module. 
 
 | ID | Requirement |
 | --- | --- |
-| PR-01 | A named scenario and seed reproduce the same initial grid. |
+| PR-01 | Each completed field run records its boundary/sample fingerprint, seed, parameters, feature schema, versions, and diagnostics so the same declared request can be reproduced. No field dataset is silently preloaded. |
 | PR-02 | Cell and zone inspectors show values, units, source, and applicable measurement context. Missing values remain missing. |
 | PR-03 | Boundary, sample, or analysis-parameter changes preserve the prior immutable run and mark it stale; the sparse-sample field workflow does not imply cell-brush editing. |
 | PR-04 | A field-scale zoning run records its method, parameters, seed, feature schema, exclusions, pipeline versions, processing duration, diagnostics, and result. |
@@ -88,9 +88,9 @@ A weather-driven soil-water-balance simulator is a possible later rules module. 
 
 ### Crop compatibility
 
-- Keep clustering crop-neutral. Calculate compatibility or suitability independently per cell and crop from a versioned profile, then summarize within each zone with variation and data sufficiency visible. Cluster IDs and FCM memberships never identify crops.
+- Keep clustering crop-neutral. In the implemented workflow, evaluate the user-selected cell profile or returned zone mean independently for each crop using versioned rules. The current backend exposes a limited pH screen; unsupported factors stay “Not assessed.” Cluster IDs and FCM memberships never identify crops.
 - Define the land-use/production context before publishing a profile: target geography, crop and (where relevant) cultivar/rootstock, season or crop stage, rainfed/irrigated production system, input/management level, soil-test method/depth, and units. Numeric limits, interactions, sources, rule version, and boundary/missing-input behavior must be documented. Do not invent thresholds or weights from qualitative nutrient-demand statements.
-- A full suitability assessment may require climate and growing-period data, water availability over the season, radiation, soil texture and effective depth, drainage/aeration, salinity, slope/topography, flooding, and other crop-specific constraints. The current synthetic feature set (pH, soil temperature, EC, N/P/K, optional spot moisture) is only a partial soil-factor demonstration. FAO's crop/land framework evaluates each crop under a defined production system against climate, soil, and landform conditions ([method](https://www.fao.org/4/W2962E/w2962e-04.htm)).
+- A full suitability assessment may require climate and growing-period data, water availability over the season, radiation, soil texture and effective depth, drainage/aeration, salinity, slope/topography, flooding, and other crop-specific constraints. The current zoning result contains IDW estimates for pH, EC, and N/P/K; the implemented Crop Fit screen assesses only pH. This is a partial soil-factor demonstration, not full land evaluation. FAO's crop/land framework evaluates each crop under a defined production system against climate, soil, and landform conditions ([method](https://www.fao.org/4/W2962E/w2962e-04.htm)).
 - Without supported inputs and sourced numeric criteria, show measured factors and “Not assessed”; do not fabricate a composite. Calcium and micronutrients not present in the input remain unmeasured. If a sourced factor aggregation is later approved, call it a compatibility index or suitability class—not a cultivation probability—and disclose its factors and assumptions.
 - Do not force the three crop values to total 100%. Multiple crops may each be suitable, or none; independent crop-success events are not mutually exclusive. A future probability requires a defined outcome and horizon, representative field-by-crop-by-season outcome data, independent validation, calibration evidence, uncertainty, and a separate scope decision. If a percentage is used under a validated land-evaluation model, name its denominator (for example, per-crop modeled yield relative to that crop's attainable maximum); that is not a probability or a share among crops. See the [crop-suitability research note](research/crop-suitability-probability.md).
 - Call current output a limited soil-to-crop compatibility estimate. Do not call it a recommendation, yield prediction, planting certificate, fertilizer plan, or success guarantee.

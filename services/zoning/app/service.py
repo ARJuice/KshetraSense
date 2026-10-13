@@ -443,6 +443,7 @@ def run_field_zoning(request: FieldZoningRequest) -> dict:
                 "column": cell.column,
                 "centerUtm": {"eastingM": cell.center_utm[0], "northingM": cell.center_utm[1]},
                 "centerWgs84": {"longitude": cell.center_wgs84[0], "latitude": cell.center_wgs84[1]},
+                "geometry": cell.geometry_wgs84,
                 "areaM2": cell.area_m2,
                 "nearestSampleDistanceM": cell.nearest_sample_distance_m,
                 "soilValues": cell.values,

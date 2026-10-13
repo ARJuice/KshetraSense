@@ -1,4 +1,2 @@
-export { ZoningFieldCanvas } from './ZoningFieldCanvas';
-export type { ZoningFieldCanvasProps, ZoningFieldCell, ZoningFieldZone } from './ZoningFieldCanvas';
-export { FieldScene3D } from './FieldScene3D';
-export type { FieldInteractionMode, FieldScene3DProps } from './FieldScene3D';
+export { FieldMap2D } from './FieldMap2D';
+export type { FieldMap2DProps, FieldMapSample } from './FieldMap2D';

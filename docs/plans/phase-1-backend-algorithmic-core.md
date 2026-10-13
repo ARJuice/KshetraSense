@@ -3,7 +3,7 @@
 **Scope:** `services/zoning/app/` — Python backend  
 **Depends on:** Nothing (this is the foundation)  
 **Produces:** 6 new Python modules + updated API endpoints + test suites  
-**Status:** Implemented and validated on 2026-10-14. The legacy `/v1/zoning/run` contract remains available; Phase 2 will move the frontend to `/v2/zoning/run`.
+**Status:** Implemented and validated on 2026-10-14. The legacy `/v1/zoning/run` contract remains available for compatibility; the Phase 2 workspace now uses `/v2/zoning/run`.
 
 ---
 
@@ -462,7 +462,7 @@ $$x^{(t+1)} = \frac{\sum_k \frac{\text{medoid}_k}{\|x^{(t)} - \text{medoid}_k\|}
 
 - Field boundary, local UTM CRS, cell size, area, cell count, and grid-area coverage.
 - Sample locations, values, depth/date/method metadata, uncertainty, and data-context warnings.
-- Per-cell IDW estimates, SHI and component scores, nearest-sample distance, cluster/zone IDs, and FCM memberships when selected.
+- Per-cell IDW estimates, SHI and component scores, nearest-sample distance, cluster/zone IDs, FCM memberships when selected, and a WGS84 footprint clipped to the field boundary. The footprint was added in Phase 2 for map fidelity; it is an additive response field.
 - Per-zone area, geometry, soil-profile means/standard deviations, SHI, source cluster IDs, and mean FCM membership where applicable.
 - Auto-K silhouette/FPC/inertia diagnostics, adjacency-merge log, sample-perturbation sensitivity report, and WSN/gateway candidates.
 
@@ -510,7 +510,7 @@ POST /v2/zoning/run
 
 ### Backward Compatibility
 
-Keep the existing `POST /v1/zoning/run` endpoint and its compatibility alias unchanged while the current frontend still uses them. Phase 2 migrates the frontend; deprecation/removal requires a separate consumer check and is not part of Phase 1.
+Keep the existing `POST /v1/zoning/run` endpoint and its compatibility alias unchanged for existing consumers. The Phase 2 frontend uses `/v2`; deprecation/removal of `/v1` requires a separate consumer check and is not part of this implementation.
 
 ---
 

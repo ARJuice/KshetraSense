@@ -7,7 +7,7 @@ export interface FieldImportResult {
   errors: string[];
 }
 
-const parseCsv = (text: string): string[][] => {
+export const parseCsvRows = (text: string): string[][] => {
   const rows: string[][] = [];
   let row: string[] = [];
   let value = '';
@@ -37,7 +37,7 @@ const toNumber = (raw: string, label: string, rowNumber: number, errors: string[
 };
 
 export function importFieldCsv(content: string, name: string): FieldImportResult {
-  const rows = parseCsv(content.replace(/^\uFEFF/, ''));
+  const rows = parseCsvRows(content.replace(/^\uFEFF/, ''));
   if (rows.length < 2) return { errors: ['The file needs a header row and at least two observations.'] };
   const headers = rows[0].map((header) => header.toLowerCase());
   const missing = REQUIRED_HEADERS.filter((header) => !headers.includes(header));

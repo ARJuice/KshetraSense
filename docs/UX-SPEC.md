@@ -1,6 +1,6 @@
 # UX specification
 
-**Status:** historical UX contract for the previous grid-painting workflow. It is superseded for the current Soil Zoning redesign by [Phase 2](plans/phase-2-soil-zoning-ui-redesign.md), which uses boundary + sparse samples and the implemented `/v2` API. Do not use brush/preset interactions below as the Phase 2 implementation spec. Product scope remains in the [PRD](PRD.md); backend contracts are in the [TRD](TRD.md) and phase plans.
+**Status:** historical UX contract for the previous grid-painting workflow. It is superseded for the current Soil Zoning workflow by the implemented boundary/sample UI in [Phase 2](plans/phase-2-soil-zoning-ui-redesign.md), which uses the `/v2` API. Do not use brush/preset interactions below as the current implementation spec. Product scope remains in the [PRD](PRD.md); backend contracts are in the [TRD](TRD.md) and phase plans.
 
 The existing prototype UI is not the design baseline. Rebuild the experience from the user's jobs and real module boundaries. There is no presentation-only mock phase, no canned result, and no fake algorithm progress. Use synthetic fixtures only for tests/benchmarks or an explicitly labeled development diagnostic.
 

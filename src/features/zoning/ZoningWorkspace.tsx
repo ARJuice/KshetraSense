@@ -1,1323 +1,809 @@
-import { useEffect, useMemo, useRef, useState, useCallback, Suspense } from 'react';
+import { Component, lazy, Suspense, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import {
   AlertCircle,
-  ChevronRight,
+  Check,
+  ChevronDown,
   Crosshair,
-  FileUp,
+  Download,
   FlaskConical,
   Focus,
   LoaderCircle,
   Map as MapIcon,
-  Maximize2,
-  Minimize2,
-  Paintbrush,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
+  MapPin,
   Play,
-  Redo2,
-  RefreshCcw,
-  SlidersHorizontal,
+  Plus,
+  Settings2,
   Sprout,
-  TreePine,
-  Undo2,
-  WandSparkles,
+  Trash2,
+  Upload,
 } from 'lucide-react';
+import { evaluateFieldCropFit, runFieldZoning, type CropFitMeasurementContext, type CropFitResponse } from '../../services/zoningApi';
+import { FieldMap2D } from './field/FieldMap2D';
+import { getFieldLayerRange, ZONE_COLORS, type FieldLayer } from './field/fieldDisplay';
+import { estimateGeometryTriangleCount, parseFieldBoundary, type GeoJsonPolygon, type Position } from './field/fieldGeometry';
 import {
-  FEATURE_KEYS,
-  SOIL_FEATURES,
-  createStarterField,
-  formatSoilValue,
-  type ClusteringMethod,
-  type FieldGrid,
-  type SoilCell,
-  type SoilFeatureKey,
-  type ZoningResult,
-  type ZoneSummary,
-} from '../../domain/soil';
-import {
-  evaluateCropFit,
-  runZoning,
-  type CropFitMeasurementContext,
-  type CropFitResponse,
-  ZoningApiError,
-} from '../../services/zoningApi';
-import {
-  FieldScene3D,
-  ZoningFieldCanvas,
-  type FieldInteractionMode,
-  type ZoningFieldCell,
-  type ZoningFieldZone,
-} from './field';
-import { importFieldCsv } from './fieldImport';
-import { ClickSpark } from '../../components/ui/ClickSpark';
-import { DecryptedText } from '../../components/ui/DecryptedText';
-import { FieldReticle } from '../../components/ui/FieldReticle';
+  buildFieldZoningRequest,
+  createBlankSoilSample,
+  SOIL_PROPERTIES,
+  type SoilSampleDraft,
+} from './field/fieldSamples';
+import { parseSoilSampleCsv } from './field/soilSampleCsv';
+import type { FieldZoningOptions, FieldZoningResponse, SoilMeasurements, SoilProperty } from './field/fieldTypes';
+import './zoning.css';
 
-const ZONE_COLOURS = ['#387d65', '#c99037', '#4c79a6', '#9a5d8d', '#9a6d41', '#517e80'];
-const MAX_HISTORY = 30;
+const FieldScene3D = lazy(() => import('./field/FieldScene3D').then(({ FieldScene3D: Scene }) => ({ default: Scene })));
+const EMPTY_CELLS: FieldZoningResponse['cells'] = [];
+const MAX_IMPORT_BYTES = 2_000_000;
+const MAX_3D_CELLS = 768;
+const MAX_3D_TRIANGLES = 20_000;
+const MAX_3D_OVERLAY_TRIANGLES = 1_300;
+const SOIL_LABELS: Record<SoilProperty, string> = {
+  pH: 'pH', ec: 'Electrical conductivity', nitrogen: 'Nitrogen', phosphorus: 'Phosphorus', potassium: 'Potassium',
+};
+const SOIL_UNITS: Record<SoilProperty, string> = {
+  pH: 'pH', ec: 'dS/m', nitrogen: 'mg/kg', phosphorus: 'mg/kg', potassium: 'mg/kg',
+};
+const LAYER_OPTIONS: Array<{ value: FieldLayer; label: string; unit: string }> = [
+  { value: 'zone', label: 'Management zones', unit: '' },
+  { value: 'pH', label: 'pH', unit: 'pH' },
+  { value: 'ec', label: 'Electrical conductivity', unit: 'dS/m' },
+  { value: 'nitrogen', label: 'Nitrogen', unit: 'mg/kg' },
+  { value: 'phosphorus', label: 'Phosphorus', unit: 'mg/kg' },
+  { value: 'potassium', label: 'Potassium', unit: 'mg/kg' },
+  { value: 'shi', label: 'KshetraSense SHI', unit: '0–100' },
+  { value: 'membership', label: 'FCM membership', unit: '0–1' },
+];
+const INITIAL_OPTIONS: FieldZoningOptions = {
+  cellSizeM: 10,
+  method: 'fcm',
+  maxK: 6,
+  seed: 42,
+  mergeThresholdZ: 0.5,
+  perturbationRuns: 10,
+  fcm: { fuzziness: 2, maxIterations: 150, tolerance: 1e-5 },
+};
 
-type WorkspacePane = 'inspect' | 'crop-fit';
-type FieldView = 'three' | 'atlas';
-type Playback = 'idle' | 'calculating' | 'revealing' | 'ready';
-type BrushDirection = 'raise' | 'lower';
+interface AnalysisRun {
+  response: FieldZoningResponse;
+  inputRevision: number;
+  boundaryRevision: number;
+}
 
-const isCurrentResult = (field: FieldGrid, result: ZoningResult | null) =>
-  Boolean(result && Object.keys(result.assignments).length === field.cells.length);
+interface CropFitState {
+  key: string;
+  status: 'loading' | 'ready' | 'error';
+  response?: CropFitResponse;
+  error?: string;
+}
 
-const cloneField = (field: FieldGrid): FieldGrid => ({
-  ...field,
-  cells: field.cells.map((cell) => ({ ...cell, values: { ...cell.values } })),
-});
+type SampleTextField = 'id' | 'latitude' | 'longitude' | 'depthCm' | 'collectionDate' | 'labMethod';
 
-function brushDelta(feature: SoilFeatureKey, intensity: number, direction: BrushDirection) {
-  const definition = SOIL_FEATURES[feature];
-  const raw = (definition.max - definition.min) * (intensity / 100);
-  return (direction === 'raise' ? 1 : -1) * Number(raw.toFixed(definition.precision));
+function prettyValue(value: number, digits = 2): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(digits);
+}
+
+function shortRunId(value: string): string {
+  return value.startsWith('field-zoning-') ? value.slice('field-zoning-'.length, 'field-zoning-'.length + 8) : value.slice(0, 12);
+}
+
+function nextSampleId(samples: readonly SoilSampleDraft[]): string {
+  for (let sequence = 1; sequence <= 50; sequence += 1) {
+    const id = `S-${String(sequence).padStart(2, '0')}`;
+    if (!samples.some((sample) => sample.id === id)) return id;
+  }
+  return 'S-50';
+}
+
+function isSampleComplete(sample: SoilSampleDraft): boolean {
+  return Boolean(
+    sample.id.trim() && sample.latitude.trim() && sample.longitude.trim() && sample.depthCm.trim()
+    && SOIL_PROPERTIES.every((property) => sample.measurements[property].trim()),
+  );
+}
+
+function isFieldPosition(value: string, min: number, max: number): boolean {
+  const parsed = Number(value);
+  return value.trim() !== '' && Number.isFinite(parsed) && parsed >= min && parsed <= max;
+}
+
+function getUnits(layer: FieldLayer): string {
+  return LAYER_OPTIONS.find((option) => option.value === layer)?.unit ?? '';
 }
 
 export function ZoningWorkspace() {
-  const [field, setField] = useState<FieldGrid>(() => createStarterField());
-  const fieldRef = useRef(field);
-  const brushBase = useRef<FieldGrid | null>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-
-  const [feature, setFeature] = useState<SoilFeatureKey>('nitrogen');
-  const [method, setMethod] = useState<ClusteringMethod>('kmeans');
-  const [clusterCount, setClusterCount] = useState(3);
-  const [fuzziness, setFuzziness] = useState(2);
-  const [result, setResult] = useState<ZoningResult | null>(null);
-  const [selectedCellId, setSelectedCellId] = useState<string | null>(field.cells[0]?.id ?? null);
-  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
-  const [hoveredCell, setHoveredCell] = useState<ZoningFieldCell | null>(null);
-
+  const [boundary, setBoundary] = useState<GeoJsonPolygon | null>(null);
+  const [boundaryName, setBoundaryName] = useState('');
+  const [boundaryRevision, setBoundaryRevision] = useState(0);
+  const [samples, setSamples] = useState<SoilSampleDraft[]>([]);
+  const [options, setOptions] = useState<FieldZoningOptions>(INITIAL_OPTIONS);
+  const [inputRevision, setInputRevision] = useState(0);
+  const [analysis, setAnalysis] = useState<AnalysisRun | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [playback, setPlayback] = useState<Playback>('idle');
-  const [error, setError] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
-
-  const [pane, setPane] = useState<WorkspacePane>('inspect');
-  const [view, setView] = useState<FieldView>('three');
-  const [interactionMode, setInteractionMode] = useState<FieldInteractionMode>('inspect');
-  const [brushRadius, setBrushRadius] = useState(1);
-  const [brushIntensity, setBrushIntensity] = useState(6);
-  const [brushDirection, setBrushDirection] = useState<BrushDirection>('lower');
-
-  // Collapsible panels state for wide panoramic soil focus
-  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const [boundaryError, setBoundaryError] = useState<string | null>(null);
+  const [sampleError, setSampleError] = useState<string | null>(null);
+  const [placementMode, setPlacementMode] = useState(false);
+  const [layer, setLayer] = useState<FieldLayer>('zone');
+  const [membershipCluster, setMembershipCluster] = useState(0);
+  const [view, setView] = useState<'2d' | '3d'>('2d');
   const [fitTrigger, setFitTrigger] = useState(0);
+  const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
+  const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
+  const [cropFitScope, setCropFitScope] = useState<'cell' | 'zone'>('cell');
+  const [cropContext, setCropContext] = useState<CropFitMeasurementContext>({
+    sourceScope: '', soilTestMethod: 'Not supplied', sampleDepth: 'Not supplied', ecMethod: 'Not supplied',
+  });
+  const [cropFitState, setCropFitState] = useState<CropFitState | null>(null);
+  const cropRequestId = useRef(0);
+  const [hoveredCellId, setHoveredCellId] = useState<string | null>(null);
 
-  const [undoStack, setUndoStack] = useState<FieldGrid[]>([]);
-  const [redoStack, setRedoStack] = useState<FieldGrid[]>([]);
-
-  useEffect(() => {
-    fieldRef.current = field;
-  }, [field]);
-
-  useEffect(() => {
-    if (playback !== 'revealing') return undefined;
-    const timer = window.setTimeout(() => setPlayback('ready'), 900);
-    return () => window.clearTimeout(timer);
-  }, [playback]);
-
-  // Keyboard shortcut 'F' to fit camera
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLSelectElement ||
-        e.target instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
-      if (e.key === 'f' || e.key === 'F') {
-        setFitTrigger((prev) => prev + 1);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const selectedCell = field.cells.find((cell) => cell.id === selectedCellId) ?? null;
-  const selectedZone = result?.zones.find((zone) => String(zone.zoneId) === selectedZoneId) ?? null;
-  const fieldZones = useMemo<ZoningFieldZone[]>(
-    () =>
-      (result?.zones ?? []).map((zone, index) => ({
-        id: String(zone.zoneId),
-        label: `Zone ${Number(zone.zoneId) + 1}`,
-        color: ZONE_COLOURS[index % ZONE_COLOURS.length],
-      })),
-    [result]
-  );
-  const activeFeature = SOIL_FEATURES[feature];
-  const zoningIsCurrent = isCurrentResult(field, result);
-
-  const renderedCells = useMemo<ZoningFieldCell[]>(
-    () =>
-      field.cells.map((cell) => ({
-        id: cell.id,
-        row: cell.row,
-        col: cell.column,
-        value: cell.values[feature],
-        zoneId: result ? String(result.assignments[cell.id]) : null,
-        membership: result?.memberships?.[cell.id]?.[Number(result.assignments[cell.id])],
-      })),
-    [feature, field.cells, result]
-  );
-
-  const markDirty = () => {
-    setResult(null);
-    setSelectedZoneId(null);
-    setPlayback('idle');
+  const invalidateCropFit = () => {
+    cropRequestId.current += 1;
+    setCropFitState(null);
   };
-
-  const recordField = (next: FieldGrid, previous = fieldRef.current) => {
-    setUndoStack((history) => [...history, cloneField(previous)].slice(-MAX_HISTORY));
-    setRedoStack([]);
-    setField(next);
-    markDirty();
+  const markInputsChanged = () => {
+    setInputRevision((current) => current + 1);
+    setInputError(null);
+    invalidateCropFit();
   };
+  const stale = Boolean(analysis && (analysis.inputRevision !== inputRevision || analysis.boundaryRevision !== boundaryRevision));
+  const geometryStale = Boolean(analysis && analysis.boundaryRevision !== boundaryRevision);
+  const response = analysis?.response ?? null;
+  const displayBoundary = geometryStale ? boundary : response?.field.boundary ?? boundary;
+  const displayCells = analysis && !geometryStale ? response?.cells ?? EMPTY_CELLS : EMPTY_CELLS;
+  const displayZones = analysis && !geometryStale ? response?.zones ?? [] : [];
+  const mapSamples = useMemo(() => samples.flatMap((sample) => {
+    if (!isFieldPosition(sample.latitude, -80, 84) || !isFieldPosition(sample.longitude, -180, 180)) return [];
+    return [{ id: sample.id, latitude: Number(sample.latitude), longitude: Number(sample.longitude) }];
+  }), [samples]);
+  const range = useMemo(
+    () => getFieldLayerRange(displayCells, layer, membershipCluster),
+    [displayCells, layer, membershipCluster],
+  );
+  const estimated3DTriangles = useMemo(() => {
+    if (!displayBoundary) return 0;
+    return displayCells.reduce((total, cell) => total + estimateGeometryTriangleCount(cell.geometry), estimateGeometryTriangleCount(displayBoundary))
+      + MAX_3D_OVERLAY_TRIANGLES;
+  }, [displayBoundary, displayCells]);
+  const selectedCell = displayCells.find((cell) => cell.cellId === selectedCellId) ?? null;
+  const selectedZone = displayZones.find((zone) => zone.zoneId === selectedZoneId) ?? null;
+  const selectedSample = samples.find((sample) => sample.id === selectedSampleId) ?? null;
+  const activeLayer = LAYER_OPTIONS.find((option) => option.value === layer)!;
+  const canUse3D = displayCells.length > 0 && displayCells.length <= MAX_3D_CELLS && estimated3DTriangles <= MAX_3D_TRIANGLES;
+  const threeDLimitMessage = displayCells.length > MAX_3D_CELLS
+    ? `3D is limited to ${MAX_3D_CELLS} cells to protect rendering performance.`
+    : estimated3DTriangles > MAX_3D_TRIANGLES
+      ? `The field geometry exceeds the ${MAX_3D_TRIANGLES.toLocaleString()}-triangle 3D budget; use the full 2D map.`
+      : undefined;
+  const completeSampleCount = samples.filter(isSampleComplete).length;
+  const statusLabel = !analysis ? 'Setup required' : stale ? 'Previous analysis · stale' : 'Analysis current';
+  const hoveredCell = hoveredCellId ? displayCells.find((cell) => cell.cellId === hoveredCellId) ?? null : null;
 
-  const updateCells = (mutate: (cell: SoilCell) => SoilCell, record = true) => {
-    const previous = fieldRef.current;
-    const next = {
-      ...previous,
-      source: previous.source === 'starter' ? ('manual' as const) : previous.source,
-      cells: previous.cells.map(mutate),
-    };
-    if (record) recordField(next, previous);
-    else {
-      setField(next);
-      markDirty();
+  const handleBoundaryUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    setBoundaryError(null);
+    if (file.size > MAX_IMPORT_BYTES) {
+      setBoundaryError('GeoJSON files must be 2 MB or smaller. Simplify the boundary and try again.');
+      return;
+    }
+    try {
+      const parsed = parseFieldBoundary(JSON.parse(await file.text()));
+      setBoundary(parsed);
+      setBoundaryName(file.name);
+      setBoundaryRevision((current) => current + 1);
+      setSelectedCellId(null);
+      setSelectedZoneId(null);
+      setSelectedSampleId(null);
+      setPlacementMode(false);
+      setView('2d');
+      markInputsChanged();
+    } catch (reason) {
+      setBoundaryError(reason instanceof Error ? reason.message : 'Could not read this GeoJSON boundary.');
     }
   };
 
-  const editCellValue = (cellId: string, featureToEdit: SoilFeatureKey, nextValue: number) => {
-    const definition = SOIL_FEATURES[featureToEdit];
-    const bounded = Number(
-      Math.min(definition.max, Math.max(definition.min, nextValue)).toFixed(definition.precision)
-    );
-    updateCells((cell) =>
-      cell.id === cellId ? { ...cell, values: { ...cell.values, [featureToEdit]: bounded } } : cell
-    );
-  };
-
-  const applyBrushAt = useCallback(
-    (origin: ZoningFieldCell) => {
-      if (!brushBase.current) {
-        brushBase.current = cloneField(fieldRef.current);
-        setUndoStack((history) => [...history, brushBase.current!].slice(-MAX_HISTORY));
-        setRedoStack([]);
-      }
-      const delta = brushDelta(feature, brushIntensity, brushDirection);
-      const definition = SOIL_FEATURES[feature];
-      updateCells((cell) => {
-        const distance = Math.hypot(cell.row - origin.row, cell.column - origin.col);
-        if (distance > brushRadius) return cell;
-        const falloff = 1 - distance / (brushRadius + 0.35);
-        const nextValue = Number(
-          Math.min(
-            definition.max,
-            Math.max(definition.min, cell.values[feature] + delta * falloff)
-          ).toFixed(definition.precision)
-        );
-        return { ...cell, values: { ...cell.values, [feature]: nextValue } };
-      }, false);
-    },
-    [feature, brushIntensity, brushDirection, brushRadius]
-  );
-
-  const finishBrush = useCallback(() => {
-    brushBase.current = null;
-  }, []);
-
-  const applyPreset = (preset: 'low-nitrogen' | 'ec-pocket' | 'acid-wash') => {
-    const config =
-      preset === 'low-nitrogen'
-        ? { key: 'nitrogen' as const, factor: 0.48 }
-        : preset === 'ec-pocket'
-        ? { key: 'ec' as const, add: 1.45 }
-        : { key: 'ph' as const, add: -0.8 };
-    const origin = selectedCell ?? fieldRef.current.cells[Math.floor(fieldRef.current.cells.length / 2)];
-    const definition = SOIL_FEATURES[config.key];
-    updateCells((cell) => {
-      const distance = Math.hypot(cell.row - origin.row, cell.column - origin.column);
-      if (distance > 3.4) return cell;
-      const strength = Math.max(0, 1 - distance / 3.9);
-      const base = cell.values[config.key];
-      const proposed =
-        'factor' in config
-          ? base * (1 - (1 - (config.factor ?? 1)) * strength)
-          : base + (config.add ?? 0) * strength;
-      return {
-        ...cell,
-        values: {
-          ...cell.values,
-          [config.key]: Number(
-            Math.min(definition.max, Math.max(definition.min, proposed)).toFixed(definition.precision)
-          ),
-        },
-      };
-    });
-    setFeature(config.key);
-    setInteractionMode('inspect');
-  };
-
-  const undo = () => {
-    const previous = undoStack.at(-1);
-    if (!previous) return;
-    setRedoStack((history) => [...history, cloneField(fieldRef.current)].slice(-MAX_HISTORY));
-    setUndoStack((history) => history.slice(0, -1));
-    setField(cloneField(previous));
-    markDirty();
-  };
-
-  const redo = () => {
-    const next = redoStack.at(-1);
-    if (!next) return;
-    setUndoStack((history) => [...history, cloneField(fieldRef.current)].slice(-MAX_HISTORY));
-    setRedoStack((history) => history.slice(0, -1));
-    setField(cloneField(next));
-    markDirty();
-  };
-
-  const run = async () => {
-    setError(null);
-    setIsRunning(true);
-    setPlayback('calculating');
+  const handleSampleCsvUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    setSampleError(null);
+    if (file.size > MAX_IMPORT_BYTES) {
+      setSampleError('Soil-sample CSV files must be 2 MB or smaller.');
+      return;
+    }
     try {
-      const nextResult = await runZoning(fieldRef.current, method, clusterCount, fuzziness);
-      setResult(nextResult);
-      setSelectedZoneId(null);
-      setPane('inspect');
-      setPlayback('revealing');
+      const result = parseSoilSampleCsv(await file.text());
+      if (result.errors.length) {
+        setSampleError(result.errors.join(' '));
+        return;
+      }
+      setSamples(result.samples);
+      setSelectedSampleId(null);
+      setSampleError(null);
+      setPlacementMode(false);
+      markInputsChanged();
     } catch (reason) {
-      const message =
-        reason instanceof ZoningApiError
-          ? reason.message
-          : 'Unable to reach the local zoning service. Start it, then run zoning again.';
-      setError(message.replace(/^"|"$/g, ''));
-      setPlayback('idle');
+      setSampleError(reason instanceof Error ? reason.message : 'Could not read this soil-sample CSV.');
+    }
+  };
+
+  const patchSample = (id: string, change: (sample: SoilSampleDraft) => SoilSampleDraft) => {
+    setSamples((current) => current.map((sample) => sample.id === id ? change(sample) : sample));
+    markInputsChanged();
+  };
+
+  const addBlankSample = () => {
+    if (samples.length >= 50) {
+      setSampleError('The field-zoning service accepts at most 50 samples.');
+      return;
+    }
+    const sample = createBlankSoilSample(nextSampleId(samples));
+    setSamples((current) => [...current, sample]);
+    setSelectedSampleId(sample.id);
+    setSampleError(null);
+    markInputsChanged();
+  };
+
+  const removeSample = (id: string) => {
+    setSamples((current) => current.filter((sample) => sample.id !== id));
+    if (selectedSampleId === id) setSelectedSampleId(null);
+    markInputsChanged();
+  };
+
+  const placeSampleAt = (position: Position) => {
+    const [longitude, latitude] = position;
+    const emptyDraft = samples.find((sample) => !sample.latitude.trim() || !sample.longitude.trim());
+    if (emptyDraft) {
+      patchSample(emptyDraft.id, (sample) => ({
+        ...sample, latitude: latitude.toFixed(6), longitude: longitude.toFixed(6),
+      }));
+      setSelectedSampleId(emptyDraft.id);
+      return;
+    }
+    if (samples.length >= 50) {
+      setSampleError('The field-zoning service accepts at most 50 samples.');
+      return;
+    }
+    const sample = {
+      ...createBlankSoilSample(nextSampleId(samples)),
+      latitude: latitude.toFixed(6),
+      longitude: longitude.toFixed(6),
+    };
+    setSamples((current) => [...current, sample]);
+    setSelectedSampleId(sample.id);
+    setSampleError(null);
+    markInputsChanged();
+  };
+
+  const updateOptions = (change: (current: FieldZoningOptions) => FieldZoningOptions) => {
+    setOptions(change);
+    markInputsChanged();
+  };
+
+  const runAnalysis = async () => {
+    if (!boundary) {
+      setInputError('Import a valid GeoJSON field boundary before analysis.');
+      return;
+    }
+    let request: ReturnType<typeof buildFieldZoningRequest>;
+    try {
+      request = buildFieldZoningRequest(boundary, samples, options);
+    } catch (reason) {
+      setInputError(reason instanceof Error ? reason.message : 'Check the field inputs before analysis.');
+      return;
+    }
+    const revisionAtStart = inputRevision;
+    const boundaryRevisionAtStart = boundaryRevision;
+    setInputError(null);
+    setIsRunning(true);
+    try {
+      const result = await runFieldZoning(request);
+      setAnalysis({ response: result, inputRevision: revisionAtStart, boundaryRevision: boundaryRevisionAtStart });
+      setLayer('zone');
+      setView('2d');
+      setMembershipCluster(0);
+      setSelectedCellId(null);
+      setSelectedZoneId(null);
+      setSelectedSampleId(null);
+      setCropFitScope('cell');
+      const recordedMethods = [...new Set(result.samples.map((sample) => sample.labMethod?.trim()).filter((method): method is string => Boolean(method)))];
+      setCropContext({
+        sourceScope: '',
+        soilTestMethod: recordedMethods.length === 1 && result.samples.every((sample) => sample.labMethod?.trim())
+          ? recordedMethods[0]
+          : 'Mixed or not supplied; see sample warnings',
+        sampleDepth: result.samples[0]?.depthCm ?? 'Not supplied',
+        ecMethod: 'Not supplied',
+      });
+    } catch (reason) {
+      setInputError(reason instanceof Error ? reason.message : 'The zoning service could not process this field.');
     } finally {
       setIsRunning(false);
     }
   };
 
-  const resetPracticeField = () => {
-    const next = createStarterField();
-    setField(next);
-    setResult(null);
-    setSelectedCellId(next.cells[0]?.id ?? null);
+  const updateCropContext = (key: keyof CropFitMeasurementContext, value: string) => {
+    setCropContext((current) => ({ ...current, [key]: value }));
+    invalidateCropFit();
+  };
+
+  const cropProfile: SoilMeasurements | null = cropFitScope === 'cell'
+    ? selectedCell?.soilValues ?? null
+    : selectedZone?.meanSoilValues ?? null;
+  const cropTargetLabel = cropFitScope === 'cell' && selectedCell
+    ? `Cell R${selectedCell.row + 1} · C${selectedCell.column + 1}`
+    : cropFitScope === 'zone' && selectedZone
+      ? `Zone ${selectedZone.zoneId + 1} mean`
+      : null;
+  const cropTargetKey = response && cropProfile && cropTargetLabel
+    ? `${response.runId}|${cropFitScope}|${cropTargetLabel}|${cropContext.soilTestMethod}|${cropContext.sampleDepth}|${cropContext.ecMethod}`
+    : '';
+  const currentCropFit = cropFitState?.key === cropTargetKey ? cropFitState : null;
+
+  const runCropFit = async () => {
+    if (!cropProfile || !cropTargetLabel || !cropTargetKey) return;
+    const context = { ...cropContext, sourceScope: cropTargetLabel };
+    const requestId = cropRequestId.current + 1;
+    cropRequestId.current = requestId;
+    setCropFitState({ key: cropTargetKey, status: 'loading' });
+    try {
+      const result = await evaluateFieldCropFit(cropProfile, context);
+      if (cropRequestId.current !== requestId) return;
+      setCropFitState({ key: cropTargetKey, status: 'ready', response: result });
+    } catch (reason) {
+      if (cropRequestId.current !== requestId) return;
+      setCropFitState({
+        key: cropTargetKey,
+        status: 'error',
+        error: reason instanceof Error ? reason.message : 'Crop-fit service unavailable.',
+      });
+    }
+  };
+
+  const selectCell = (cell: FieldZoningResponse['cells'][number]) => {
+    setSelectedCellId(cell.cellId);
+    setSelectedZoneId(cell.zoneId);
+    setSelectedSampleId(null);
+    setCropFitScope('cell');
+    setHoveredCellId(null);
+    invalidateCropFit();
+  };
+
+  const selectZone = (zoneId: number) => {
+    setSelectedZoneId(zoneId);
+    setSelectedCellId(null);
+    setSelectedSampleId(null);
+    setCropFitScope('zone');
+    invalidateCropFit();
+  };
+
+  const selectSample = (id: string) => {
+    setSelectedSampleId(id);
+    setSelectedCellId(null);
     setSelectedZoneId(null);
-    setError(null);
-    setUndoStack([]);
-    setRedoStack([]);
-    setPlayback('idle');
+    invalidateCropFit();
   };
 
-  const importGrid = (file: File | undefined) => {
-    if (!file) return;
-    setImportError(null);
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      setImportError('Choose a .csv file using the required field-grid columns.');
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      setImportError('Field CSV files must be 2 MB or smaller.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const imported = importFieldCsv(String(reader.result ?? ''), file.name);
-      if (!imported.field) {
-        setImportError(imported.errors.join(' '));
-        return;
-      }
-      recordField(imported.field);
-      setSelectedCellId(imported.field.cells[0]?.id ?? null);
-    };
-    reader.onerror = () => setImportError('The selected CSV could not be read.');
-    reader.readAsText(file);
+  const downloadResult = () => {
+    if (!response) return;
+    const file = new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(file);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${response.runId}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
-  // Toggle Focus / Zen mode (collapse or restore both sidebars)
-  const toggleFocusField = () => {
-    if (leftPanelOpen || rightPanelOpen) {
-      setLeftPanelOpen(false);
-      setRightPanelOpen(false);
-    } else {
-      setLeftPanelOpen(true);
-      setRightPanelOpen(true);
-    }
+  const clearBoundary = () => {
+    setBoundary(null);
+    setBoundaryName('');
+    setBoundaryRevision((current) => current + 1);
+    setPlacementMode(false);
+    setSelectedCellId(null);
+    setSelectedZoneId(null);
+    setSelectedSampleId(null);
+    markInputsChanged();
   };
-
-  const activeHoverOrSelected = hoveredCell ?? renderedCells.find((c) => c.id === selectedCellId);
 
   return (
-    <section className="workspace">
-      {/* Header with status & Reset */}
-      <header className="workspace__header">
+    <section className="workspace zoning-workspace">
+      <header className="zoning-header">
         <div>
-          <p className="eyebrow">Field intelligence / zoning</p>
-          <h1>Soil zoning &amp; management atlas</h1>
-          <p className="workspace__lede">
-            Explore 216 soil observations, edit conditions with radial brushes or presets, calculate
-            homogeneous management zones, and screen zone means for evidence-backed crop fit.
-          </p>
+          <p className="zoning-eyebrow">FIELD ANALYSIS · SOIL ZONING</p>
+          <h1>Soil zoning</h1>
+          <p>Bring a field boundary and measured soil samples. The map is built only from the analysis service response.</p>
         </div>
-        <div className="workspace__header-actions">
-          <span className={`status-dot ${zoningIsCurrent ? 'status-dot--success' : ''}`}>
-            {zoningIsCurrent ? 'Current run' : 'Zoning out of date'}
-          </span>
-          <button className="button button--secondary" onClick={resetPracticeField}>
-            <RefreshCcw size={15} /> Reset practice field
-          </button>
+        <div className={`zoning-run-state ${stale ? 'is-stale' : analysis ? 'is-current' : ''}`} role="status">
+          {stale ? <AlertCircle size={16} /> : analysis ? <Check size={16} /> : <Crosshair size={16} />}
+          <span>{statusLabel}</span>
+          {analysis && <small>Run {shortRunId(response!.runId)}</small>}
         </div>
       </header>
 
-      {/* Notice Banner */}
-      <div className={`workspace__notice ${zoningIsCurrent ? '' : 'workspace__notice--amber'}`}>
-        <FlaskConical size={17} />
-        <span>
-          <strong>{field.source === 'starter' ? 'Practice workspace.' : 'Working field.'}</strong>{' '}
-          {field.source === 'starter'
-            ? 'Starter observations are synthetic and clearly labelled. Every zone is calculated from the values currently on this field.'
-            : 'Edits preserve their source and require a new zoning run.'}
-        </span>
-      </div>
+      <div className="zoning-layout">
+        <aside className="zoning-input-column" aria-label="Field input and run settings">
+          <section className="zoning-panel">
+            <div className="zoning-panel__heading">
+              <div><span className="zoning-step">01</span><h2>Field boundary</h2></div>
+              {boundary && <span className="zoning-check"><Check size={13} /> Loaded</span>}
+            </div>
+            <label className="zoning-upload">
+              <input type="file" accept=".geojson,.json,application/geo+json,application/json" onChange={handleBoundaryUpload} />
+              <MapIcon size={19} />
+              <strong>{boundary ? 'Replace GeoJSON' : 'Import GeoJSON'}</strong>
+              <span>Polygon or Polygon Feature · WGS84</span>
+            </label>
+            {boundaryName && <div className="zoning-file-row"><span title={boundaryName}>{boundaryName}</span><button type="button" onClick={clearBoundary} aria-label="Remove field boundary">Remove</button></div>}
+            {boundaryError && <p className="zoning-inline-error" role="alert"><AlertCircle size={14} />{boundaryError}</p>}
+            <p className="zoning-help">No farm geometry or measurements are preloaded. Self-intersection and projection limits are checked by the service before computation.</p>
+          </section>
 
-      {/* Panoramic Layout with Collapsible Sidebars & Hero Canvas */}
-      <div className="flex items-start gap-4 w-full">
-        {/* Collapsible Left Panel: Run & Layer Configuration */}
-        {leftPanelOpen && (
-          <aside className="w-[285px] flex-shrink-0 panel zoning-controls" aria-label="Zoning controls">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2 text-evergreen-900 font-bold text-xs uppercase tracking-wider">
-                <SlidersHorizontal size={16} />
-                <h2>Run configuration</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setLeftPanelOpen(false)}
-                className="p-1 rounded text-sage-600 hover:text-evergreen-950 hover:bg-sage-100 transition-colors"
-                title="Collapse controls panel"
-                aria-label="Collapse controls panel"
-              >
-                <PanelLeftClose size={16} />
+          <section className="zoning-panel zoning-samples-panel">
+            <div className="zoning-panel__heading">
+              <div><span className="zoning-step">02</span><h2>Soil samples</h2></div>
+              <span className={`zoning-count ${completeSampleCount >= 3 ? 'is-ready' : ''}`}>{completeSampleCount} / 3 complete</span>
+            </div>
+            <div className="zoning-action-row">
+              <label className="zoning-small-button">
+                <input type="file" accept=".csv,text/csv" onChange={handleSampleCsvUpload} />
+                <Upload size={15} /> Import CSV
+              </label>
+              <button type="button" className="zoning-small-button" onClick={addBlankSample} disabled={samples.length >= 50}>
+                <Plus size={15} /> Add sample
               </button>
             </div>
-
-            <label className="form-label" htmlFor="zoning-method">
-              Method
-            </label>
-            <select
-              id="zoning-method"
-              className="select-control"
-              value={method}
-              onChange={(e) => {
-                setMethod(e.target.value as ClusteringMethod);
-                markDirty();
-              }}
-            >
-              <option value="kmeans">K-means — crisp zone assignment</option>
-              <option value="fuzzy-c-means">Fuzzy C-means — membership strength</option>
-            </select>
-
-            <label className="form-label" htmlFor="cluster-count">
-              Zone count
-            </label>
-            <select
-              id="cluster-count"
-              className="select-control"
-              value={clusterCount}
-              onChange={(e) => {
-                setClusterCount(Number(e.target.value));
-                markDirty();
-              }}
-            >
-              {[2, 3, 4, 5, 6].map((count) => (
-                <option key={count} value={count}>
-                  {count} zones
-                </option>
-              ))}
-            </select>
-
-            {method === 'fuzzy-c-means' && (
-              <>
-                <label className="form-label" htmlFor="fuzziness">
-                  Fuzziness (m)
-                </label>
-                <select
-                  id="fuzziness"
-                  className="select-control"
-                  value={fuzziness}
-                  onChange={(e) => {
-                    setFuzziness(Number(e.target.value));
-                    markDirty();
-                  }}
-                >
-                  <option value={1.5}>1.5 — firmer</option>
-                  <option value={2}>2.0 — balanced</option>
-                  <option value={2.5}>2.5 — softer</option>
-                </select>
-                <p className="control-hint">
-                  m controls how softly a cell can belong to several zones; it does not add random noise.
-                </p>
-              </>
-            )}
-
-            <div className="control-rule" />
-
-            <label className="form-label" htmlFor="feature">
-              Visible field layer
-            </label>
-            <select
-              id="feature"
-              className="select-control"
-              value={feature}
-              onChange={(e) => setFeature(e.target.value as SoilFeatureKey)}
-            >
-              {FEATURE_KEYS.map((key) => (
-                <option key={key} value={key}>
-                  {SOIL_FEATURES[key].label}
-                </option>
-              ))}
-            </select>
-            <p className="control-hint">
-              All six observations are standardized and used for every zoning run. This selector changes
-              surface display and brush target.
-            </p>
-
-            <div className="preset-block">
-              <span className="form-label">Quick scenarios</span>
-              <button onClick={() => applyPreset('low-nitrogen')}>Low nitrogen patch</button>
-              <button onClick={() => applyPreset('ec-pocket')}>High EC pocket</button>
-              <button onClick={() => applyPreset('acid-wash')}>Acidic wash</button>
-            </div>
-
-            <label className="import-grid">
-              <FileUp size={15} />
-              <span>Import soil grid CSV</span>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => importGrid(e.target.files?.[0])}
-              />
-            </label>
-            <p className="control-hint">
-              Columns: row, column, ph, nitrogen, phosphorus, potassium, ec, soil_temperature.
-            </p>
-            {importError && <p className="import-error">{importError}</p>}
-
-            <button
-              className="button button--primary button--run"
-              disabled={isRunning}
-              onClick={run}
-            >
-              {isRunning ? (
-                <LoaderCircle className="spin" size={17} />
-              ) : (
-                <Play size={17} fill="currentColor" />
-              )}
-              {isRunning ? 'Calculating from field…' : 'Run zoning'}
-            </button>
-            <p className="control-hint">
-              Local deterministic algorithms; results are decision support, not crop prescriptions.
-            </p>
-          </aside>
-        )}
-
-        {/* Hero Central Field Stage (Maximizes to 100% width when sidebars collapse) */}
-        <div className="flex-1 min-w-0 flex flex-col gap-3">
-          {error && (
-            <div className="error-banner">
-              <AlertCircle size={17} />
-              <div>
-                <strong>Local service unavailable</strong>
-                <span>{error}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Interactive Field Stage Container */}
-          <div
-            ref={stageRef}
-            className={`relative w-full rounded-xl overflow-hidden border border-evergreen-850 shadow-2xl bg-evergreen-950 field-stage-pattern ${
-              interactionMode === 'brush' ? 'cursor-field-brush' : 'cursor-field-reticle'
-            }`}
-            style={{ minHeight: 600, height: 'clamp(580px, 74vh, 840px)' }}
-          >
-            {/* Top Seam & Controls Bar */}
-            <div className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
-              {/* Left: Open Controls if closed & Architecture Seam Badge */}
-              <div className="flex items-center gap-2 pointer-events-auto">
-                {!leftPanelOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setLeftPanelOpen(true)}
-                    className="stage-floating-btn"
-                    title="Open configuration panel"
-                  >
-                    <PanelLeftOpen size={14} />
-                    <span>Run Config</span>
-                  </button>
-                )}
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-mono tracking-wider bg-evergreen-900/90 text-sage-300 border border-sage-700/40 backdrop-blur-md shadow-md">
-                  <span className="w-1.5 h-1.5 rounded-full bg-verdigris animate-pulse" />
-                  FIELD STAGE · 18×12 GRID (216 CELLS)
-                </span>
-              </div>
-
-              {/* Center: View Switcher (3D Realistic vs 2.5D Atlas Map) & Focus Field */}
-              <div className="flex items-center gap-2 pointer-events-auto">
-                <div className="flex items-center p-1 rounded-lg bg-evergreen-900/90 border border-sage-700/40 backdrop-blur-md shadow-md">
-                  <button
-                    type="button"
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                      view === 'three'
-                        ? 'bg-sage-600/90 text-white shadow-sm'
-                        : 'text-sage-300 hover:text-white'
-                    }`}
-                    onClick={() => setView('three')}
-                  >
-                    <TreePine size={13} />
-                    <span>3D Realistic</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                      view === 'atlas'
-                        ? 'bg-sage-600/90 text-white shadow-sm'
-                        : 'text-sage-300 hover:text-white'
-                    }`}
-                    onClick={() => setView('atlas')}
-                  >
-                    <MapIcon size={13} />
-                    <span>2.5D Atlas</span>
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={toggleFocusField}
-                  className="stage-floating-btn"
-                  title={leftPanelOpen || rightPanelOpen ? 'Maximize field canvas' : 'Restore side panels'}
-                >
-                  {leftPanelOpen || rightPanelOpen ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
-                  <span>{leftPanelOpen || rightPanelOpen ? 'Focus' : 'Standard'}</span>
-                </button>
-              </div>
-
-              {/* Right: DecryptedText Live Coordinate HUD & Open Inspector if closed */}
-              <div className="flex items-center gap-2 pointer-events-auto">
-                {activeHoverOrSelected && (
-                  <div className="px-3 py-1.5 rounded-md text-xs font-mono bg-evergreen-900/95 text-sage-200 border border-sage-700/50 shadow-md flex items-center gap-2 backdrop-blur-md">
-                    <span className="text-sage-400 font-semibold">
-                      <DecryptedText
-                        text={`R${activeHoverOrSelected.row} : C${activeHoverOrSelected.col}`}
-                        speed={30}
-                        maxIterations={5}
-                        animateOn="change"
-                      />
-                    </span>
-                    <span className="text-evergreen-700">|</span>
-                    <span>
-                      {activeHoverOrSelected.value.toFixed(SOIL_FEATURES[feature].precision)}{' '}
-                      {activeFeature.unit}
-                    </span>
-                    {activeHoverOrSelected.zoneId && (
-                      <>
-                        <span className="text-evergreen-700">|</span>
-                        <span className="text-amberGold font-semibold">
-                          Zone {Number(activeHoverOrSelected.zoneId) + 1}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                )}
-                {!rightPanelOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setRightPanelOpen(true)}
-                    className="stage-floating-btn"
-                    title="Open inspector panel"
-                  >
-                    <PanelRightOpen size={14} />
-                    <span>Inspector</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Field Reticle Guidelines & Corner Surveyor Markings from 0efec7b */}
-            <FieldReticle
-              containerRef={stageRef}
-              hoveredCellRow={hoveredCell?.row ?? null}
-              hoveredCellCol={hoveredCell?.col ?? null}
-              totalRows={12}
-              totalCols={18}
-              activeFeatureLabel={activeFeature.label}
-              activeFeatureValue={hoveredCell?.value}
-              activeFeatureUnit={activeFeature.unit}
-            />
-
-            {/* Tactile Particle Burst with ClickSpark */}
-            <ClickSpark
-              sparkColor={interactionMode === 'brush' ? '#C86B49' : '#387D65'}
-              sparkRadius={24}
-              className="w-full h-full"
-            >
-              <div className="w-full h-full relative">
-                {view === 'three' ? (
-                  <Suspense
-                    fallback={
-                      <div className="flex items-center justify-center h-full gap-2 text-sage-300">
-                        <LoaderCircle className="spin" size={20} />
-                        <span>Rendering 3D realistic field…</span>
-                      </div>
-                    }
-                  >
-                    <FieldScene3D
-                      cells={renderedCells}
-                      zones={fieldZones}
-                      featureRange={[activeFeature.min, activeFeature.max]}
-                      selectedCellId={selectedCellId}
-                      selectedZoneId={selectedZoneId}
-                      mode={interactionMode}
-                      brushRadius={brushRadius}
-                      fitTrigger={fitTrigger}
-                      onCellSelect={(cell) => {
-                        setSelectedCellId(cell.id);
-                        if (cell.zoneId) setSelectedZoneId(cell.zoneId);
-                      }}
-                      onBrushCell={applyBrushAt}
-                      onBrushEnd={finishBrush}
-                      onCellHover={setHoveredCell}
-                    />
-                  </Suspense>
-                ) : (
-                  <ZoningFieldCanvas
-                    cells={renderedCells}
-                    zones={fieldZones}
-                    featureLabel={result ? 'Zone assignment' : activeFeature.label}
-                    featureUnit={result ? undefined : activeFeature.unit}
-                    featureRange={[activeFeature.min, activeFeature.max]}
-                    selectedCellId={selectedCellId}
-                    selectedZoneId={selectedZoneId}
-                    interactionMode={interactionMode}
-                    brushRadius={brushRadius}
-                    onCellSelect={(cell) => {
-                      setSelectedCellId(cell.id);
-                      if (cell.zoneId) setSelectedZoneId(cell.zoneId);
-                    }}
-                    onBrushCell={applyBrushAt}
-                    onBrushEnd={finishBrush}
-                    onCellHover={setHoveredCell}
-                    onZoneSelect={setSelectedZoneId}
+            {boundary && <button type="button" className={`zoning-place-button ${placementMode ? 'is-active' : ''}`} onClick={() => { setView('2d'); setPlacementMode((active) => !active); }}>
+              <MapPin size={15} /> {placementMode ? 'Finish map placement' : 'Place samples on map'}
+            </button>}
+            {sampleError && <p className="zoning-inline-error" role="alert"><AlertCircle size={14} />{sampleError}</p>}
+            {samples.length === 0 ? (
+              <div className="zoning-empty-samples"><FlaskConical size={18} /><p>Add measured samples manually or import a CSV. Values are never generated for you.</p></div>
+            ) : (
+              <div className="zoning-sample-list">
+                {samples.map((sample, index) => (
+                  <SoilSampleCard
+                    key={`${sample.id}-${index}`}
+                    sample={sample}
+                    index={index}
+                    selected={selectedSampleId === sample.id}
+                    onSelect={() => selectSample(sample.id)}
+                    onRemove={() => removeSample(sample.id)}
+                    onChange={(update) => patchSample(sample.id, update)}
                   />
-                )}
-
-                {/* Calculation Overlay */}
-                {playback === 'calculating' && (
-                  <div className="calculation-overlay">
-                    <LoaderCircle className="spin" size={24} />
-                    <strong>Calculating real {method === 'kmeans' ? 'K-means++' : 'Fuzzy C-means'} result</strong>
-                    <span>Standardizing 6 soil features and clustering locally.</span>
-                  </div>
-                )}
-
-                {/* Reveal Note Animation */}
-                {playback === 'revealing' && (
-                  <div className="reveal-note">
-                    <WandSparkles size={15} />
-                    <span>Revealing completed cluster assignment from standardized field features.</span>
-                  </div>
-                )}
-              </div>
-            </ClickSpark>
-
-            {/* Floating Bottom Quick Action Dock */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
-              <div className="stage-dock">
-                {/* Tool Switcher */}
-                <div className="flex items-center gap-1 p-0.5 rounded-full bg-evergreen-950/80 border border-sage-700/40">
-                  <button
-                    type="button"
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                      interactionMode === 'inspect'
-                        ? 'bg-sage-600 text-white shadow-sm'
-                        : 'text-sage-300 hover:text-white'
-                    }`}
-                    onClick={() => setInteractionMode('inspect')}
-                  >
-                    <Crosshair size={13} />
-                    <span>Inspect</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                      interactionMode === 'brush'
-                        ? 'bg-clay text-white shadow-sm'
-                        : 'text-sage-300 hover:text-white'
-                    }`}
-                    onClick={() => setInteractionMode('brush')}
-                  >
-                    <Paintbrush size={13} />
-                    <span>Brush</span>
-                  </button>
-                </div>
-
-                {/* Brush Settings inline when brush is active */}
-                {interactionMode === 'brush' && (
-                  <div className="flex items-center gap-2 pl-1 pr-2 border-l border-sage-700/40 text-[11px] text-sage-200">
-                    <select
-                      value={brushDirection}
-                      onChange={(e) => setBrushDirection(e.target.value as BrushDirection)}
-                      className="bg-evergreen-900 border border-sage-700/60 rounded px-1.5 py-0.5 text-xs text-white"
-                    >
-                      <option value="lower">Lower</option>
-                      <option value="raise">Raise</option>
-                    </select>
-
-                    <div className="flex items-center gap-1">
-                      <span className="text-sage-400">Radius:</span>
-                      {[1, 2, 3].map((r) => (
-                        <button
-                          key={r}
-                          type="button"
-                          className={`w-5 h-5 rounded text-[10px] font-bold ${
-                            brushRadius === r
-                              ? 'bg-clay text-white'
-                              : 'bg-evergreen-900 text-sage-300 hover:bg-evergreen-800'
-                          }`}
-                          onClick={() => setBrushRadius(r)}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sage-400">Strength:</span>
-                      <input
-                        type="range"
-                        min="2"
-                        max="12"
-                        value={brushIntensity}
-                        onChange={(e) => setBrushIntensity(Number(e.target.value))}
-                        className="w-14 accent-clay cursor-pointer"
-                      />
-                      <span className="font-mono text-[10px]">{brushIntensity}%</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="w-px h-4 bg-sage-700/40" />
-
-                {/* Undo / Redo */}
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={!undoStack.length}
-                    onClick={undo}
-                    className="p-1 rounded text-sage-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="Undo stroke"
-                  >
-                    <Undo2 size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!redoStack.length}
-                    onClick={redo}
-                    className="p-1 rounded text-sage-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="Redo stroke"
-                  >
-                    <Redo2 size={14} />
-                  </button>
-                </div>
-
-                <div className="w-px h-4 bg-sage-700/40" />
-
-                {/* Fit Camera */}
-                <button
-                  type="button"
-                  onClick={() => setFitTrigger((prev) => prev + 1)}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono text-sage-300 hover:text-white"
-                  title="Fit camera view (Press F)"
-                >
-                  <Focus size={13} />
-                  <span>Fit</span>
-                </button>
-
-                <div className="w-px h-4 bg-sage-700/40" />
-
-                {/* Run Zoning Trigger in Dock */}
-                <button
-                  type="button"
-                  disabled={isRunning}
-                  onClick={run}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sage-500 hover:bg-sage-400 text-white shadow-md disabled:opacity-50"
-                >
-                  {isRunning ? <LoaderCircle className="spin" size={13} /> : <Play size={13} fill="currentColor" />}
-                  <span>{isRunning ? 'Running…' : 'Run'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Bottom Status Indicators from 0efec7b */}
-            <div className="absolute bottom-2 left-4 right-4 flex items-center justify-between text-[11px] text-sage-400 font-mono z-10 pointer-events-none">
-              <div className="flex items-center gap-2">
-                <span>
-                  Mode: <strong className="text-sage-200">{interactionMode.toUpperCase()}</strong>
-                </span>
-                <span>•</span>
-                <span>
-                  Layer: <strong className="text-sage-200">{activeFeature.label.toUpperCase()}</strong>
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <kbd className="px-1.5 py-0.5 rounded text-[10px] bg-evergreen-900 border border-sage-800 text-sage-300">
-                  F
-                </kbd>
-                <span className="text-sage-500">Fit camera</span>
-                <span>•</span>
-                <kbd className="px-1.5 py-0.5 rounded text-[10px] bg-evergreen-900 border border-sage-800 text-sage-300">
-                  Arrow keys
-                </kbd>
-                <span className="text-sage-500">Navigate</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Field Stage Legend */}
-          <div className="field-stage__legend">
-            {result ? (
-              <>
-                <span className="legend-label">Calculated zones:</span>
-                {fieldZones.map((zone) => (
-                  <button
-                    key={zone.id}
-                    type="button"
-                    className={`zone-key ${zone.id === selectedZoneId ? 'zone-key--active' : ''}`}
-                    onClick={() =>
-                      setSelectedZoneId(zone.id === selectedZoneId ? null : zone.id)
-                    }
-                  >
-                    <i style={{ background: zone.color }} />
-                    {zone.label}
-                  </button>
                 ))}
-              </>
-            ) : (
-              <>
-                <span className="legend-label">{activeFeature.shortLabel} scale:</span>
-                <span>{activeFeature.min}</span>
-                <div className="gradient-bar" />
-                <span>
-                  {activeFeature.max} {activeFeature.unit}
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* Diagnostic Evidence Summary */}
-          <RunEvidence result={result} playback={playback} />
-        </div>
-
-        {/* Collapsible Right Panel: Selected Observation / Crop Fit */}
-        {rightPanelOpen && (
-          <aside className="w-[315px] flex-shrink-0 panel inspector-panel" aria-label="Selected observation or zone">
-            <div className="flex items-center justify-between mb-3">
-              <div className="segmented-control flex-1 mr-2" role="tablist" aria-label="Analysis inspector">
-                <button
-                  role="tab"
-                  aria-selected={pane === 'inspect'}
-                  className={pane === 'inspect' ? 'is-active' : ''}
-                  onClick={() => setPane('inspect')}
-                >
-                  Inspect
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={pane === 'crop-fit'}
-                  className={pane === 'crop-fit' ? 'is-active' : ''}
-                  onClick={() => setPane('crop-fit')}
-                >
-                  Crop fit
-                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setRightPanelOpen(false)}
-                className="p-1 rounded text-sage-600 hover:text-evergreen-950 hover:bg-sage-100 transition-colors"
-                title="Collapse inspector panel"
-                aria-label="Collapse inspector panel"
-              >
-                <PanelRightClose size={16} />
-              </button>
-            </div>
-
-            {pane === 'inspect' ? (
-              <InspectionPanel
-                selectedCell={selectedCell}
-                feature={feature}
-                result={result}
-                selectedZone={selectedZone}
-                onEdit={editCellValue}
-              />
-            ) : (
-              <CropFitPanel
-                result={result}
-                selectedZone={selectedZone}
-                selectedCell={selectedCell}
-                onChooseZone={() => setPane('inspect')}
-              />
             )}
-          </aside>
-        )}
+            <p className="zoning-help">3–50 samples · 5–10 recommended · pH, EC, N, P and K required · one explicit common depth.</p>
+          </section>
+
+          <section className="zoning-panel">
+            <div className="zoning-panel__heading"><div><span className="zoning-step">03</span><h2>Analysis settings</h2></div><Settings2 size={16} /></div>
+            <div className="zoning-form-grid">
+              <label>Grid cell size<select value={options.cellSizeM} onChange={(event) => updateOptions((current) => ({ ...current, cellSizeM: Number(event.target.value) as 5 | 10 }))}><option value={10}>10 metres</option><option value={5}>5 metres · finer</option></select></label>
+              <label>Clustering method<select value={options.method} onChange={(event) => updateOptions((current) => ({ ...current, method: event.target.value as FieldZoningOptions['method'] }))}><option value="fcm">Fuzzy C-means</option><option value="kmeans">K-means++</option></select></label>
+              <label>Maximum tested K<select value={options.maxK} onChange={(event) => updateOptions((current) => ({ ...current, maxK: Number(event.target.value) }))}>{[2, 3, 4, 5, 6].map((value) => <option value={value} key={value}>{value} clusters</option>)}</select></label>
+            </div>
+            <details className="zoning-advanced">
+              <summary>Advanced parameters <ChevronDown size={14} /></summary>
+              <div className="zoning-form-grid">
+                <label>Random seed<input type="number" value={options.seed} min={0} onChange={(event) => updateOptions((current) => ({ ...current, seed: Number(event.target.value) }))} /></label>
+                <label>Merge threshold Z<input type="number" value={options.mergeThresholdZ} min={0} max={2} step={0.1} onChange={(event) => updateOptions((current) => ({ ...current, mergeThresholdZ: Number(event.target.value) }))} /></label>
+                <label>Sensitivity reruns<input type="number" value={options.perturbationRuns} min={0} max={50} step={1} onChange={(event) => updateOptions((current) => ({ ...current, perturbationRuns: Number(event.target.value) }))} /></label>
+                {options.method === 'fcm' && <>
+                  <label>Fuzziness<input type="number" value={options.fcm.fuzziness} min={1.01} max={5} step={0.1} onChange={(event) => updateOptions((current) => ({ ...current, fcm: { ...current.fcm, fuzziness: Number(event.target.value) } }))} /></label>
+                  <label>FCM iteration limit<input type="number" value={options.fcm.maxIterations} min={1} max={500} step={1} onChange={(event) => updateOptions((current) => ({ ...current, fcm: { ...current.fcm, maxIterations: Number(event.target.value) } }))} /></label>
+                </>}
+              </div>
+              <p>Auto-K selects the silhouette-best tested K. FCM memberships describe cluster membership strength, not probability.</p>
+            </details>
+            <button className="zoning-run-button" type="button" onClick={runAnalysis} disabled={isRunning || !boundary || samples.length < 3}>
+              {isRunning ? <LoaderCircle size={16} className="zoning-spin" /> : <Play size={16} fill="currentColor" />}
+              {isRunning ? 'Running field analysis…' : 'Run field analysis'}
+            </button>
+            <p className="zoning-help">Runs IDW → SHI → Auto-K clustering → zone post-processing. Higher sensitivity counts may take longer.</p>
+            {inputError && <p className="zoning-inline-error" role="alert"><AlertCircle size={14} />{inputError}</p>}
+          </section>
+        </aside>
+
+        <main className="zoning-map-column">
+          <section className="zoning-panel zoning-map-panel" aria-label="Field map">
+            {response && <div className="zoning-result-summary">
+              <div><span>Field area</span><strong>{response.field.areaHectares.toFixed(2)} ha</strong></div>
+              <div><span>Cells</span><strong>{response.field.cellCount.toLocaleString()}</strong></div>
+              <div><span>Zones</span><strong>{response.zoneCount}</strong></div>
+              <div><span>Auto-selected K</span><strong>{response.selectedK}</strong></div>
+              <button type="button" onClick={downloadResult}><Download size={15} /> Export JSON</button>
+            </div>}
+            {stale && <div className="zoning-stale-banner" role="status"><AlertCircle size={16} /><span><strong>Zoning out of date.</strong> This map and its diagnostics still show the last completed response; run analysis again to reflect edited inputs.</span></div>}
+            {response?.sampleWarnings.map((warning) => <div className="zoning-warning" key={warning}><AlertCircle size={14} />{warning}</div>)}
+            <div className="zoning-map-toolbar">
+              <div className="zoning-map-toolbar__left">
+                <label>Map layer<select value={layer} disabled={!displayCells.length} onChange={(event) => setLayer(event.target.value as FieldLayer)}>
+                  {LAYER_OPTIONS.filter((option) => option.value !== 'membership' || response?.method === 'fcm').map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+                </select></label>
+                {layer === 'membership' && response && <label>Source cluster<select value={membershipCluster} onChange={(event) => setMembershipCluster(Number(event.target.value))}>{Array.from({ length: response.selectedK }, (_, index) => <option value={index} key={index}>Cluster {index + 1}</option>)}</select></label>}
+              </div>
+              <div className="zoning-map-toolbar__right">
+                <div className="zoning-view-switch" role="group" aria-label="Map rendering mode">
+                  <button type="button" className={view === '2d' ? 'is-active' : ''} onClick={() => setView('2d')}><MapIcon size={14} /> 2D map</button>
+                  <button type="button" className={view === '3d' ? 'is-active' : ''} onClick={() => { setView('3d'); setPlacementMode(false); }} disabled={!canUse3D} title={threeDLimitMessage}><Focus size={14} /> 3D view</button>
+                </div>
+                {view === '3d' && <button type="button" className="zoning-fit-button" onClick={() => setFitTrigger((current) => current + 1)} title="Reset 3D camera"><Focus size={15} /><span>Fit</span></button>}
+              </div>
+            </div>
+            <div className={`zoning-map-stage ${placementMode ? 'is-pinning' : ''}`}>
+              {view === '2d' || !displayCells.length ? (
+                <FieldMap2D
+                  boundary={displayBoundary}
+                  cells={displayCells}
+                  zones={displayZones}
+                  samples={mapSamples}
+                  layer={layer}
+                  range={range}
+                  membershipCluster={membershipCluster}
+                  selectedCellId={selectedCellId}
+                  selectedZoneId={selectedZoneId}
+                  selectedSampleId={selectedSampleId}
+                  placementMode={placementMode}
+                  onAddSampleAt={placeSampleAt}
+                  onCellSelect={selectCell}
+                  onCellHover={(cell) => setHoveredCellId(cell?.cellId ?? null)}
+                  onSampleSelect={selectSample}
+                  wsnNodes={!geometryStale ? response?.wsnNodes : []}
+                  clusterHead={!geometryStale ? response?.clusterHead : null}
+                />
+              ) : (
+                <SceneErrorBoundary fallback={<div className="zoning-3d-fallback"><strong>3D rendering is unavailable in this browser.</strong><span>The 2D map retains all field inspection and sample-placement actions.</span><button type="button" onClick={() => setView('2d')}>Return to 2D map</button></div>}>
+                  <Suspense fallback={<div className="zoning-3d-fallback"><LoaderCircle size={18} className="zoning-spin" />Preparing the lightweight 3D field…</div>}>
+                    <div className="zoning-3d-canvas"><FieldScene3D
+                        result={response!}
+                        samples={mapSamples}
+                        layer={layer}
+                        range={range}
+                        membershipCluster={membershipCluster}
+                        selectedCellId={selectedCellId}
+                        selectedZoneId={selectedZoneId}
+                        fitTrigger={fitTrigger}
+                        onCellSelect={selectCell}
+                        onCellHover={(cell) => setHoveredCellId(cell?.cellId ?? null)}
+                      /></div>
+                  </Suspense>
+                </SceneErrorBoundary>
+              )}
+            </div>
+            <div className="zoning-map-footer">
+              <div className="zoning-legend">
+                {layer === 'zone' ? (
+                  displayZones.map((zone) => <button type="button" key={zone.zoneId} className={selectedZoneId === zone.zoneId ? 'is-selected' : ''} onClick={() => selectZone(zone.zoneId)}><i style={{ background: zoneColor(zone.zoneId) }} />Zone {zone.zoneId + 1}</button>)
+                ) : <>
+                  <span className="zoning-gradient" aria-hidden="true" />
+                <span>{prettyValue(range[0])} {getUnits(layer)}</span>
+                  <span>to</span>
+                  <span>{prettyValue(range[1])} {getUnits(layer)}</span>
+                </>}
+                <span className="zoning-map-symbol"><i className="is-sample" /> Lab sample</span>
+                {response && <span className="zoning-map-symbol"><i className="is-candidate" /> Suggested node</span>}
+              </div>
+              <p>{hoveredCell ? `Row ${hoveredCell.row + 1} · Column ${hoveredCell.column + 1} · ${activeLayer.label}: ${hoveredLayerValue(hoveredCell, layer, membershipCluster) == null ? 'Not available' : `${prettyValue(hoveredLayerValue(hoveredCell, layer, membershipCluster)!)} ${activeLayer.unit}`}` : threeDLimitMessage ? `${response?.field.cellSizeM} m cells · full 2D map retained; ${threeDLimitMessage}` : displayCells.length ? `${response?.field.cellSizeM} m cells · IDW estimates · nearest-sample distance is available per cell` : 'Map extent fits the imported boundary automatically.'}</p>
+            </div>
+          </section>
+
+          {response && <section className="zoning-panel zoning-zone-list-panel">
+            <div className="zoning-panel__heading"><div><span className="zoning-step">RESULT</span><h2>Zones</h2></div><small>Statistical soil-profile groups, not prescriptions</small></div>
+            <div className="zoning-zone-list">
+              {response.zones.map((zone) => <button type="button" key={zone.zoneId} className={selectedZoneId === zone.zoneId ? 'is-selected' : ''} onClick={() => selectZone(zone.zoneId)}>
+                <i style={{ background: zoneColor(zone.zoneId) }} /><span><strong>Zone {zone.zoneId + 1}</strong><small>{zone.cellCount.toLocaleString()} cells · {zone.areaM2.toFixed(0)} m²</small></span><b>SHI {zone.meanShi.toFixed(0)}</b>
+              </button>)}
+            </div>
+          </section>}
+
+          {response && <Diagnostics response={response} />}
+        </main>
+
+        <aside className="zoning-inspector-column" aria-label="Field inspection and crop fit">
+          <section className="zoning-panel zoning-inspector">
+            <div className="zoning-panel__heading"><div><span className="zoning-step">INSPECT</span><h2>Selected profile</h2></div><Crosshair size={16} /></div>
+            {!response ? <div className="zoning-inspector-empty"><Crosshair size={19} /><p>Run a field analysis, then select a cell or zone to inspect its returned values.</p></div>
+              : selectedSample ? <SampleInspection sample={selectedSample} />
+              : selectedCell ? <CellInspection cell={selectedCell} />
+              : selectedZone ? <ZoneInspection zone={selectedZone} />
+              : <div className="zoning-inspector-empty"><Crosshair size={19} /><p>Select a map cell, sample marker, or zone card.</p></div>}
+          </section>
+
+          <section className="zoning-panel zoning-crop-fit">
+            <div className="zoning-panel__heading"><div><span className="zoning-step">CROP FIT</span><h2>Independent crop checks</h2></div><Sprout size={17} /></div>
+            <p className="zoning-help">Apple, tomato and potato are assessed separately for the selected cell or zone mean. This is not a probability, ranking, yield estimate or prescription.</p>
+            <div className="zoning-crop-scope" role="group" aria-label="Crop-fit scope">
+              <button type="button" className={cropFitScope === 'cell' ? 'is-active' : ''} onClick={() => { setCropFitScope('cell'); invalidateCropFit(); }} disabled={!selectedCell}>Cell</button>
+              <button type="button" className={cropFitScope === 'zone' ? 'is-active' : ''} onClick={() => { setCropFitScope('zone'); invalidateCropFit(); }} disabled={!selectedZone}>Zone mean</button>
+            </div>
+            {cropTargetLabel && cropProfile ? <>
+              <p className="zoning-crop-target">Assessing <strong>{cropTargetLabel}</strong>{stale && <span> · from previous run</span>}</p>
+              <details className="zoning-advanced zoning-crop-context">
+                <summary>Sample context <ChevronDown size={14} /></summary>
+                <label>Soil test method<input value={cropContext.soilTestMethod} onChange={(event) => updateCropContext('soilTestMethod', event.target.value)} /></label>
+                <label>Common sample depth<input value={cropContext.sampleDepth} onChange={(event) => updateCropContext('sampleDepth', event.target.value)} /></label>
+                <label>EC method<input value={cropContext.ecMethod} onChange={(event) => updateCropContext('ecMethod', event.target.value)} /></label>
+              </details>
+              <button type="button" className="zoning-crop-run" onClick={runCropFit} disabled={currentCropFit?.status === 'loading'}>
+                {currentCropFit?.status === 'loading' ? <LoaderCircle size={15} className="zoning-spin" /> : <Sprout size={15} />}
+                {currentCropFit?.status === 'loading' ? 'Checking profiles…' : 'Run crop fit'}
+              </button>
+              {currentCropFit?.status === 'error' && <p className="zoning-inline-error" role="alert"><AlertCircle size={14} />{currentCropFit.error}</p>}
+              {currentCropFit?.status === 'ready' && currentCropFit.response && <CropFitCards response={currentCropFit.response} />}
+            </> : <div className="zoning-inspector-empty"><p>Select a calculated cell or zone first.</p></div>}
+          </section>
+        </aside>
       </div>
     </section>
   );
 }
 
-function RunEvidence({ result, playback }: { result: ZoningResult | null; playback: Playback }) {
-  if (!result || playback === 'calculating') return null;
-  const diagnostics = result.diagnostics;
-  const isFuzzy = result.method === 'fuzzy-c-means';
+function SoilSampleCard({
+  sample, index, selected, onSelect, onRemove, onChange,
+}: {
+  sample: SoilSampleDraft;
+  index: number;
+  selected: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
+  onChange: (change: (sample: SoilSampleDraft) => SoilSampleDraft) => void;
+}) {
+  const complete = isSampleComplete(sample);
+  const setField = (field: SampleTextField, value: string) => onChange((current) => ({ ...current, [field]: value }));
   return (
-    <div className="run-evidence">
-      <span>
-        <strong>{isFuzzy ? 'Fuzzy C-means' : 'K-means++ / Lloyd'}</strong> ·{' '}
-        {diagnostics?.iterations ?? '—'} actual iterations
-      </span>
-      <span>
-        {isFuzzy
-          ? `FPC ${diagnostics?.fuzzyPartitionCoefficient?.toFixed(3) ?? '—'}`
-          : `Inertia ${diagnostics?.inertia?.toFixed(2) ?? '—'}`}
-      </span>
-      <span>{diagnostics?.converged === false ? 'Reached iteration limit' : 'Converged'}</span>
-      <small>
-        {isFuzzy
-          ? 'Soft opacity reflects the winning membership for each assigned cell.'
-          : 'Every cell has one nearest-centroid assignment.'}{' '}
-        The reveal follows the completed local computation.
-      </small>
-    </div>
+    <article className={`zoning-sample-card ${selected ? 'is-selected' : ''}`}>
+      <div className="zoning-sample-card__heading">
+        <button type="button" onClick={onSelect} aria-pressed={selected}><MapPin size={13} /><strong>{sample.id || `Sample ${index + 1}`}</strong><span>{complete ? 'Complete' : 'Incomplete'}</span></button>
+        <button type="button" onClick={onRemove} aria-label={`Remove soil sample ${sample.id}`}><Trash2 size={14} /></button>
+      </div>
+      <div className="zoning-sample-grid zoning-sample-grid--coordinates">
+        <label>Sample ID<input value={sample.id} onChange={(event) => setField('id', event.target.value)} aria-label={`Sample ${index + 1} ID`} /></label>
+        <label>Latitude<input type="number" step="any" value={sample.latitude} onChange={(event) => setField('latitude', event.target.value)} aria-label={`${sample.id} latitude`} /></label>
+        <label>Longitude<input type="number" step="any" value={sample.longitude} onChange={(event) => setField('longitude', event.target.value)} aria-label={`${sample.id} longitude`} /></label>
+        <label>Depth interval, cm<input value={sample.depthCm} placeholder="e.g. 0–15" onChange={(event) => setField('depthCm', event.target.value)} aria-label={`${sample.id} common soil depth interval`} /></label>
+      </div>
+      <div className="zoning-sample-grid zoning-sample-grid--soil">
+        {SOIL_PROPERTIES.map((property) => <label key={property}>{SOIL_LABELS[property]} <small>{SOIL_UNITS[property]}</small><input type="number" min={0} max={property === 'pH' ? 14 : undefined} step="any" value={sample.measurements[property]} onChange={(event) => onChange((current) => ({ ...current, measurements: { ...current.measurements, [property]: event.target.value } }))} aria-label={`${sample.id} ${SOIL_LABELS[property]} in ${SOIL_UNITS[property]}`} /></label>)}
+      </div>
+      <div className="zoning-sample-grid zoning-sample-grid--provenance">
+        <label>Collection date<input type="date" value={sample.collectionDate} onChange={(event) => setField('collectionDate', event.target.value)} /></label>
+        <label>Lab method<input value={sample.labMethod} placeholder="Optional" onChange={(event) => setField('labMethod', event.target.value)} /></label>
+      </div>
+      <details className="zoning-sample-uncertainty"><summary>Optional measurement uncertainty</summary><div className="zoning-sample-grid zoning-sample-grid--soil">
+        {SOIL_PROPERTIES.map((property) => <label key={property}>{SOIL_LABELS[property]} σ<input type="number" min={0} step="any" value={sample.standardUncertainty[property] ?? ''} onChange={(event) => onChange((current) => ({ ...current, standardUncertainty: { ...current.standardUncertainty, [property]: event.target.value } }))} aria-label={`${sample.id} ${SOIL_LABELS[property]} standard uncertainty`} /></label>)}
+      </div></details>
+    </article>
   );
 }
 
-function InspectionPanel({
-  selectedCell,
-  feature,
-  result,
-  selectedZone,
-  onEdit,
-}: {
-  selectedCell: SoilCell | null;
-  feature: SoilFeatureKey;
-  result: ZoningResult | null;
-  selectedZone: ZoningResult['zones'][number] | null;
-  onEdit: (cellId: string, feature: SoilFeatureKey, value: number) => void;
-}) {
-  if (selectedZone) {
-    return (
-      <div className="inspector-content">
-        <div className="inspector-kicker">
-          <Crosshair size={15} /> Zone profile
-        </div>
-        <h2>Zone {Number(selectedZone.zoneId) + 1}</h2>
-        <p className="muted">
-          {selectedZone.cellCount} observations · within-zone variance{' '}
-          {selectedZone.variance.toFixed(3)}
-        </p>
-        <dl className="metric-list">
-          {FEATURE_KEYS.map((key) => (
-            <div key={key}>
-              <dt>{SOIL_FEATURES[key].shortLabel}</dt>
-              <dd>{formatSoilValue(key, selectedZone.mean[key])}</dd>
-            </div>
-          ))}
-        </dl>
-        {result?.silhouetteScore != null && (
-          <p className="quality-note">
-            Silhouette score: <strong>{result.silhouetteScore.toFixed(2)}</strong>. This indicates
-            separation in standardized soil-feature space, not yield quality.
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  if (!selectedCell) {
-    return (
-      <div className="empty-panel">
-        <Crosshair size={20} />
-        <p>Select an observation on the field to inspect it.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="inspector-content">
-      <div className="inspector-kicker">
-        <Crosshair size={15} /> Observation
-      </div>
-      <h2>
-        Row {selectedCell.row}, column {selectedCell.column}
-      </h2>
-      <p className="muted">
-        Edit a precise value here, or use Brush mode for a spatial patch. A change makes the prior run
-        stale.
-      </p>
-      <dl className="metric-list">
-        {FEATURE_KEYS.map((key) => (
-          <div key={key}>
-            <dt>{SOIL_FEATURES[key].label}</dt>
-            <dd>{formatSoilValue(key, selectedCell.values[key])}</dd>
-          </div>
-        ))}
-      </dl>
-      <CellValueEditor cell={selectedCell} feature={feature} onCommit={onEdit} />
-    </div>
-  );
+function SampleInspection({ sample }: { sample: SoilSampleDraft }) {
+  return <div className="zoning-profile-content"><p className="zoning-profile-kicker"><MapPin size={14} /> Measured lab sample</p><h3>{sample.id}</h3><p className="zoning-profile-note">Entered laboratory data; these values are inputs, not interpolated estimates.</p><dl className="zoning-metric-list">
+    <Metric label="Latitude" value={sample.latitude || 'Not entered'} />
+    <Metric label="Longitude" value={sample.longitude || 'Not entered'} />
+    <Metric label="Depth" value={sample.depthCm || 'Not entered'} />
+    {SOIL_PROPERTIES.map((property) => <Metric key={property} label={SOIL_LABELS[property]} value={`${sample.measurements[property] || 'Not entered'} ${SOIL_UNITS[property]}`} />)}
+    <Metric label="Collection date" value={sample.collectionDate || 'Not recorded'} />
+    <Metric label="Lab method" value={sample.labMethod || 'Not recorded'} />
+  </dl></div>;
 }
 
-function CellValueEditor({
-  cell,
-  feature,
-  onCommit,
-}: {
-  cell: SoilCell;
-  feature: SoilFeatureKey;
-  onCommit: (cellId: string, feature: SoilFeatureKey, value: number) => void;
-}) {
-  const [draft, setDraft] = useState(String(cell.values[feature]));
-  useEffect(() => setDraft(String(cell.values[feature])), [cell.id, cell.values, feature]);
-  const commit = () => {
-    const parsed = Number(draft);
-    if (Number.isFinite(parsed)) onCommit(cell.id, feature, parsed);
-    else setDraft(String(cell.values[feature]));
-  };
-  return (
-    <div className="inline-edit">
-      <label htmlFor="selected-value">Edit {SOIL_FEATURES[feature].shortLabel}</label>
-      <input
-        id="selected-value"
-        type="number"
-        aria-label={`Edit ${SOIL_FEATURES[feature].label}`}
-        value={draft}
-        min={SOIL_FEATURES[feature].min}
-        max={SOIL_FEATURES[feature].max}
-        step={10 ** -SOIL_FEATURES[feature].precision}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur();
-        }}
-      />
-    </div>
-  );
+function CellInspection({ cell }: { cell: FieldZoningResponse['cells'][number] }) {
+  return <div className="zoning-profile-content"><p className="zoning-profile-kicker"><Crosshair size={14} /> IDW-interpolated estimate</p><h3>Cell R{cell.row + 1} · C{cell.column + 1}</h3><p className="zoning-profile-note">Zone {cell.zoneId + 1} · {cell.areaM2.toFixed(1)} m² · {cell.nearestSampleDistanceM.toFixed(1)} m to nearest sample</p><dl className="zoning-metric-list">
+    {SOIL_PROPERTIES.map((property) => <Metric key={property} label={SOIL_LABELS[property]} value={`${prettyValue(cell.soilValues[property])} ${SOIL_UNITS[property]}`} />)}
+    <Metric label="KshetraSense SHI" value={`${cell.shi.toFixed(1)} / 100`} />
+    {cell.clusterMemberships?.map((membership, index) => <Metric key={index} label={`Cluster ${index + 1} membership`} value={`${(membership * 100).toFixed(1)}%`} />)}
+  </dl><p className="zoning-caveat">SHI is a provisional project-defined screen, not a crop score or official soil-health index. FCM membership is not probability.</p></div>;
 }
 
-function CropFitPanel({
-  result,
-  selectedZone,
-  selectedCell,
-  onChooseZone,
-}: {
-  result: ZoningResult | null;
-  selectedZone: ZoneSummary | null;
-  selectedCell: SoilCell | null;
-  onChooseZone: () => void;
-}) {
-  const [scope, setScope] = useState<'zone' | 'cell'>('zone');
-  const [soilTestMethod, setSoilTestMethod] = useState('not supplied');
-  const [sampleDepth, setSampleDepth] = useState('not supplied');
-  const [ecMethod, setEcMethod] = useState('not supplied');
-  const [cropFit, setCropFit] = useState<CropFitResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+function ZoneInspection({ zone }: { zone: FieldZoningResponse['zones'][number] }) {
+  return <div className="zoning-profile-content"><p className="zoning-profile-kicker"><Crosshair size={14} /> Contiguous management zone</p><h3>Zone {zone.zoneId + 1}</h3><p className="zoning-profile-note">{zone.cellCount.toLocaleString()} cells · {zone.areaM2.toFixed(1)} m² · source cluster{zone.sourceClusterIds.length === 1 ? '' : 's'} {zone.sourceClusterIds.map((id) => id + 1).join(', ')}</p><dl className="zoning-metric-list">
+    {SOIL_PROPERTIES.map((property) => <Metric key={property} label={`Mean ${SOIL_LABELS[property]}`} value={`${prettyValue(zone.meanSoilValues[property])} ${SOIL_UNITS[property]}`} />)}
+    <Metric label="Mean SHI" value={`${zone.meanShi.toFixed(1)} / 100`} />
+  </dl><p className="zoning-caveat">Zone means summarize IDW estimates, not additional laboratory measurements. SHI is not a crop suitability score.</p></div>;
+}
 
-  const measurements = useMemo(
-    () => (scope === 'zone' ? selectedZone?.mean ?? null : selectedCell?.values ?? null),
-    [scope, selectedCell, selectedZone]
-  );
-  const label =
-    scope === 'zone'
-      ? selectedZone
-        ? `Zone ${Number(selectedZone.zoneId) + 1} mean`
-        : null
-      : selectedCell
-      ? `Cell ${selectedCell.id}`
-      : null;
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div><dt>{label}</dt><dd>{value}</dd></div>;
+}
 
-  useEffect(() => {
-    if (!measurements || !label) {
-      setCropFit(null);
-      setError(null);
-      return;
-    }
-    let active = true;
-    const context: CropFitMeasurementContext = {
-      sourceScope: label,
-      soilTestMethod,
-      sampleDepth,
-      ecMethod,
-    };
-    setLoading(true);
-    setError(null);
-    evaluateCropFit(measurements, context)
-      .then((response) => {
-        if (active) setCropFit(response);
-      })
-      .catch((reason: unknown) => {
-        if (active)
-          setError(reason instanceof Error ? reason.message : 'Crop-fit service unavailable.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [ecMethod, label, measurements, sampleDepth, soilTestMethod]);
+function CropFitCards({ response }: { response: CropFitResponse }) {
+  return <div className="zoning-crop-results">
+    {response.assessments.map((assessment) => <article className="zoning-crop-card" key={assessment.crop}>
+      <div className="zoning-crop-card__heading"><strong>{assessment.crop}</strong><span>Independent screen</span></div>
+      {assessment.factors.map((factor) => <div className="zoning-crop-factor" key={factor.feature}>
+        <div><span>{factor.feature}</span><b className={`is-${factor.state}`}>{factor.state === 'within_contextual_range' ? 'Within context' : factor.state === 'outside_contextual_range' ? 'Review' : 'Not assessed'}</b></div>
+        <p>{factor.reason}</p>
+        {factor.supportedRange && <small>{factor.supportedRange.min}–{factor.supportedRange.max} {factor.supportedRange.unit}{factor.source && <> · <a href={factor.source.url} target="_blank" rel="noreferrer">{factor.source.label}</a></>}</small>}
+      </div>)}
+    </article>)}
+    {response.dataLimitations.map((limitation) => <p className="zoning-caveat" key={limitation}>{limitation}</p>)}
+  </div>;
+}
 
-  if (!result) {
-    return (
-      <div className="empty-panel">
-        <Sprout size={20} />
-        <p>Run zoning first. Then screen either the selected zone mean or a selected grid observation.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="inspector-content">
-      <div className="inspector-kicker">
-        <Sprout size={15} /> Evidence-aware screen
-      </div>
-      <h2>Crop fit</h2>
-      <p className="muted">
-        Apple, tomato, and potato are assessed independently. This is never a 100% probability split,
-        yield forecast, or fertilizer prescription.
-      </p>
-      <div className="crop-scope">
-        <button
-          className={scope === 'zone' ? 'is-active' : ''}
-          onClick={() => setScope('zone')}
-          disabled={!selectedZone}
-        >
-          Selected zone
-        </button>
-        <button
-          className={scope === 'cell' ? 'is-active' : ''}
-          onClick={() => setScope('cell')}
-          disabled={!selectedCell}
-        >
-          Selected cell
-        </button>
-      </div>
-
-      {!measurements && (
-        <div className="empty-inline">
-          <p>Select {scope === 'zone' ? 'a calculated zone' : 'a field cell'} first.</p>
-          <button className="text-button" onClick={onChooseZone}>
-            Go to inspector <ChevronRight size={14} />
-          </button>
-        </div>
-      )}
-
-      {measurements && (
-        <>
-          <p className="crop-target">
-            Evaluating <strong>{label}</strong>
-          </p>
-          <details className="measurement-context">
-            <summary>Measurement context (required for fuller nutrient interpretation)</summary>
-            <label>
-              Soil test method
-              <input
-                value={soilTestMethod}
-                onChange={(e) => setSoilTestMethod(e.target.value)}
-                placeholder="e.g. Mehlich-3"
-              />
-            </label>
-            <label>
-              Sample depth
-              <input
-                value={sampleDepth}
-                onChange={(e) => setSampleDepth(e.target.value)}
-                placeholder="e.g. 0–15 cm"
-              />
-            </label>
-            <label>
-              EC method
-              <input
-                value={ecMethod}
-                onChange={(e) => setEcMethod(e.target.value)}
-                placeholder="e.g. saturation extract ECe"
-              />
-            </label>
-          </details>
-
-          {loading ? (
-            <div className="empty-inline">
-              <LoaderCircle className="spin" size={18} />
-              <p>Checking source-backed factors…</p>
-            </div>
-          ) : error ? (
-            <div className="empty-inline">
-              <AlertCircle size={18} />
-              <p>{error}</p>
-            </div>
-          ) : (
-            <div className="crop-fit-list">
-              {cropFit?.assessments.map((assessment) => (
-                <article className="crop-fit-card" key={assessment.crop}>
-                  <div>
-                    <strong>{assessment.crop}</strong>
-                    <span className="fit-state">Limited screen</span>
-                  </div>
-                  {assessment.factors.map((factor) => (
-                    <div className="factor-row" key={factor.feature}>
-                      <span>{factor.feature}</span>
-                      <b
-                        className={
-                          factor.state === 'within_contextual_range'
-                            ? 'factor-state factor-state--okay'
-                            : factor.state === 'outside_contextual_range'
-                            ? 'factor-state factor-state--review'
-                            : 'factor-state'
-                        }
-                      >
-                        {factor.state === 'within_contextual_range'
-                          ? 'Within context'
-                          : factor.state === 'outside_contextual_range'
-                          ? 'Review'
-                          : 'Not assessed'}
-                      </b>
-                      <p>{factor.reason}</p>
-                      {factor.supportedRange && (
-                        <small>
-                          {factor.supportedRange.min}–{factor.supportedRange.max}{' '}
-                          {factor.supportedRange.unit} ·{' '}
-                          <a href={factor.source?.url} target="_blank" rel="noreferrer">
-                            {factor.source?.label}
-                          </a>
-                        </small>
-                      )}
-                    </div>
-                  ))}
-                </article>
-              ))}
-            </div>
-          )}
-
-          {cropFit && <p className="crop-limit">{cropFit.dataLimitations[1]}</p>}
-        </>
-      )}
+function Diagnostics({ response }: { response: FieldZoningResponse }) {
+  return <section className="zoning-panel zoning-diagnostics">
+    <div className="zoning-panel__heading"><div><span className="zoning-step">EVIDENCE</span><h2>Analysis diagnostics</h2></div><small>{response.method === 'fcm' ? 'Fuzzy C-means' : 'K-means++'} · {response.processingDurationMs.toFixed(0)} ms</small></div>
+    <div className="zoning-diagnostic-grid">
+      <article><span>Auto-K selection</span><strong>K = {response.autoK.optimalK}</strong><small>{response.autoK.selectionCriterion}</small></article>
+      <article><span>Silhouette</span><strong>{response.autoK.sweep.find((entry) => entry.k === response.selectedK)?.silhouette?.toFixed(3) ?? 'Not available'}</strong><small>Internal separation; not agronomic validation</small></article>
+      <article><span>Grid coverage</span><strong>{response.field.gridCoveragePercent.toFixed(1)}%</strong><small>{response.field.cellSizeM} m grid · {response.field.utmCrs}</small></article>
+      <article><span>FCM convergence</span><strong>{response.autoK.selectedAlgorithmConverged ? 'Converged' : 'Iteration limit'}</strong><small>{response.method === 'fcm' ? 'Memberships are not probabilities' : 'K-means++ / Lloyd iterations'}</small></article>
     </div>
-  );
+    <details className="zoning-diagnostic-details">
+      <summary>Auto-K silhouette sweep <ChevronDown size={14} /></summary>
+      <SilhouetteChart response={response} />
+      <p>{response.autoK.silhouetteInterpretation}</p>
+      {response.method === 'fcm' && <p>FPC is a secondary fuzzy-partition diagnostic; Auto-K is selected by silhouette, not FPC.</p>}
+    </details>
+    <details className="zoning-diagnostic-details">
+      <summary>Interpolation and sample validation <ChevronDown size={14} /></summary>
+      <div className="zoning-loocv-grid">{SOIL_PROPERTIES.map((property) => {
+        const item = response.interpolation.crossValidation[property];
+        return <article key={property}><strong>{SOIL_LABELS[property]}</strong><span>{item.sampleCount} folds</span><small>RMSE {item.rmse.toFixed(2)} · MAE {item.mae.toFixed(2)} {SOIL_UNITS[property]}</small></article>;
+      })}</div>
+      <p>IDW uses p={response.interpolation.power} with {response.interpolation.distanceMetric}. Cross-validation is diagnostic and depends on the small sample set.</p>
+      <p>{response.shi.name} v{response.shi.version} is independent of clustering and not locally calibrated.</p>
+    </details>
+    <details className="zoning-diagnostic-details">
+      <summary>Sensitivity and zone merging <ChevronDown size={14} /></summary>
+      <div className="zoning-diagnostic-inline"><strong>Mean ARI: {response.stability.meanARI?.toFixed(3) ?? 'Not computed'}</strong><span>Minimum: {response.stability.minARI?.toFixed(3) ?? '—'}</span><span>Reruns: {response.stability.perturbationRuns}</span></div>
+      <p>{response.stability.limitations}</p>
+      {response.mergeLog.length ? <ul>{response.mergeLog.map((entry, index) => <li key={index}>Clusters {entry.mergedClusters.map((id) => id + 1).join(' + ')}: profile distance Z {entry.profileDistanceZ.toFixed(3)} across {entry.sharedGridEdges} shared grid edges.</li>)}</ul> : <p>No adjacent cluster merges were needed.</p>}
+    </details>
+    <details className="zoning-diagnostic-details">
+      <summary>Suggested sensor and gateway candidates <ChevronDown size={14} /></summary>
+      <p>Geometric planning candidates only. Radio coverage, access, power, terrain and installation feasibility have not been validated.</p>
+      <ul>{response.wsnNodes.map((node) => <li key={node.zoneId}>Zone {node.zoneId + 1}: {node.placementStatus} · {node.positionWgs84.latitude.toFixed(5)}, {node.positionWgs84.longitude.toFixed(5)}</li>)}</ul>
+      <p>Gateway: {response.clusterHead.placementStatus} · straight-line total {response.clusterHead.totalDistanceToNodesM.toFixed(1)} m; not a radio link budget.</p>
+    </details>
+  </section>;
+}
+
+function SilhouetteChart({ response }: { response: FieldZoningResponse }) {
+  const entries = response.autoK.sweep;
+  const chartWidth = 400;
+  const chartHeight = 128;
+  const innerWidth = 350;
+  const left = 34;
+  const base = 96;
+  return <svg className="zoning-silhouette-chart" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label="Silhouette scores for each tested cluster count">
+    <line x1={left} y1={base} x2={chartWidth - 10} y2={base} />
+    <text x="2" y="17">1.0</text><text x="12" y={base + 3}>0</text><text x="2" y="119">−1.0</text>
+    {entries.map((entry, index) => {
+      const score = entry.silhouette;
+      const x = left + (index + 0.5) * (innerWidth / entries.length);
+      const barHeight = score == null ? 0 : Math.max(1, (score + 1) * 38);
+      return <g key={entry.k} aria-label={`K ${entry.k}: ${score?.toFixed(3) ?? 'unavailable'}`}>
+        <rect x={x - 15} y={base - barHeight} width="30" height={barHeight} rx="4" className={entry.k === response.selectedK ? 'is-selected' : ''} />
+        <text x={x} y={base + 17} textAnchor="middle">K {entry.k}</text>
+        {score != null && <text x={x} y={base - barHeight - 5} textAnchor="middle">{score.toFixed(2)}</text>}
+      </g>;
+    })}
+  </svg>;
+}
+
+function SceneErrorBoundary({ children, fallback }: { children: ReactNode; fallback: ReactNode }) {
+  return <SceneBoundary fallback={fallback}>{children}</SceneBoundary>;
+}
+
+class SceneBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+}
+
+function hoveredLayerValue(cell: FieldZoningResponse['cells'][number], selectedLayer: FieldLayer, cluster: number): number | null {
+  if (selectedLayer === 'membership') return cell.clusterMemberships?.[cluster] ?? null;
+  if (selectedLayer === 'zone') return cell.zoneId;
+  if (selectedLayer === 'shi') return cell.shi;
+  return cell.soilValues[selectedLayer];
+}
+
+function zoneColor(zoneId: number): string {
+  return ZONE_COLORS[zoneId % ZONE_COLORS.length];
 }

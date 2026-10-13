@@ -1,6 +1,6 @@
 # Technical requirements
 
-**Status:** Phase 1 field-scale zoning backend is implemented; the Phase 2 frontend migration is pending. The five-phase architecture and current implementation status are indexed in [plans/README.md](plans/README.md); product behavior is defined by the [PRD](PRD.md), domain terms by [GLOSSARY](../GLOSSARY.md), and user-facing interactions by the [UX specification](UX-SPEC.md).
+**Status:** Phases 1–2 are implemented: the sparse-sample zoning API and its boundary/sample workspace, returned-result maps, diagnostics, and selected-cell/zone Crop Fit. The five-phase architecture and current implementation status are indexed in [plans/README.md](plans/README.md); product behavior is defined by the [PRD](PRD.md), domain terms by [GLOSSARY](../GLOSSARY.md), and user-facing interactions by the [UX specification](UX-SPEC.md).
 
 ## System boundary
 
@@ -10,8 +10,8 @@ Keep React, TypeScript, and Vite for the host UI, with Three.js/React Three Fibe
 
 ```text
 Browser UI
-  ├─ scenario state, forms, accessible 2D field
-  ├─ Three.js / React Three Fiber field enhancement
+  ├─ boundary/sample forms, accessible 2D returned-result map
+  ├─ lazily loaded Three.js / React Three Fiber field enhancement
   ├─ zoning request ─────────────> clustering module/service
   ├─ crop-fit request ───────────> versioned rules module/service
   └─ image request ──────────────> shared model inference module/service
@@ -29,7 +29,9 @@ Versioned local artifacts: feature schema | scenarios/presets | crop profiles/ru
 
 ## Domain contracts
 
-### Scenario and soil cell
+### Legacy grid scenario and soil cell (`/v1`)
+
+The schema below is retained for the backward-compatible cell-grid endpoint. The current Soil Zoning UI does not create a synthetic `Scenario` or edit grid cells; its request/response contract is the boundary-and-sample workflow described under [Zoning](#zoning).
 
 ```text
 Scenario {
@@ -82,7 +84,7 @@ The new sample records must persist across application restarts so users can rev
 
 ### Zoning
 
-The legacy `POST /v1/zoning/run` remains available while the current grid frontend is migrated. The field-scale `POST /v2/zoning/run` accepts a WGS84 GeoJSON Polygon and 3–50 georeferenced soil samples (5–10 recommended). Each sample supplies exactly pH, EC, N, P, and K, an explicit common sampling-depth interval, and optional collection date, laboratory method, and standard uncertainty. Units are pH (dimensionless), EC (dS/m), and N/P/K (mg/kg). Cell size is 5 or 10 m; sample locations must lie within the polygon.
+The legacy `POST /v1/zoning/run` remains available for compatibility; the current Soil Zoning workspace calls the field-scale `POST /v2/zoning/run`. The v2 request accepts a WGS84 GeoJSON Polygon and 3–50 georeferenced soil samples (5–10 recommended). Each sample supplies exactly pH, EC, N, P, and K, an explicit common sampling-depth interval, and optional collection date, laboratory method, and standard uncertainty. Units are pH (dimensionless), EC (dS/m), and N/P/K (mg/kg). Cell size is 5 or 10 m; sample locations must lie within the polygon.
 
 The v2 service chooses a local UTM CRS, discretizes cells whose centers are within the polygon, clips cell/zone areas to the boundary, and caps the request at 5,000 cells (and 100,000 bounding-box candidates). It runs IDW with fixed power p=2 over projected metres and returns per-property leave-one-out RMSE/MAE, nearest-sample distances, and explicitly labeled interpolated estimates. Sampling depth mismatch is rejected; incomplete or mixed date/method context is surfaced as warnings.
 
@@ -90,13 +92,13 @@ For clustering, standardize the varying pH/EC/N/P/K interpolated fields separate
 
 Merge only adjacent clusters whose standardized multivariate centroid distance is at most the configured threshold (default 0.5); then assign separate zone IDs to disconnected four-connected components and keep small components. The independent KshetraSense SHI uses provisional project-defined curves/weights and is not an official USDA/NRCS score, a Crop Fit input, or a calibrated agronomic threshold. Sample perturbation reruns IDW and clustering at fixed selected K (10 runs by default, configurable from 0–50), reports ARI/flip/sensitivity diagnostics, and labels noise values as project assumptions unless per-sample standard uncertainty is provided. It does not assign a universal pass/fail grade.
 
-The field result includes a measured `processingDurationMs`, cells, zone polygons/profiles, diagnostics, pipeline versions, and suggested per-zone medoids/geometric gateway candidates. Gateway `radioCoverageValidated` is false; no deployment, storage, link budget, or Field Monitoring hand-off is implemented. See the [Phase 1 plan](plans/phase-1-backend-algorithmic-core.md) for the full schema and method details.
+The field result includes a measured `processingDurationMs`, cells, zone polygons/profiles, diagnostics, pipeline versions, and suggested per-zone medoids/geometric gateway candidates. Every cell includes its exact WGS84 `geometry` clipped to the field boundary, allowing the 2D and 3D renderers to show the same edge shapes and holes. The Phase 2 UI displays those results and sends a selected cell's `soilValues` or a selected zone's `meanSoilValues` to `/v1/crop-fit/evaluate`; Crop Fit remains a separate rules call and is not folded into clustering. Gateway `radioCoverageValidated` is false; results are request-local, with no persistence, link budget, or Field Monitoring hand-off. See the [Phase 1 plan](plans/phase-1-backend-algorithmic-core.md) for the full schema and method details.
 
 The v1 and v2 zoning routes use the repository's own NumPy implementations rather than a scikit-fuzzy adapter. FCM uses its own fuzzy objective and is not K-means with soft colors. Both methods use recorded seeds; any future normalization/weighting control must be explicit, versioned run configuration.
 
 ### Crop compatibility
 
-Request identifies scenario revision, profile/rules version, and selected cells/zones. Results contain crop, profile version/source references, factor records (observed value, unit, state, reason, supported range), missing-data state, and zone coverage/variation. Rules consume soil inputs only and cannot read or change cluster assignments. No composite score exists until sources define thresholds and weights. Any later aggregate must identify its metric, denominator, source, and production assumptions; a rule index/class or modeled per-crop yield ratio is not a probability. Never normalize the three crops to a 100% crop-success distribution. A probability field requires a separately approved event/data/calibration contract and validation report.
+`POST /v1/crop-fit/evaluate` receives a caller-supplied measurement profile, profile version, and optional measurement context identifying the selected cell/zone scope and available lab context. The UI passes the exact selected cell values or zone mean. Results contain the profile version, echoed context, and independent per-crop factor records (observed value, unit, state, reason, supported range, and source) plus limitations. Only pH has a configured sourced range; other factors remain not assessed. Rules consume soil inputs only and cannot read or change cluster assignments. No composite score exists until sources define thresholds and weights. Any later aggregate must identify its metric, denominator, source, and production assumptions; a rule index/class or modeled per-crop yield ratio is not a probability. Never normalize the three crops to a 100% crop-success distribution. A probability field requires a separately approved event/data/calibration contract and validation report.
 
 ### Leaf inference
 
@@ -104,10 +106,10 @@ Request contains the image and model/preprocessing version. Result contains the 
 
 ## Rendering architecture
 
-- Build the functional, accessible 2D field path as part of the first real Field Lab slice; add the data-driven low-relief 2.5D R3F enhancement in the same production-intended product sequence. There is no R3F-only mock milestone or separate fake-result phase.
-- On capable desktop devices, render the functional 2.5D field with React Three Fiber and Three.js. Derive colors/transforms from scenario and run state. Reuse geometry/materials and use instancing for cells and repeated markers; do not create a React component, mesh, or material per cell.
-- The default field camera is isometric. Desktop drag orbits/pans, scroll zooms, and `F` fits the complete grid. Keep camera state separate from soil/run state. Cell relief is a bounded visual encoding of the selected feature, not geospatial elevation; soil standardization must never be visualized as terrain flattening.
-- Use DOM/SVG for controls, text, legends, accessible hit targets, zone patterns, and overlays. Use 2D fallback for mobile by default and for WebGL failure/context loss.
+- The 2D boundary-and-sample map is the complete, accessible default. The optional R3F field is dynamically imported only when requested and uses actual `/v2` response geometry; no mock-result phase exists.
+- The R3F scene triangulates exact boundary-clipped cell footprints into one batched `BufferGeometry`, with a face-to-cell lookup for selection. Reuse the field material and use instancing for repeated sample/node markers; do not allocate a mesh/material per cell.
+- The 3D camera is initially isometric; pointer controls orbit/pan and zoom, and a visible **Fit** action resets the view. Keep camera state separate from soil/run state. Cell relief is a bounded visual encoding of the selected feature, not geospatial elevation; soil standardization must never be visualized as terrain flattening.
+- Use DOM/SVG for controls, text, legends, accessible hit targets, zone patterns, and the complete 2D workflow. Keep 2D available for WebGL failure, large fields, or geometry that exceeds the 3D budget.
 - Use one ambient and one directional light by default. No post-processing, physics, dense foliage, particle system, or per-cell texture is required.
 - Update instance buffers only when relevant state changes. Dispose resources when the scene unmounts. Keep camera movement separate from soil-data state.
 - Spline is restricted to lazy decorative scenes and must have a static SVG or lightweight Three.js fallback. Verify current free-tier export/embed behavior before choosing it.
@@ -118,11 +120,11 @@ These are design limits, not measured performance claims. **This table is the si
 
 | Measure | Initial/default | Hard ceiling |
 | --- | ---: | ---: |
-| Field cells in 3D | 216 (18 × 12) | 768 desktop; 384 if mobile 3D is explicitly enabled |
-| Cell mesh geometry | 12 triangles per cell | 9,216 triangles at 768 cells |
-| Total scene geometry | — | 20,000 visible triangles desktop; 12,000 constrained/mobile |
+| Field cells in 3D | 216 | 768 desktop; 384 if mobile 3D is explicitly enabled |
+| Estimated total scene geometry | — | 20,000 triangles desktop, including up to 1,300 reserved for markers/selection |
 | Field scene draw calls | — | 8 desktop; 6 constrained/mobile |
-| Sensor markers | 8 desktop / 6 constrained | 24 desktop / 12 constrained |
+| Lab sample markers | — | 50, instanced; included in triangle reserve |
+| Suggested WSN markers | 8 desktop / 6 constrained | 24 desktop / 12 constrained; included in triangle reserve |
 | Optional crop cues | Off by default | 256 desktop / 96 constrained; hide first under pressure |
 | Materials/lights | Shared materials; 2 lights | 5 materials desktop / 4 constrained; 2 lights |
 | Texture use | 0 required | 4 MiB total; no texture dimension above 512 px |
@@ -131,27 +133,27 @@ These are design limits, not measured performance claims. **This table is the si
 | Any future individual GLB | None required | 512 KiB; 2,000 triangles; 2 materials; 1 texture up to 512 px |
 | Ambient loops | 0 required | 2; pause while hidden and remove in reduced-motion/constrained modes |
 
-Use a shared box geometry with no more than 12 triangles per cell; 768 cells therefore account for 9,216 triangles before overlays and optional visuals. Instance count and draw-call budgets apply to the entire scene. If a hard ceiling is exceeded, remove decorative cues or use 2D; revisit the budget only with device profiling.
+Estimate triangulation from the vertex counts of the returned cell and field polygons, including holes, and enable 3D only when the estimate plus the 1,300-triangle overlay reserve is at most 20,000. This is a conservative geometry guard, not a measured frame-rate guarantee. Instance count and draw-call budgets apply to the entire scene. If a hard ceiling is exceeded, keep the full 2D map and revisit the budget only with device profiling.
 
 ### Performance verification targets
 
 - Aim for 60 FPS on a named desktop reference device and at least 30 FPS on a named constrained/mobile reference.
 - Record device, browser, viewport, cell count, pixel ratio, quality tier, frame-time summary, draw calls, triangles, texture memory, transfer bytes, and load time.
-- Measure the initial grid and maximum allowed grid during selection/edit/pan and with zoning overlays. These targets are not product claims until measured.
+- Measure a typical returned field and the largest 3D-eligible result during selection/orbit/pan and with zoning overlays. These targets are not product claims until measured.
 
 ## Asset policy
 
 Procedural geometry/SVG covers grid cells, field edges, zones, patterns, membership overlays, sensor markers, crop cues, centroids, and root layers. No model, texture, font, icon pack, or external asset service is required to operate the product. Sensor markers are illustrative primitives labeled “Illustrative; no live sensor stream.”
 
-The desktop product may use the twelve small Kenney Nature Kit GLBs listed in the [asset manifest](../assets/3d/asset-manifest.json) as an optional art-direction palette for distant trees, sparse foliage/flowers, rocks, and a short background rail. Their combined prepared size is 79,544 bytes, with 882 triangles and no textures. They do not represent cells, crop outcomes, soil state, or sensors; the functional field remains procedural. Start with two or three distinct imported model types in the default view, keep them outside selectable cells, and never exceed the full-scene draw-call budget. Any additional decorative GLB must improve a documented visual need, have exact source/creator/license provenance, stay within the budgets above, include original/optimized SHA-256 and size/geometry metadata, pass glTF validation with zero errors, and remain optional behind a working fallback. [Poly Haven](https://polyhaven.com/license) remains a potential CC0 source; its collection-wide license alone does not approve a specific model.
+The current zoning scene uses procedural geometry only; prepared Kenney Nature Kit GLBs are not loaded into it. The twelve small models in the [asset manifest](../assets/3d/asset-manifest.json) remain optional assets for a later documented visual need. They must not represent cells, crop outcomes, soil state, or sensors; imported decoration must remain outside selectable field data, optional behind a working fallback, and inside the scene budgets. Any model addition needs exact source/creator/license provenance, original/optimized SHA-256 and size/geometry metadata, and zero-error glTF validation. [Poly Haven](https://polyhaven.com/license) remains a potential CC0 source; its collection-wide license alone does not approve a specific model.
 
 Use `.glb` as the runtime interchange format for a justified imported model. The [Khronos glTF 2.0 specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) defines GLB as binary glTF, a container for JSON and binary asset data.
 
 ## Privacy, reliability, and reproducibility
 
-- A request carries `gridRevision`; a result is current only when its revision matches current inputs.
+- The UI tracks local input/boundary revisions and labels the last immutable API response stale when those inputs change; the response also records its fingerprint and run metadata. No server persistence is implemented.
 - Failures retain edits and the previous immutable run. Do not replace a failure with invented output.
-- Persist seed, method/configuration, feature schema/exclusions, algorithm/model/profile versions, and diagnostics with each run.
+- Export preserves seed, method/configuration, feature schema/exclusions, pipeline versions, and diagnostics from the returned run; storage across restarts is not implemented.
 - Do not persist uploaded leaf images by default; omit image bytes from logs.
 - The planned Earth Engine dependency for CropSight is an explicit hosted-service exception: it requires project/auth configuration and quota availability but must not require a paid tier for the college build. Document it and show unavailable/error states. No other hosted API, font, asset, or runtime is required for core workflows.
 - Mark unavailable Earth Engine credentials, quota exhaustion, no valid image coverage, and provider failures as distinct user-visible states. Never substitute a prepared map or recommendation.
@@ -162,14 +164,14 @@ Use `.glb` as the runtime interchange format for a justified imported model. The
 
 | Area | Evidence required |
 | --- | --- |
-| Scenario/commands | Same-seed output, edit bounds, exact preset deltas, undo/redo, stale-state transitions, and invalid/missing values. |
+| Soil zoning | Boundary/sample validation, units/depth, API response fidelity, stale-state transitions, selected-scope Crop Fit isolation, and response export. |
 | Clustering | Feature inclusion/exclusion, fixed-seed run, FCM membership dimensions/sums, adjacency, merge trace, synthetic recovery and stability. |
 | Rules | Threshold/source/version/unit/boundary/missing-data behavior and independence from cluster labels. |
 | Vision | Preprocessing/class-map/model version match, 17 labels, review branch, no contextual inputs, transient upload. |
 | Soil investigation | Manual/CSV validation, original-unit preservation, sample metadata completeness, local persistence, export/delete behavior. |
 | SoilGrids | Product/depth/property/quantile/resolution provenance and explicit modeled-context display; no coupling into zoning/crop rules. |
 | CropSight | Pinned source startup, Earth Engine configuration and failure handling, date/AOI correctness, supported map/time-series consistency, no KshetraSense module-data dependency. |
-| UI/renderer | 2D/WebGL parity, keyboard path, reduced motion, no per-cell mesh allocation, context-loss fallback. |
+| UI/renderer | Returned-geometry parity, 2D keyboard path, 3D selection/orbit/fit, reduced motion, scene-budget guard, and fallback behavior. |
 | Performance | Trace against all budgets above on named desktop and constrained/mobile reference devices. |
 
 ## Implementation-time technical choices
@@ -178,7 +180,7 @@ These choices remain for implementation and benchmarking; they do not change the
 
 - Local service topology and transport for zoning/rules/inference.
 - Final local inference runtime, model artifact size, and distribution strategy after benchmark.
-- Exact 2D grid implementation and picking technique after interaction validation.
+- Device-specific 3D performance after profiling on named hardware.
 - Whether to include Spline after current free-tier/export verification. Its absence must not block any task.
 - Exact local persistence mechanism and validated sample-import file format.
 - CropSight sub-application hosting/embedding mechanics and separate Python dependency lockfile; its AOI/data boundary is fixed by [Decision 0004](decisions/0004-field-monitoring-and-direct-build.md).

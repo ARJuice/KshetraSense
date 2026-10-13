@@ -34,6 +34,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 
 .main-content { min-width: 0; }
 .topbar { height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 clamp(20px, 4vw, 54px); color: #64766a; border-bottom: 1px solid #e0e8df; background: rgba(250,252,249,.88); font-size: 11px; font-weight: 700; backdrop-filter: blur(12px); }
+.topbar__live i.is-neutral { background: #a5b0a6; box-shadow: 0 0 0 4px rgba(165,176,166,.13); }
 .topbar__section { color: #31463a; text-transform: uppercase; letter-spacing: .075em; }.topbar__divider { margin: 0 8px; color: #a8b8aa; }.topbar__state { color: #849488; font-weight: 500; }.topbar__live { display: inline-flex; align-items: center; gap: 7px; color: #547263; }.topbar__live i { width: 7px; height: 7px; border-radius: 50%; background: #66a475; box-shadow: 0 0 0 4px rgba(102,164,117,.13); }
 
 .workspace { max-width: 1640px; margin: 0 auto; padding: clamp(25px, 4vw, 48px) clamp(20px, 4vw, 54px) 54px; }

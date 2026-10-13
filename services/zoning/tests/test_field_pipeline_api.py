@@ -57,6 +57,7 @@ def test_full_pipeline_returns_interpolated_surfaces_contiguous_zones_and_site_c
     assert result["processingDurationMs"] >= 0
     assert result["field"]["cellCount"] == 100
     assert len(result["cells"]) == 100
+    assert all(cell["geometry"]["type"] in {"Polygon", "MultiPolygon"} for cell in result["cells"])
     assert all(set(cell["soilValues"]) == {"pH", "ec", "nitrogen", "phosphorus", "potassium"} for cell in result["cells"])
     assert all(0 <= cell["shi"] <= 100 for cell in result["cells"])
     assert all(sum(cell["clusterMemberships"]) == pytest.approx(1.0) for cell in result["cells"])

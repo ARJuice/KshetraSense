@@ -22,7 +22,7 @@ python -m pip install -r requirements.txt
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
-The interactive OpenAPI contract is then available at `http://127.0.0.1:8000/docs`. The service permits the local Vite origins `http://localhost:5173` and `http://127.0.0.1:5173`; extend `CORS_ORIGINS` only for an intentional local port change.
+The interactive OpenAPI contract is then available at `http://127.0.0.1:8000/docs`. The service permits the local Vite origins on ports 3000 and 5173 for both `localhost` and `127.0.0.1`; set `CORS_ORIGINS` only when intentionally using another origin.
 
 Run focused tests with:
 
@@ -37,15 +37,17 @@ python -m pytest -q
 | `GET /health` | Local service status and algorithm/rule versions. |
 | `POST /v1/zoning/run` | Validate cells and run `kmeans` or `fuzzy-c-means`. |
 | `POST /v2/zoning/run` | Run the boundary + sparse-sample field pipeline and return per-cell estimates, contiguous zones, diagnostics, and candidate locations. |
-| `POST /v1/crop-fit/evaluate` | Evaluate a caller-supplied selected-zone mean profile. |
+| `POST /v1/crop-fit/evaluate` | Evaluate a caller-supplied selected-cell or selected-zone profile. |
 
 `/v1/crop-fit/evaluate` intentionally takes measurements and their declared scope/context, not a zone ID, clustering assignment, or membership value. It therefore cannot influence or reinterpret zoning.
 
 For the host UI, `/api/v1/zoning/run` is a compatibility alias. It accepts both the documented nested-cell request and the UI's compact request: `cluster_count`, `method: "fuzzy-c-means"`, and flat cell measurements. The response exposes the compact `assignments` map, plus `assignmentDetails` with coordinates and FCM memberships.
 
-The current frontend still uses the v1 grid endpoint. Phase 2 migrates Soil Zoning to v2 and calls `/v1/crop-fit/evaluate` for a user-selected zone; the v2 endpoint itself does not run or persist Crop Fit.
+The current Soil Zoning workspace uses `/v2/zoning/run` and then calls `/v1/crop-fit/evaluate` for an explicitly selected cell or zone mean; the zoning endpoint itself does not run or persist Crop Fit. The `/v1/zoning/run` endpoint remains available to older consumers.
 
-The v2 request requires pH, EC, nitrogen, phosphorus, and potassium for every sample, with a common explicit `depthCm`. Units are pH (dimensionless), EC (dS/m), and N/P/K (mg/kg). Cell size is 5 or 10 m; the request is capped at 5,000 retained grid cells. A lab sample is measured input; returned per-cell values are IDW estimates. The response records `processingDurationMs` for the completed field pipeline.
+The v2 request requires pH, EC, nitrogen, phosphorus, and potassium for every sample, with a common explicit `depthCm`. Units are pH (dimensionless), EC (dS/m), and N/P/K (mg/kg). Cell size is 5 or 10 m; the request is capped at 5,000 retained grid cells. A lab sample is measured input; returned per-cell values are IDW estimates. Each cell's `geometry` is its exact WGS84 Polygon/MultiPolygon footprint clipped to the field boundary. The response records `processingDurationMs` for the completed field pipeline.
+
+The frontend displays all supported cells in 2D. Its optional 3D scene is lazy-loaded and disabled above 768 cells or a conservative 20,000-triangle scene estimate; this renderer cap does not reduce the service's 5,000-cell API limit.
 
 ## Data and evidence boundaries
 

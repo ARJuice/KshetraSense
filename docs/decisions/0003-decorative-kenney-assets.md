@@ -1,7 +1,9 @@
 # Decision 0003: small decorative Kenney GLBs
 
-**Status:** accepted for the desktop mock-data frontend
+**Status:** Superseded for the current zoning scene by [Decision 0006](0006-phase-2-soil-field-ui.md); the prepared models remain optional and are not currently loaded.
 **Date:** 2026-10-07
+
+**Supersession note:** The Phase 2 field renderer uses procedural, response-driven geometry only. This record remains as asset provenance/preparation history; its mock-scene composition and “wait for the frontend prompt” instructions are not current implementation guidance.
 
 ## Context
 

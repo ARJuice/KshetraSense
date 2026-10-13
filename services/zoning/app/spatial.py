@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 from pyproj import Transformer
 from shapely import contains_xy, transform
-from shapely.geometry import Polygon, box
+from shapely.geometry import Polygon, box, mapping
 
 MAX_FIELD_CELLS = 5_000
 MAX_GRID_CANDIDATES = 100_000
@@ -25,6 +25,7 @@ class GridCell:
     center_utm: tuple[float, float]
     center_wgs84: tuple[float, float]
     area_m2: float
+    geometry_wgs84: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -95,7 +96,9 @@ def discretize_field(boundary: dict[str, Any], cell_size_m: float) -> Discretize
     for index, (row, column) in enumerate(zip(row_indices, column_indices, strict=True), start=1):
         x = float(xx[row, column])
         y = float(yy[row, column])
-        clipped_area = polygon_utm.intersection(box(x - half_size, y - half_size, x + half_size, y + half_size)).area
+        footprint_utm = polygon_utm.intersection(box(x - half_size, y - half_size, x + half_size, y + half_size))
+        footprint_wgs84 = transform(footprint_utm, to_wgs84.transform, interleaved=False)
+        clipped_area = footprint_utm.area
         lon, lat = to_wgs84.transform(x, y)
         cells.append(
             GridCell(
@@ -105,6 +108,7 @@ def discretize_field(boundary: dict[str, Any], cell_size_m: float) -> Discretize
                 center_utm=(x, y),
                 center_wgs84=(float(lon), float(lat)),
                 area_m2=float(clipped_area),
+                geometry_wgs84=mapping(footprint_wgs84),
             )
         )
 

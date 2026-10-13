@@ -2,14 +2,14 @@
 
 **Scope:** `src/features/zoning/` — React / TypeScript frontend & 3D WebGL Canvas  
 **Depends on:** Completed Phase 1 backend at `POST /v2/zoning/run`
-**Status:** Planned. The current frontend still uses the legacy `/v1/zoning/run` grid contract; no Phase 2 migration or UI completion is claimed.
+**Status:** Implemented and verified on 2026-10-14. The workspace uses the Phase 1 sparse-sample API and retains the legacy `/v1` endpoints only for backward compatibility.
 **Produces:** Boundary/sample entry, real API integration, returned-surface and zone inspection, diagnostic views, and a clearly labeled JSON result export.
 
 ---
 
 ## 2.1 Overview & Design Rationale
 
-The current frontend is a grid/cell workflow backed by `/v1`; Phase 1 now provides a distinct sparse-sample field workflow at `/v2`. Phase 2 replaces the user-facing soil-painting path rather than adapting it into the new field model.
+Phase 2 replaces the former grid-painting workflow with the sparse-sample field model. The UI submits boundary and measured samples to `/v2/zoning/run`; it never preloads a practice farm or fabricates a zoning result.
 
 In Phase 2, the UI is overhauled to reflect actual precision farming:
 1. **Field Boundary & Geometry:** Import a valid GeoJSON Polygon. Any bundled benchmark must have verified provenance and be labeled as measured or synthetic; never present invented samples as a real farm.
@@ -20,27 +20,26 @@ In Phase 2, the UI is overhauled to reflect actual precision farming:
 
 ---
 
-## 2.2 Component Hierarchy & Architecture
+## 2.2 Implemented Component Hierarchy & Architecture
 
 ```
 src/features/zoning/
-├── ZoningWorkspace.tsx                 # Main container orchestrating state & steps
-├── components/
-│   ├── FieldBoundarySelector.tsx       # GeoJSON import; only provenance-verified presets
-│   ├── SparseSampleTable.tsx           # 3–50 samples, units, common depth, provenance
-│   ├── InterpolationLayerControls.tsx  # Toggle returned pH | EC | N | P | K | SHI layers
-│   ├── SilhouetteOptimizationChart.tsx # Sweep curve across K=2..6 highlighting K*
-│   ├── ZoneProfilesDrawer.tsx          # Zone summaries, nutrient means & variance
-│   ├── CellZoneCropFitPanel.tsx         # Existing source-backed /v1 crop-fit assessment
-│   ├── StabilityDiagnosticsModal.tsx   # Monte Carlo perturbation & ARI score view
-│   ├── FieldRunControls.tsx            # Cell size, method, max K, seed, sensitivity runs
-│   └── CandidateLocationsCard.tsx      # Candidate caveats and JSON result export
+├── ZoningWorkspace.tsx       # Boundary/sample workflow, run state, inspection and Crop Fit
+├── zoning.css                # Scoped workspace layout and responsive states
 └── field/
-    ├── FieldScene3D.tsx                # R3F 2.5D/3D field renderer (Kept & extended)
-    ├── FieldSurfaceMesh.tsx            # Polygon-clipped mesh with continuous shader/color mapping
-    ├── SamplePins3D.tsx                # 3D interactive marker pins for sparse soil samples
-    └── WsnNodesOverlay3D.tsx           # Suggested medoid/gateway markers; not live hardware
+    ├── FieldMap2D.tsx        # Complete accessible default map and sample placement
+    ├── FieldScene3D.tsx      # Lazily loaded, batched optional R3F scene
+    ├── fieldDisplay.ts       # Returned layer values, ranges and colors
+    ├── fieldGeometry.ts      # GeoJSON validation, local projection and geometry budgets
+    ├── fieldSamples.ts      # Sample validation and `/v2` request construction
+    ├── fieldSurface.ts      # One triangulated surface geometry and face-to-cell mapping
+    ├── fieldTypes.ts        # Request/response contract, including cell footprints
+    └── soilSampleCsv.ts     # Validated sample CSV import
+
+src/services/zoningApi.ts    # `/v2/zoning/run` and `/v1/crop-fit/evaluate` clients
 ```
+
+The 2D map renders every returned cell up to the service's 5,000-cell limit. The optional 3D scene is lazy-loaded and enabled only for at most 768 cells and an estimated total of at most 20,000 triangles (including a reserved marker budget); otherwise the full 2D workflow remains available. Both views use exact WGS84 cell footprints returned by the service, including clipped edges and holes.
 
 ---
 
@@ -139,6 +138,7 @@ export interface FieldCellResult {
   column: number;
   centerUtm: { eastingM: number; northingM: number };
   centerWgs84: { longitude: number; latitude: number };
+  geometry: GeoJsonGeometry; // Exact WGS84 footprint clipped to the analyzed field boundary
   areaM2: number;
   nearestSampleDistanceM: number;
   soilValues: SoilValues;
@@ -243,12 +243,11 @@ export interface FieldZoningResponse {
 
 ## 2.5 Verification & Acceptance Criteria
 
-1. **Boundary validation:** Valid Polygon GeoJSON reaches the backend; invalid geometry and unsupported field sizes produce readable errors.
-2. **Sample contract:** The UI enforces 3–50 unique in-boundary samples, complete fixed-unit properties, and one explicit common depth; mixed dates/methods are shown as warnings.
-3. **Real run:** A single UI action posts the input to `/v2/zoning/run`; the visible result is the returned response, and service errors never fall back to a fixture.
-4. **Layer fidelity:** Toggling pH, EC, N, P, K, SHI, zone, and FCM-membership layers uses returned values and units without another request.
-5. **Diagnostics fidelity:** Auto-K chart, FCM membership, merge log, LOOCV, and sensitivity panels match the response and preserve its caveats.
-6. **Result invalidation:** Changing boundary, samples, or run parameters marks the prior immutable result stale without silently rewriting it.
-7. **Candidate/export honesty:** Medoid and gateway markers are labeled suggestions; export downloads the actual versioned response and does not unlock an unimplemented telemetry console.
-8. **Crop Fit integration:** A selected cell or zone passes its exact soil profile/means to `/v1/crop-fit/evaluate`; per-crop statuses remain independent and sourced.
-9. **Access/performance:** All essential actions work in the 2D fallback and with keyboard/reduced-motion settings; WebGL rendering respects TRD budgets.
+1. **Boundary and sample inputs — implemented:** WGS84 GeoJSON import; blank manual drafts and CSV import; 3–50 sample, value, unit, depth, coordinate, and uniqueness checks; placement is constrained to the field polygon. Backend validation remains authoritative.
+2. **Real run — implemented:** the workspace submits to `/v2/zoning/run`, displays the returned result, and reports service failures without substituting fixtures.
+3. **Layer/diagnostic fidelity — implemented:** pH, EC, N, P, K, project-defined SHI, zone, and FCM-membership views read the response; Auto-K, LOOCV, merges, and sensitivity data are shown with their limits.
+4. **Stale result and export — implemented:** changed inputs preserve the previous immutable response as stale; export downloads the actual response JSON.
+5. **Crop Fit — implemented:** selected cell values or zone means are sent to `/v1/crop-fit/evaluate`; three independent source-backed crop assessments remain contextual to Soil Zoning.
+6. **2D/3D map — implemented:** accessible 2D is complete and default; 3D is lazy, uses returned clipped geometry, supports orbit/zoom/fit and selection, and is disabled above 768 cells or the 20,000-triangle estimate.
+
+**Verification on 2026-10-14:** 38 frontend tests passed, TypeScript typecheck passed, 51 zoning-service tests passed, and the production build succeeded. The browser layout was checked at desktop and narrow widths. The build emits an optional 3D chunk of approximately 824 kB raw / 223 kB gzip; the main app bundle is approximately 289 kB raw / 87 kB gzip. Device frame-time profiling and a full UI run against real farm measurements remain unverified; no real-field or performance claim is made.

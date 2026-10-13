@@ -1,6 +1,6 @@
 # Delivery plan and acceptance
 
-**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phase 1 backend is complete, and the Phase 2 UI migration is next. No visual-only or fixture-output product phase is planned.
+**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phases 1–2 are complete, with Phases 3–5 remaining. No visual-only or fixture-output product phase is planned.
 
 ## Delivery principles
 
@@ -15,7 +15,7 @@
 | Phase | Deliverable | Exit condition |
 | --- | --- | --- |
 | 1. Backend Algorithmic Core — complete | GeoJSON/UTM grid, IDW, KshetraSense SHI, Auto-K K-means/FCM, adjacent-profile merge, contiguous components, source-sample sensitivity, and WSN/gateway candidates at `/v2/zoning/run`. | Backend tests pass; estimates, provisional score, sensitivity assumptions, and geometry-only candidates are labeled honestly. |
-| 2. Soil Zoning UI Redesign — planned | Replace the legacy grid/painting path with boundary/sample input, real `/v2` integration, returned layers/diagnostics, and selected-cell/zone Crop Fit via the existing rules endpoint. | No canned result; edits make prior runs stale; 2D and WebGL paths agree with actual response data and expose limitations. |
+| 2. Soil Zoning UI Redesign — complete | Boundary/sample input, real `/v2` integration, returned clipped-cell layers/diagnostics, and selected-cell/zone Crop Fit via the existing rules endpoint. | Frontend/service tests pass; no canned result; edits mark prior runs stale; 2D/3D use the same response geometry; 3D obeys cell and triangle limits. |
 | 3. WSN Telemetry Service & Edge AI — planned | Verify the selected replay data, implement a provenance-aware playback API, GRU moisture forecast, FAO-56 MAD logic, and anomaly filtering. | Dataset/schema/split and forecasting tests pass; no hardware actuation claim unless validated separately. |
 | 4. Field Monitoring UI Transformation — planned | Build monitoring views for the telemetry workflow and the isolated CropSight vegetation workflow; preserve Soil Investigation and SoilGrids boundaries. | Provider/data failures are honest; no monitoring output silently changes zoning or Crop Fit. |
 | 5. Leaf Contract, Verification & Defense — planned | Freeze and verify the 17-class MobileNetV3-Small interface and evaluation/data contract; prepare demonstration and defense materials. | Model, preprocessing, class map, evaluation report, and inference interface agree; image bytes are not persisted by default. |
@@ -90,7 +90,7 @@ If a required provider is unavailable during demonstration, show the explicit un
 
 Do not publish accuracy without the audited split/evaluation report; crop compatibility without sourced thresholds and tests; or VRA, irrigation, and yield estimates without dedicated validation. Do not enable production 3D by default for a device class without profiling and an equivalent accessible path. Do not add an asset before it passes the [TRD asset gate](TRD.md#asset-policy). The CropSight academic-use decision is recorded in Decision 0004; it does not establish a public redistribution right.
 
-## Soil zoning frontend migration
+## Soil zoning implementation
 
-The prior grid-brush refinement list is superseded by the [Phase 2 sparse-sample UI contract](plans/phase-2-soil-zoning-ui-redesign.md). Do not implement brush-specific work against the new field-scale pipeline.
+The prior grid-brush refinement list is superseded by the implemented [Phase 2 sparse-sample UI contract](plans/phase-2-soil-zoning-ui-redesign.md). Do not implement brush-specific work against the new field-scale pipeline.
 

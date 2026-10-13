@@ -187,7 +187,7 @@ class ZoningRequest(BaseModel):
 
 
 class CropFitRequest(BaseModel):
-    """A selected zone's pre-computed mean measurements, not raw cluster state."""
+    """A selected cell profile or zone mean, separate from clustering state."""
 
     model_config = ConfigDict(extra="forbid")
 

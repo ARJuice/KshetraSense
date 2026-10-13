@@ -14,6 +14,7 @@ def _cell(cell_id: str, x: float, y: float) -> GridCell:
         center_utm=(x, y),
         center_wgs84=(x, y),
         area_m2=100.0,
+        geometry_wgs84={"type": "Polygon", "coordinates": [[[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1], [x, y]]]},
     )
 
 

@@ -37,6 +37,7 @@ class InterpolatedCell:
     center_utm: tuple[float, float]
     center_wgs84: tuple[float, float]
     area_m2: float
+    geometry_wgs84: dict
     values: dict[str, float]
     nearest_sample_distance_m: float
 
@@ -142,6 +143,7 @@ def interpolate_field(
             center_utm=cell.center_utm,
             center_wgs84=cell.center_wgs84,
             area_m2=cell.area_m2,
+            geometry_wgs84=cell.geometry_wgs84,
             values={property_name: float(predictions[property_name][index]) for property_name in properties},
             nearest_sample_distance_m=float(nearest_distances[index]),
         )
