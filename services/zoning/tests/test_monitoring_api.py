@@ -13,25 +13,16 @@ def test_health_reports_monitoring_status():
     data = response.json()
     assert data["service"] == "kshetrasense-zoning-and-monitoring"
     assert data["soilGridsVersion"] == "2.0"
+    assert data["soilGridsStatus"] == "unavailable-until-verified-provider-configured"
     assert "cropsightMounted" in data
     assert data["cropsightMounted"] is True
 
 
 def test_soilgrids_endpoint_valid_request():
     response = client.get("/v1/monitoring/soilgrids?latitude=12.9716&longitude=77.5946&property=phh2o&depth=0-5cm")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["property"] == "phh2o"
-    assert data["propertyName"] == "Soil pH (in H2O)"
-    assert data["depth"] == "0-5cm"
-    assert data["nativeResolution"] == "250 m"
-    assert "Q0.05" in data["quantiles"]
-    assert "Q0.50" in data["quantiles"]
-    assert "Q0.95" in data["quantiles"]
-    assert data["quantiles"]["Q0.05"] <= data["quantiles"]["Q0.50"] <= data["quantiles"]["Q0.95"]
-    assert data["modeledContextLabel"] == "Modeled regional context — not a field measurement"
-    assert "ISRIC" in data["source"]
-    assert "not a field measurement" in data["modeledContextLabel"]
+    assert response.status_code == 503
+    assert "No verified ISRIC data adapter is configured" in response.json()["detail"]
+    assert "WCS/WebDAV" in response.json()["detail"]
 
 
 def test_soilgrids_endpoint_invalid_property():

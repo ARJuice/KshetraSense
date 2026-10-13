@@ -88,14 +88,6 @@ export interface CropSightRainfall {
   maxDailyRainfall: number;
 }
 
-export interface CropSightZoneStat {
-  zone: number;
-  meanNdvi: number;
-  areaPercentage: number;
-  pixelCount?: number;
-  scoutingPriority: 'High' | 'Moderate' | 'Baseline';
-}
-
 export interface CropSightAnalysisResult {
   source: string;
   provider: string;
@@ -107,16 +99,12 @@ export interface CropSightAnalysisResult {
     endDate: string;
   };
   clusteringMethod: string;
-  zonesIdentified: number;
-  processingTime: number;
+  processingTime: number | null;
   ndviStats: CropSightNDVIStats;
   ndviTimeSeries: CropSightTimeSeries;
   rainfallData?: CropSightRainfall | null;
-  zonalStats: CropSightZoneStat[];
   recommendations: string[];
-  isBenchmark?: boolean;
-  benchmarkSceneId?: string;
-  retrievalDate: string;
+  responseReceivedAt: string;
 }
 
 export interface ComparableGroup {

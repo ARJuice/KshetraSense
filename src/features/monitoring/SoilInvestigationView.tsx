@@ -22,7 +22,6 @@ import {
 } from './comparability';
 import { SampleCoverageMap } from './SampleCoverageMap';
 import { SOIL_CSV_HEADERS, validateSoilSampleRow, type CsvSampleRow } from './soilSampleValidation';
-import { BANGALORE_MULTI_STRATA_SAMPLES, PUNJAB_WHEAT_SAMPLES } from './seedData';
 import { fetchSoilGridsContext } from '../../services/monitoringApi';
 import type { CsvImportPreview, SoilGridsContextData, SoilMeasurement } from './types';
 
@@ -101,13 +100,17 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
   const [trendParam, setTrendParam] = useState<MeasurableParameter>('ph');
 
   // SoilGrids State (FM-03, FM-04)
-  const [sgLat, setSgLat] = useState<number>(30.9015);
-  const [sgLon, setSgLon] = useState<number>(75.8524);
+  const [sgLat, setSgLat] = useState('');
+  const [sgLon, setSgLon] = useState('');
   const [sgProp, setSgProp] = useState<string>('phh2o');
   const [sgDepth, setSgDepth] = useState<string>('0-5cm');
   const [sgData, setSgData] = useState<SoilGridsContextData | null>(null);
   const [sgLoading, setSgLoading] = useState<boolean>(false);
   const [sgError, setSgError] = useState<string | null>(null);
+  const sgCoordinatesValid =
+    sgLat.trim() !== '' && sgLon.trim() !== '' &&
+    Number.isFinite(Number(sgLat)) && Number(sgLat) >= -90 && Number(sgLat) <= 90 &&
+    Number.isFinite(Number(sgLon)) && Number(sgLon) >= -180 && Number(sgLon) <= 180;
 
   // Manual Form Submit
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -169,15 +172,6 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
     setImportPreview(null);
   };
 
-  // Presets
-  const loadPreset = (preset: 'punjab' | 'bangalore') => {
-    const records = preset === 'punjab' ? PUNJAB_WHEAT_SAMPLES : BANGALORE_MULTI_STRATA_SAMPLES;
-    const existingIds = new Set(samples.map((s) => s.sampleId));
-    const fresh = records.filter((r) => !existingIds.has(r.sampleId));
-    onUpdateSamples([...samples, ...fresh]);
-    if (fresh.length > 0) setSelectedSample(fresh[0]);
-  };
-
   const clearAllSamples = () => {
     if (window.confirm('Clear all recorded soil measurements?')) {
       onUpdateSamples([]);
@@ -185,15 +179,20 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
     }
   };
 
+  const measuredSamples = useMemo(
+    () => samples.filter((sample) => sample.provenance !== 'seed-preset'),
+    [samples],
+  );
+
   // Summary Metrics
   const summary = useMemo(() => {
-    if (samples.length === 0) return null;
+    if (measuredSamples.length === 0) return null;
     const avg = (fn: (s: SoilMeasurement) => number | undefined) => {
-      const vals = samples.map(fn).filter((v): v is number => v !== undefined && Number.isFinite(v));
+      const vals = measuredSamples.map(fn).filter((v): v is number => v !== undefined && Number.isFinite(v));
       return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
     };
     return {
-      count: samples.length,
+      count: measuredSamples.length,
       meanPh: avg((s) => s.ph),
       meanEc: avg((s) => s.ecDsM),
       meanN: avg((s) => s.nitrogenMgKg),
@@ -201,19 +200,24 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
       meanK: avg((s) => s.potassiumMgKg),
       meanMoist: avg((s) => s.moisturePercentage),
     };
-  }, [samples]);
+  }, [measuredSamples]);
 
   // Comparable Groups for Trends (FM-02)
   const comparableGroups = useMemo(() => {
-    return groupSamplesForTrend(samples, trendParam);
-  }, [samples, trendParam]);
+    return groupSamplesForTrend(measuredSamples, trendParam);
+  }, [measuredSamples, trendParam]);
 
   // SoilGrids Retrieval
   const runSoilGridsQuery = async () => {
+    if (!sgCoordinatesValid) {
+      setSgError('Enter a valid latitude (−90 to 90) and longitude (−180 to 180).');
+      return;
+    }
     setSgLoading(true);
     setSgError(null);
+    setSgData(null);
     try {
-      const res = await fetchSoilGridsContext(sgLat, sgLon, sgProp, sgDepth);
+      const res = await fetchSoilGridsContext(Number(sgLat), Number(sgLon), sgProp, sgDepth);
       setSgData(res);
     } catch (err) {
       setSgError(err instanceof Error ? err.message : 'Failed to query SoilGrids context.');
@@ -257,20 +261,6 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => loadPreset('punjab')}
-            className="rounded border border-line-border bg-parchment-50 px-2 py-1 text-[11px] font-medium text-ink-muted hover:bg-parchment-100"
-          >
-            Load Punjab Samples
-          </button>
-          <button
-            type="button"
-            onClick={() => loadPreset('bangalore')}
-            className="rounded border border-line-border bg-parchment-50 px-2 py-1 text-[11px] font-medium text-ink-muted hover:bg-parchment-100"
-          >
-            Load Multi-Strata Samples
-          </button>
           {samples.length > 0 && (
             <button
               type="button"
@@ -424,7 +414,7 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                   </div>
                   <p className="text-[11px] text-ink-muted">Relative coordinate scatter within bounding box.</p>
                 </div>
-                <span className="font-mono text-xs font-bold text-sage-800">{samples.length} records</span>
+                <span className="font-mono text-xs font-bold text-sage-800">{measuredSamples.length} measured/imported</span>
               </div>
 
               <SampleCoverageMap
@@ -432,8 +422,11 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                 selectedSampleId={selectedSample?.sampleId ?? null}
                 onSelectSample={(s) => {
                   setSelectedSample(s);
-                  setSgLat(s.latitude);
-                  setSgLon(s.longitude);
+                  if (s.provenance !== 'seed-preset') {
+                    setSgLat(String(s.latitude));
+                    setSgLon(String(s.longitude));
+                    setSgData(null);
+                  }
                 }}
               />
 
@@ -469,8 +462,8 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                     <h3 className="font-mono text-xs font-bold text-ink">{selectedSample.sampleId}</h3>
                     <p className="text-[10px] text-ink-subtle">{selectedSample.collectedAt} · {selectedSample.source}</p>
                   </div>
-                  <StatusPill tone={selectedSample.provenance === 'csv-import' ? 'slate' : 'sage'}>
-                    {selectedSample.provenance}
+                  <StatusPill tone={selectedSample.provenance === 'seed-preset' ? 'amber' : selectedSample.provenance === 'csv-import' ? 'slate' : 'sage'}>
+                    {selectedSample.provenance === 'seed-preset' ? 'Synthetic legacy — excluded' : selectedSample.provenance}
                   </StatusPill>
                 </div>
 
@@ -492,17 +485,17 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                 )}
 
                 <div className="mt-3 flex justify-between gap-2 border-t border-line-subtle pt-2">
-                  <button
+                  {selectedSample.provenance !== 'seed-preset' && <button
                     type="button"
                     onClick={() => {
-                      setSgLat(selectedSample.latitude);
-                      setSgLon(selectedSample.longitude);
+                      setSgLat(String(selectedSample.latitude));
+                      setSgLon(String(selectedSample.longitude));
                       setSubTab('soilgrids');
                     }}
                     className="inline-flex items-center gap-1 text-[10px] font-semibold text-sage-800 hover:underline"
                   >
                     View SoilGrids for this site <ChevronRight size={12} />
-                  </button>
+                  </button>}
                 </div>
               </section>
             ) : (
@@ -641,22 +634,26 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                 <h2 className="font-serif text-lg font-bold text-ink">Regional SoilGrids Context (FM-03, FM-04)</h2>
               </div>
               <p className="text-xs text-ink-muted">
-                ISRIC SoilGrids 2.0 coarse modeled estimates (250m). Provided for regional background context only; never used as field cells or zoning inputs.
+                Intended for broad modeled context only—not field measurements or zoning inputs. The local SoilGrids provider is currently unavailable.
               </p>
             </div>
             <StatusPill tone="amber">Modeled Regional Context</StatusPill>
           </div>
 
+          <div role="status" className="rounded-lg border border-amberGold/30 bg-amberGold-subtle p-3 text-xs leading-5 text-amberGold-dark">
+            No verified ISRIC data adapter is configured in this build. The former local coordinate formula has been removed; no regional estimate will be shown until a real WCS/WebDAV-backed provider is implemented and verified.
+          </div>
+
           {/* Query Inputs Card */}
           <div className="grid grid-cols-1 gap-3 rounded-lg border border-line-border bg-parchment-100/60 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <FieldLabel label="Latitude" help="Decimal degrees">
-              <input type="number" step="any" value={sgLat} onChange={(e) => setSgLat(Number(e.target.value))} className={inputClassName} />
+              <input required type="number" min="-90" max="90" step="any" value={sgLat} onChange={(e) => { setSgLat(e.target.value); setSgData(null); }} className={inputClassName} placeholder="Enter coordinates or select a sample" />
             </FieldLabel>
             <FieldLabel label="Longitude" help="Decimal degrees">
-              <input type="number" step="any" value={sgLon} onChange={(e) => setSgLon(Number(e.target.value))} className={inputClassName} />
+              <input required type="number" min="-180" max="180" step="any" value={sgLon} onChange={(e) => { setSgLon(e.target.value); setSgData(null); }} className={inputClassName} placeholder="Enter coordinates or select a sample" />
             </FieldLabel>
             <FieldLabel label="Soil Property" help="SoilGrids analyte">
-              <select value={sgProp} onChange={(e) => setSgProp(e.target.value)} className={inputClassName}>
+              <select value={sgProp} onChange={(e) => { setSgProp(e.target.value); setSgData(null); }} className={inputClassName}>
                 <option value="phh2o">Soil pH (in H2O)</option>
                 <option value="nitrogen">Total Nitrogen (g/kg)</option>
                 <option value="soc">Soil Organic Carbon (g/kg)</option>
@@ -668,7 +665,7 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
               </select>
             </FieldLabel>
             <FieldLabel label="Standard Depth" help="Depth interval">
-              <select value={sgDepth} onChange={(e) => setSgDepth(e.target.value)} className={inputClassName}>
+              <select value={sgDepth} onChange={(e) => { setSgDepth(e.target.value); setSgData(null); }} className={inputClassName}>
                 <option value="0-5cm">0–5 cm (Surface layer)</option>
                 <option value="5-15cm">5–15 cm (Topsoil)</option>
                 <option value="15-30cm">15–30 cm (Root zone)</option>
@@ -680,12 +677,12 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
 
             <div className="sm:col-span-2 lg:col-span-4 flex items-center justify-between gap-3 border-t border-line-subtle pt-3">
               <div className="text-[11px] text-ink-subtle">
-                Native resolution: <strong className="text-ink">250 m</strong> (~6.25 hectares) · Source: ISRIC SoilGrids 2.0
+                Supported UI properties and depth layers are listed; this is not proof of provider availability.
               </div>
               <button
                 type="button"
                 onClick={runSoilGridsQuery}
-                disabled={sgLoading}
+                disabled={sgLoading || !sgCoordinatesValid}
                 className="button button--primary"
               >
                 {sgLoading ? <RefreshCw size={13} className="spin" /> : 'Retrieve Regional Estimate'}
@@ -737,14 +734,14 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
               {/* Quantile Visualization Bar */}
               <div className="space-y-1.5 rounded-lg border border-line-subtle bg-parchment-100/70 p-3">
                 <div className="flex justify-between text-[10px] font-mono text-ink-muted">
-                  <span>90% Confidence Interval: [{sgData.quantiles.q05} – {sgData.quantiles.q95} {sgData.unit}]</span>
+                  <span>Q0.05–Q0.95 model-quantile span: [{sgData.quantiles.q05} – {sgData.quantiles.q95} {sgData.unit}]</span>
                   <span>Spread: {(sgData.quantiles.q95 - sgData.quantiles.q05).toFixed(2)}</span>
                 </div>
                 <div className="relative h-3 w-full rounded-full bg-parchment-200">
                   <div className="absolute inset-y-0 left-0 rounded-full bg-sage-300" style={{ width: '100%' }} />
                   <div
                     className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-parchment-50 bg-sage-800 shadow"
-                    style={{ left: '50%' }}
+                    style={{ left: `${sgData.quantiles.q95 === sgData.quantiles.q05 ? 50 : ((sgData.mappedValue - sgData.quantiles.q05) / (sgData.quantiles.q95 - sgData.quantiles.q05)) * 100}%` }}
                     title={`Median: ${sgData.mappedValue}`}
                   />
                 </div>

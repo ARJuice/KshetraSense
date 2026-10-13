@@ -26,7 +26,7 @@ from app.schemas import (
 from app.service import ALGORITHM_VERSION, ZoningValidationError, run_field_zoning, run_zoning
 from app.soilgrids import (
     SOILGRIDS_VERSION,
-    SoilGridsContextResponse,
+    SoilGridsUnavailable,
     get_soilgrids_context,
 )
 
@@ -76,6 +76,7 @@ def health() -> dict:
         "algorithmVersion": ALGORITHM_VERSION,
         "cropProfileVersion": PROFILE_VERSION,
         "soilGridsVersion": SOILGRIDS_VERSION,
+        "soilGridsStatus": "unavailable-until-verified-provider-configured",
         "cropsightMounted": cropsight_mounted,
     }
 
@@ -106,16 +107,18 @@ def crop_fit_evaluate(request: CropFitRequest) -> CropFitResponse:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
-@app.get("/v1/monitoring/soilgrids", response_model=SoilGridsContextResponse)
-@app.get("/api/v1/monitoring/soilgrids", response_model=SoilGridsContextResponse, include_in_schema=False)
+@app.get("/v1/monitoring/soilgrids")
+@app.get("/api/v1/monitoring/soilgrids", include_in_schema=False)
 def soilgrids_endpoint(
     latitude: float = Query(..., ge=-90.0, le=90.0, description="WGS84 latitude"),
     longitude: float = Query(..., ge=-180.0, le=180.0, description="WGS84 longitude"),
     property: str = Query("phh2o", description="Soil property (e.g. phh2o, nitrogen, soc, cec, bdod, clay, sand, silt)"),
     depth: str = Query("0-5cm", description="Depth interval (e.g. 0-5cm, 5-15cm, 15-30cm, 30-60cm, 60-100cm, 100-200cm)"),
-) -> SoilGridsContextResponse:
+) -> dict:
     try:
         return get_soilgrids_context(latitude, longitude, property, depth)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+    except SoilGridsUnavailable as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 

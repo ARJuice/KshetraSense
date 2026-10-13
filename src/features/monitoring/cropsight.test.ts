@@ -1,72 +1,104 @@
-import { describe, expect, it } from 'vitest';
-import { getVerifiedCropSightBenchmark } from '../../services/monitoringApi';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { runCropSightAnalysis } from '../../services/monitoringApi';
 import type { CircularAreaOfInterest } from './types';
 
-describe('CropSight Integration Contracts (FM-05, FM-06, FM-07, FM-08)', () => {
-  const sampleAoi: CircularAreaOfInterest = {
-    latitude: 30.9015,
-    longitude: 75.8524,
-    radiusMeters: 250,
-    startDate: '2026-01-01',
-    endDate: '2026-03-31',
-  };
+const aoi: CircularAreaOfInterest = {
+  latitude: 12.9716,
+  longitude: 77.5946,
+  radiusMeters: 250,
+  startDate: '2025-11-01',
+  endDate: '2026-03-31',
+};
 
-  it('preserves circular AOI inputs and provenance without reading zoning state (FM-05)', () => {
-    const result = getVerifiedCropSightBenchmark(sampleAoi);
-    expect(result.aoi.latitude).toBe(30.9015);
-    expect(result.aoi.longitude).toBe(75.8524);
-    expect(result.aoi.radiusMeters).toBe(250);
-    expect(result.aoi.startDate).toBe('2026-01-01');
-    expect(result.aoi.endDate).toBe('2026-03-31');
-    expect(result.provider).toContain('Google Earth Engine');
-    expect(result.source).toContain('COPERNICUS/S2_SR_HARMONIZED');
+const apiResult = {
+  ndvi_stats: { mean: 0.61, stddev: 0.09, min: 0.24, max: 0.84 },
+  zones_identified: 3,
+  processing_time: 1.48,
+  recommendations: ['Upstream rule note'],
+  ndvi_time_series: {
+    dates: ['2026-01-01', '2026-01-11'],
+    ndvi_values: [0.42, 0.66],
+    mean_ndvi: 0.54,
+    trend: 'increasing',
+  },
+  rainfall_data: {
+    dates: ['2026-01-01'],
+    rainfall_values: [4.2],
+    total_rainfall: 4.2,
+    avg_daily_rainfall: 4.2,
+    max_daily_rainfall: 4.2,
+  },
+};
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('CropSight API contract', () => {
+  it('sends the independent AOI and maps only values returned by CropSight', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(apiResult)));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await runCropSightAnalysis({
+      aoi,
+      clusteringMethod: 'K-Means',
+      numZones: 3,
+      cropType: 'Wheat',
+      cropGrowthStage: 'Unspecified',
+    });
+
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(request).toMatchObject({
+      latitude: aoi.latitude,
+      longitude: aoi.longitude,
+      buffer_size: 250,
+      start_date: aoi.startDate,
+      end_date: aoi.endDate,
+      clustering_method: 'K-Means',
+      num_zones: 3,
+    });
+    expect(result.ndviStats.mean).toBe(0.61);
+    expect(result.ndviTimeSeries.ndviValues).toEqual([0.42, 0.66]);
+    expect(result.source).toContain('COPERNICUS/S2_HARMONIZED');
+    expect(result.processingTime).toBe(1.48);
+    expect(result).not.toHaveProperty('zonalStats');
+    expect(result).not.toHaveProperty('benchmarkSceneId');
   });
 
-  it('reports verified algorithm labels and zone summaries (FM-06)', () => {
-    const result = getVerifiedCropSightBenchmark(sampleAoi);
-    expect(result.clusteringMethod).toContain('K-Means');
-    expect(result.zonesIdentified).toBe(3);
-    expect(result.zonalStats).toHaveLength(3);
-    expect(result.zonalStats[0].meanNdvi).toBeLessThan(result.zonalStats[2].meanNdvi);
+  it('does not replace authentication or provider errors with a canned benchmark', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: 'Earth Engine authentication required' }), { status: 500 })));
+
+    await expect(runCropSightAnalysis({
+      aoi,
+      clusteringMethod: 'K-Means',
+      numZones: 3,
+      cropType: 'Wheat',
+      cropGrowthStage: 'Unspecified',
+    })).rejects.toThrow(/Authentication \/ Project Error/);
   });
 
-  it('clearly marks benchmark runs as demonstration benchmarks (FM-07)', () => {
-    const result = getVerifiedCropSightBenchmark(sampleAoi);
-    expect(result.isBenchmark).toBe(true);
-    expect(result.benchmarkSceneId).toBeDefined();
-    expect(result.source).toContain('Verified Demonstration Benchmark');
+  it('rejects a response without the real date-aligned NDVI series', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...apiResult, ndvi_time_series: { dates: ['2026-01-01'], ndvi_values: [] } }))));
+
+    await expect(runCropSightAnalysis({
+      aoi,
+      clusteringMethod: 'K-Means',
+      numZones: 3,
+      cropType: 'Wheat',
+      cropGrowthStage: 'Unspecified',
+    })).rejects.toThrow(/missing valid NDVI statistics/);
   });
 
-  it('uses exploratory scouting language rather than causal or prescription claims (FM-08)', () => {
-    const result = getVerifiedCropSightBenchmark(sampleAoi);
-    const recs = result.recommendations.join(' ');
-    expect(recs.toLowerCase()).toContain('prioritize ground inspection');
-    expect(recs.toLowerCase()).not.toContain('fertilizer prescription');
-    expect(recs.toLowerCase()).not.toContain('irrigation command');
-    expect(recs.toLowerCase()).not.toContain('yield guarantee');
-  });
+  it('rejects malformed AOI inputs and unsupported clustering labels before making a request', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
 
-  it('guarantees that management zone area percentages sum to exactly 100% across all zone counts', async () => {
-    const { generateZoneStats } = await import('../../services/monitoringApi');
-    for (let k = 2; k <= 7; k += 1) {
-      const stats = generateZoneStats(k, 0.612, 0.094);
-      expect(stats).toHaveLength(k);
-      const totalArea = stats.reduce((acc, z) => acc + z.areaPercentage, 0);
-      expect(totalArea).toBe(100);
-    }
-  });
-
-  it('supports custom numZones in verified benchmark mode', () => {
-    const res4 = getVerifiedCropSightBenchmark(sampleAoi, 4);
-    expect(res4.zonesIdentified).toBe(4);
-    expect(res4.zonalStats).toHaveLength(4);
-    const totalArea4 = res4.zonalStats.reduce((acc, z) => acc + z.areaPercentage, 0);
-    expect(totalArea4).toBe(100);
-
-    const res2 = getVerifiedCropSightBenchmark(sampleAoi, 2);
-    expect(res2.zonesIdentified).toBe(2);
-    expect(res2.zonalStats).toHaveLength(2);
-    const totalArea2 = res2.zonalStats.reduce((acc, z) => acc + z.areaPercentage, 0);
-    expect(totalArea2).toBe(100);
+    await expect(runCropSightAnalysis({
+      aoi: { ...aoi, startDate: '2026-04-01' },
+      clusteringMethod: 'K-Means', numZones: 3, cropType: 'Other', cropGrowthStage: 'Unspecified',
+    })).rejects.toThrow(/start date on or before/);
+    await expect(runCropSightAnalysis({
+      aoi,
+      clusteringMethod: 'DBSCAN', numZones: 3, cropType: 'Other', cropGrowthStage: 'Unspecified',
+    })).rejects.toThrow(/Only the CropSight K-Means path/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

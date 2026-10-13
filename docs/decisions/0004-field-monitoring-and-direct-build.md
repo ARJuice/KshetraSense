@@ -20,6 +20,10 @@ Replace the earlier mock-data-demo-first milestone with a direct build of functi
 - The current CropSight source has known code/data-contract limitations. Only outputs and methods whose displayed results are verified may be described as supported; the DBSCAN display path and unvalidated recommendation strings are not evidence of agronomic correctness.
 - The detailed product contract belongs in the [PRD](../PRD.md); technical seams in the [TRD](../TRD.md); screen behavior in the [UX specification](../UX-SPEC.md). This decision records the durable boundaries without duplicating those specifications.
 
+## Phase 4 implementation clarification (2026-10-14)
+
+The implemented UI preserves these boundaries: new Soil Investigation sessions start empty, old synthetic seed-preset rows are archived rather than counted as measurements, SoilGrids remains unavailable until a real ISRIC provider is verified, CropSight displays only aggregate values returned by its API (which currently has no raster or spatial-zone output), and historical replay keeps `%RH` forecasts and anomaly candidates explicitly non-operational. The implementation findings and autonomous choices are recorded in [Decision 0009](0009-monitoring-data-provenance-and-provider-readiness.md).
+
 ## Alternatives considered
 
 | Option | Decision |

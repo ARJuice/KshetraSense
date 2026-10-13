@@ -1,6 +1,6 @@
 # KshetraSense Engineering & Redesign Master Plan
 
-**Status:** Approved five-phase architecture; Phases 1–3 implemented and verified on 2026-10-14. Phase 4 monitoring UI and Phase 5 leaf contract/verification remain planned.
+**Status:** Approved five-phase architecture; Phases 1–4 implemented and verified on 2026-10-14. Phase 5 leaf contract/verification remains planned. Earth Engine credentials and a real SoilGrids provider are external setup/integration gates, not reasons to fabricate output.
 **Target Goal:** Build a defense-ready, evidence-bounded Precision Agriculture Decision-Support System. The current plan demonstrates sensing, analysis, and human review; it does not claim a deployed closed-loop actuator system:
 
 $$\textbf{Soil (Sparse Lab Cores)} \longrightarrow \textbf{Zone (Spatial ML)} \longrightarrow \textbf{Review (Independent Monitoring Evidence)}$$
@@ -14,7 +14,7 @@ $$\textbf{Soil (Sparse Lab Cores)} \longrightarrow \textbf{Zone (Spatial ML)} \l
 | **Phase 1 — complete** | **Backend Algorithmic Core** | [`phase-1-backend-algorithmic-core.md`](phase-1-backend-algorithmic-core.md) | GeoJSON-to-UTM field grid, IDW $p=2$, project-defined KshetraSense SHI, Auto-K silhouette sweep, multivariate adjacent-cluster merge, disconnected-component split, sample-perturbation ARI, and suggested WSN/gateway coordinates. |
 | **Phase 2 — complete** | **Soil Zoning UI Redesign** | [`phase-2-soil-zoning-ui-redesign.md`](phase-2-soil-zoning-ui-redesign.md) | Boundary/sample entry, `/v2/zoning/run`, returned layer/zone/diagnostic inspection, selected-cell/zone Crop Fit, and actual-response JSON export. |
 | **Phase 3 — complete** | **Historical Telemetry Replay & Soil-Signal Forecast** | [`phase-3-wsn-telemetry-service.md`](phase-3-wsn-telemetry-service.md) | Provenance-checked Parma trial API, `%RH` soil-signal GRU with disclosed failure to beat persistence, anomaly review candidates, and a separate calibrated-VWC-only FAO-56 advisory; no zone binding or actuation. |
-| **Phase 4 — planned** | **Field Monitoring UI Transformation** | [`phase-4-field-monitoring-transformation.md`](phase-4-field-monitoring-transformation.md) | Preserve Soil Investigation, add clearly labeled historical replay, and keep CropSight independent; Earth Engine setup remains a later manual action. |
+| **Phase 4 — complete** | **Field Monitoring UI Transformation** | [`phase-4-field-monitoring-transformation.md`](phase-4-field-monitoring-transformation.md) | Empty-by-default Soil Investigation, clearly attributed historical replay, and independent live CropSight aggregate analysis; no fake SoilGrids values or synthetic zones. Earth Engine setup remains a later manual action. |
 | **Phase 5 — planned** | **Leaf Contract, Verification & Defense** | [`phase-5-leaf-contract-and-verification.md`](phase-5-leaf-contract-and-verification.md) | MobileNetV3-Small 17-class image contract, end-to-end verification, demonstration narrative, and academic defense materials. |
 
 ---
@@ -49,10 +49,10 @@ $$\textbf{Soil (Sparse Lab Cores)} \longrightarrow \textbf{Zone (Spatial ML)} \l
 │  └──────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                        │
 │  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
-│  │ Tab B: Soil Investigation (measured samples + optional SoilGrids context)         │  │
-│  │ Tab C: Vegetation Monitoring (independent CropSight workflow)                    │  │
-│  │ • Sentinel-2 L2A Cloud-Masked NDVI raster clipped to farm boundary               │  │
-│  │ • Independent Sentinel-2 NDVI exploration; no implicit join to other modules    │  │
+│  │ Tab B: Soil Investigation (manual/CSV samples; SoilGrids currently unavailable)  │  │
+│  │ Tab C: Independent CropSight workflow: circular AOI + date window                │  │
+│  │ • Current endpoint returns aggregate NDVI statistics/time series, not a raster  │  │
+│  │ • No pixel labels, zone polygons, per-zone output, or implicit module join       │  │
 │  └──────────────────────────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────────────────────────┘
                                            │
@@ -65,4 +65,4 @@ $$\textbf{Soil (Sparse Lab Cores)} \longrightarrow \textbf{Zone (Spatial ML)} \l
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Phase 2 is the completed zoning browser workflow: the user supplies a WGS84 GeoJSON boundary and measured samples; there is no preloaded practice farm or fabricated result. The accessible 2D map is the complete default, while a lazily loaded 3D view is optional and capped by both cell count and estimated scene triangles. Crop Fit is contextual to a selected returned cell or zone and remains a separate rules evaluation. Phase 3 adds a provenance-checked historical telemetry API; the dedicated replay UI remains Phase 4. The benchmark does not imply live hardware or couple the Parma research lines to a KshetraSense field. The current GRU is experimental and did not beat persistence at any horizon.
+Phase 2 is the completed zoning browser workflow: the user supplies a WGS84 GeoJSON boundary and measured samples; there is no preloaded practice farm or fabricated result. The accessible 2D map is the complete default, while a lazily loaded 3D view is optional and capped by both cell count and estimated scene triangles. Crop Fit is contextual to a selected returned cell or zone and remains a separate rules evaluation. Phase 3 provides a provenance-checked historical telemetry API and Phase 4 adds its replay UI. The benchmark does not imply live hardware or couple the Parma research lines to a KshetraSense field. The current GRU is experimental and did not beat persistence at any horizon. Soil Investigation starts with no sample presets; historical synthetic rows are archived. SoilGrids stays unavailable until a real ISRIC WCS/WebDAV-backed provider is verified. CropSight displays only outputs actually returned by its API; because the response has no raster or zone geometry, the UI does not claim spatial zoning from NDVI. See [Decision 0009](../decisions/0009-monitoring-data-provenance-and-provider-readiness.md).

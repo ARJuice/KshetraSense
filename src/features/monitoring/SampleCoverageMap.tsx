@@ -63,7 +63,7 @@ export const SampleCoverageMap: React.FC<SampleCoverageMapProps> = ({
                 key={sample.sampleId}
                 type="button"
                 onClick={() => onSelectSample(sample)}
-                title={`${sample.sampleId} (${sample.latitude.toFixed(4)}, ${sample.longitude.toFixed(4)})\nDate: ${sample.collectedAt}\npH: ${sample.ph} · Depth: ${sample.depthInterval || `${sample.depthCm}cm` || 'Unrecorded'}`}
+                title={`${sample.sampleId} (${sample.latitude.toFixed(4)}, ${sample.longitude.toFixed(4)})\n${sample.provenance === 'seed-preset' ? 'Legacy synthetic preset — not a field measurement' : `Date: ${sample.collectedAt}\npH: ${sample.ph} · Depth: ${sample.depthInterval || `${sample.depthCm}cm` || 'Unrecorded'}`}`}
                 className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-all focus:outline-none ${
                   isSelected
                     ? 'z-20 h-8 w-8 ring-4 ring-sage-400/50'

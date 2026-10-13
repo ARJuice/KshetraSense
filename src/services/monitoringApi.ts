@@ -23,102 +23,57 @@ export async function fetchSoilGridsContext(
   property = 'phh2o',
   depth = '0-5cm',
 ): Promise<SoilGridsContextData> {
-  try {
-    const url = `${BASE_URL}/v1/monitoring/soilgrids?latitude=${latitude}&longitude=${longitude}&property=${encodeURIComponent(property)}&depth=${encodeURIComponent(depth)}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      if (response.status === 404) {
-        return getOfflineSoilGridsFallback(latitude, longitude, property, depth);
-      }
-      const errText = await response.text();
-      throw new MonitoringApiError(errText || 'Failed to retrieve SoilGrids context from server.', response.status);
-    }
-    const data = await response.json();
-    return {
-      property: data.property,
-      propertyName: data.propertyName,
-      depth: data.depth,
-      nativeResolution: data.nativeResolution,
-      quantiles: {
-        q05: data.quantiles['Q0.05'] ?? data.quantiles.Q0_05,
-        q50: data.quantiles['Q0.50'] ?? data.quantiles.Q0_50,
-        q95: data.quantiles['Q0.95'] ?? data.quantiles.Q0_95,
-      },
-      unit: data.unit,
-      mappedValue: data.mappedValue,
-      source: data.source,
-      retrievalDate: data.retrievalDate,
-      modeledContextLabel: data.modeledContextLabel,
-      uncertaintyDisclosure: data.uncertaintyDisclosure,
-      disclaimer: data.disclaimer,
-      latitude: data.latitude,
-      longitude: data.longitude,
-    };
-  } catch (error) {
-    if (error instanceof MonitoringApiError) throw error;
-    // Local deterministic fallback when server is offline
-    return getOfflineSoilGridsFallback(latitude, longitude, property, depth);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new MonitoringApiError('SoilGrids requires a valid latitude (−90 to 90) and longitude (−180 to 180).');
   }
-}
-
-/**
- * Local deterministic fallback model replicating ISRIC SoilGrids 2.0 quantiles
- * for complete offline operation or client testing.
- */
-function getOfflineSoilGridsFallback(
-  latitude: number,
-  longitude: number,
-  property: string,
-  depth: string,
-): SoilGridsContextData {
-  const props: Record<string, { name: string; unit: string; base: number; spread: number; decay: number }> = {
-    phh2o: { name: 'Soil pH (in H2O)', unit: 'pH', base: 6.8, spread: 0.6, decay: 0.04 },
-    nitrogen: { name: 'Total Nitrogen', unit: 'g/kg', base: 1.6, spread: 0.45, decay: -0.22 },
-    soc: { name: 'Soil Organic Carbon', unit: 'g/kg', base: 14.2, spread: 3.8, decay: -0.28 },
-    cec: { name: 'Cation Exchange Capacity', unit: 'cmol(+)/kg', base: 19.5, spread: 4.5, decay: -0.05 },
-    bdod: { name: 'Bulk Density', unit: 'kg/dm³', base: 1.38, spread: 0.12, decay: 0.05 },
-    clay: { name: 'Clay Content', unit: '%', base: 24.0, spread: 5.5, decay: 0.03 },
-    sand: { name: 'Sand Content', unit: '%', base: 42.0, spread: 7.0, decay: -0.02 },
-    silt: { name: 'Silt Content', unit: '%', base: 34.0, spread: 5.0, decay: -0.01 },
-  };
-
-  const depthMultipliers: Record<string, number> = {
-    '0-5cm': 0.0,
-    '5-15cm': 0.2,
-    '15-30cm': 0.5,
-    '30-60cm': 1.0,
-    '60-100cm': 1.8,
-    '100-200cm': 2.5,
-  };
-
-  const spec = props[property] ?? props.phh2o;
-  const dMult = depthMultipliers[depth] ?? 0.0;
-  const decayFactor = Math.max(0.2, 1.0 + spec.decay * dMult);
-  const spatialSeed = Math.sin(latitude * 0.1) * Math.cos(longitude * 0.1) + Math.sin((latitude + longitude) * 0.05);
-  const mean = (spec.base + spatialSeed * 0.15 * spec.base) * decayFactor;
-  const spread = spec.spread * (1.0 + 0.1 * dMult);
-
-  const q05 = Number(Math.max(0.01, mean - 1.645 * spread * 0.5).toFixed(2));
-  const q50 = Number(mean.toFixed(2));
-  const q95 = Number((mean + 1.645 * spread * 0.5).toFixed(2));
-
+  const url = `${BASE_URL}/v1/monitoring/soilgrids?latitude=${latitude}&longitude=${longitude}&property=${encodeURIComponent(property)}&depth=${encodeURIComponent(depth)}`;
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch (error) {
+    throw new MonitoringApiError(error instanceof Error ? error.message : 'SoilGrids service is unreachable.');
+  }
+  if (!response.ok) {
+    const errText = await response.text();
+    let message = errText || 'Failed to retrieve SoilGrids context from server.';
+    try {
+      message = JSON.parse(errText).detail ?? message;
+    } catch {
+      // Keep the provider's plain-text error.
+    }
+    throw new MonitoringApiError(message, response.status);
+  }
+  let data: any;
+  try {
+    data = await response.json();
+  } catch {
+    throw new MonitoringApiError('SoilGrids service returned an invalid response.');
+  }
+  const q05 = data.quantiles?.['Q0.05'] ?? data.quantiles?.Q0_05;
+  const q50 = data.quantiles?.['Q0.50'] ?? data.quantiles?.Q0_50;
+  const q95 = data.quantiles?.['Q0.95'] ?? data.quantiles?.Q0_95;
+  if (![data.mappedValue, q05, q50, q95].every(Number.isFinite)) {
+    throw new MonitoringApiError('SoilGrids service response did not include a mapped estimate and quantiles.');
+  }
   return {
-    property,
-    propertyName: spec.name,
-    depth,
-    nativeResolution: '250 m',
-    quantiles: { q05, q50, q95 },
-    unit: spec.unit,
-    mappedValue: q50,
-    source: 'ISRIC — World Soil Information (SoilGrids 2.0, CC-BY 4.0)',
-    retrievalDate: new Date().toISOString(),
-    modeledContextLabel: 'Modeled regional context — not a field measurement',
-    uncertaintyDisclosure:
-      'Global machine-learning prediction at 250m native resolution (~6.25 ha per cell). ISRIC explicitly advises against using 250m regional models for farm-scale management or within-field zoning.',
-    disclaimer:
-      'SoilGrids estimates are coarse regional background context. They must not replace field-collected soil samples and do not alter or feed into Soil Zoning or Crop Fit.',
-    latitude,
-    longitude,
+    property: data.property,
+    propertyName: data.propertyName,
+    depth: data.depth,
+    nativeResolution: data.nativeResolution,
+    quantiles: {
+      q05,
+      q50,
+      q95,
+    },
+    unit: data.unit,
+    mappedValue: data.mappedValue,
+    source: data.source,
+    retrievalDate: data.retrievalDate,
+    modeledContextLabel: data.modeledContextLabel,
+    uncertaintyDisclosure: data.uncertaintyDisclosure,
+    disclaimer: data.disclaimer,
+    latitude: data.latitude,
+    longitude: data.longitude,
   };
 }
 
@@ -141,36 +96,6 @@ export async function checkCropSightHealth(): Promise<{ online: boolean; message
   }
 }
 
-/**
- * Retrieve crop reference NDVI range and optimal rainfall from CropSight.
- */
-export async function getCropSightCropInfo(cropType: string): Promise<{ ndviRange: string; optimalRainfall: number }> {
-  try {
-    const response = await fetch(`${CROPSIGHT_URL}/crop-info/${encodeURIComponent(cropType)}`, {
-      signal: AbortSignal.timeout(3000),
-    });
-    if (response.ok) {
-      const data = await response.json();
-      return {
-        ndviRange: data.ndvi_range ?? '0.3-0.8',
-        optimalRainfall: data.optimal_rainfall ?? 100,
-      };
-    }
-  } catch {
-    // Fallback to static table
-  }
-  const staticRanges: Record<string, { ndviRange: string; optimalRainfall: number }> = {
-    Wheat: { ndviRange: '0.4-0.9', optimalRainfall: 80 },
-    'Corn/Maize': { ndviRange: '0.5-0.9', optimalRainfall: 120 },
-    Rice: { ndviRange: '0.4-0.8', optimalRainfall: 180 },
-    Soybeans: { ndviRange: '0.4-0.9', optimalRainfall: 100 },
-    Cotton: { ndviRange: '0.4-0.8', optimalRainfall: 70 },
-    Sugarcane: { ndviRange: '0.5-0.9', optimalRainfall: 150 },
-    Other: { ndviRange: '0.3-0.8', optimalRainfall: 100 },
-  };
-  return staticRanges[cropType] ?? staticRanges.Other;
-}
-
 export interface CropSightAnalysisParams {
   aoi: CircularAreaOfInterest;
   clusteringMethod: 'K-Means' | 'DBSCAN';
@@ -187,8 +112,24 @@ export interface CropSightAnalysisParams {
 export async function runCropSightAnalysis(params: CropSightAnalysisParams): Promise<CropSightAnalysisResult> {
   const { aoi, clusteringMethod, numZones, cropType, cropGrowthStage } = params;
 
-  if (aoi.latitude === null || aoi.longitude === null) {
-    throw new MonitoringApiError('Valid latitude and longitude are required to run satellite analysis.');
+  if (
+    aoi.latitude === null || aoi.longitude === null ||
+    !Number.isFinite(aoi.latitude) || aoi.latitude < -90 || aoi.latitude > 90 ||
+    !Number.isFinite(aoi.longitude) || aoi.longitude < -180 || aoi.longitude > 180
+  ) {
+    throw new MonitoringApiError('Valid latitude (−90 to 90) and longitude (−180 to 180) are required to run satellite analysis.');
+  }
+  if (!Number.isFinite(aoi.radiusMeters) || aoi.radiusMeters < 10 || aoi.radiusMeters > 10000) {
+    throw new MonitoringApiError('Circular AOI radius must be between 10 and 10,000 metres.');
+  }
+  if (!aoi.startDate || !aoi.endDate || Number.isNaN(Date.parse(aoi.startDate)) || Number.isNaN(Date.parse(aoi.endDate)) || aoi.startDate > aoi.endDate) {
+    throw new MonitoringApiError('Enter a valid date window with the start date on or before the end date.');
+  }
+  if (clusteringMethod !== 'K-Means') {
+    throw new MonitoringApiError('Only the CropSight K-Means path is enabled; other labels do not match the pinned implementation.');
+  }
+  if (!Number.isInteger(numZones) || numZones < 2 || numZones > 7) {
+    throw new MonitoringApiError('CropSight K-Means cluster count must be between 2 and 7.');
   }
 
   const payload = {
@@ -245,7 +186,7 @@ export async function runCropSightAnalysis(params: CropSightAnalysisParams): Pro
 
     if (isAuth) {
       throw new MonitoringApiError(
-        `Google Earth Engine Authentication / Project Error: ${detail}. Please authenticate the Earth Engine environment with a valid project ID or switch to "Verified Benchmark" mode.`,
+        `Google Earth Engine Authentication / Project Error: ${detail}. Configure the CropSight Earth Engine project and authentication before retrying.`,
         response.status,
         true,
       );
@@ -261,13 +202,26 @@ export async function runCropSightAnalysis(params: CropSightAnalysisParams): Pro
     throw new MonitoringApiError(`CropSight analysis failed (HTTP ${response.status}): ${detail}`, response.status);
   }
 
-  const data = await response.json();
-
-  // Map API response to CropSightAnalysisResult
-  const zonalStats = generateZoneStats(numZones, data.ndvi_stats.mean, data.ndvi_stats.stddev);
+  let data: any;
+  try {
+    data = await response.json();
+  } catch {
+    throw new MonitoringApiError('CropSight returned an invalid JSON response.');
+  }
+  const stats = data?.ndvi_stats;
+  const series = data?.ndvi_time_series;
+  if (
+    !stats || !series ||
+    !['mean', 'stddev', 'min', 'max'].every((key) => Number.isFinite(stats[key])) ||
+    !Array.isArray(series.dates) || !Array.isArray(series.ndvi_values) ||
+    series.dates.length !== series.ndvi_values.length ||
+    !series.ndvi_values.every((value: unknown) => Number.isFinite(value))
+  ) {
+    throw new MonitoringApiError('CropSight response is missing valid NDVI statistics or a matching date/value series.');
+  }
 
   return {
-    source: 'Copernicus Sentinel-2 L1C/L2A Harmonized via Google Earth Engine (CropSight sub-application)',
+    source: 'COPERNICUS/S2_HARMONIZED via Google Earth Engine (CropSight sub-application)',
     provider: 'Google Earth Engine',
     aoi: {
       latitude: aoi.latitude,
@@ -277,8 +231,7 @@ export async function runCropSightAnalysis(params: CropSightAnalysisParams): Pro
       endDate: aoi.endDate,
     },
     clusteringMethod,
-    zonesIdentified: data.zones_identified ?? numZones,
-    processingTime: data.processing_time ?? 1.2,
+    processingTime: Number.isFinite(data.processing_time) ? data.processing_time : null,
     ndviStats: {
       mean: data.ndvi_stats.mean,
       stddev: data.ndvi_stats.stddev,
@@ -289,7 +242,7 @@ export async function runCropSightAnalysis(params: CropSightAnalysisParams): Pro
       dates: data.ndvi_time_series.dates,
       ndviValues: data.ndvi_time_series.ndvi_values,
       meanNdvi: data.ndvi_time_series.mean_ndvi,
-      trend: data.ndvi_time_series.trend ?? 'stable',
+      trend: data.ndvi_time_series.trend,
     },
     rainfallData: data.rainfall_data
       ? {
@@ -300,143 +253,7 @@ export async function runCropSightAnalysis(params: CropSightAnalysisParams): Pro
           maxDailyRainfall: data.rainfall_data.max_daily_rainfall,
         }
       : null,
-    zonalStats,
     recommendations: data.recommendations ?? [],
-    retrievalDate: new Date().toISOString(),
-  };
-}
-
-/**
- * Generate management zone statistics with guaranteed 100% total area percentage.
- */
-export function generateZoneStats(numZones: number, mean: number, std: number): Array<{
-  zone: number;
-  meanNdvi: number;
-  areaPercentage: number;
-  scoutingPriority: 'High' | 'Moderate' | 'Baseline';
-}> {
-  const baseShares = [0.42, 0.35, 0.23, 0.18, 0.15, 0.12, 0.1];
-  const activeShares = baseShares.slice(0, numZones);
-  const totalBase = activeShares.reduce((a, b) => a + b, 0);
-
-  // Normalize so percentages sum to exactly 100% across any zone count (2 to 7)
-  const normalized = activeShares.map((s) => (s / totalBase) * 100);
-  const rounded = normalized.map((p) => Math.round(p));
-  const diff = 100 - rounded.reduce((a, b) => a + b, 0);
-  if (rounded.length > 0) {
-    rounded[0] += diff;
-  }
-
-  const zones = [];
-  for (let i = 0; i < numZones; i += 1) {
-    const offset = (i - (numZones - 1) / 2) * (std * 1.2 || 0.08);
-    const zoneMean = Math.max(0.05, Math.min(0.95, mean + offset));
-    const share = rounded[i] ?? Math.round(100 / numZones);
-    const priority =
-      zoneMean < 0.35 ? ('High' as const) : zoneMean < 0.55 ? ('Moderate' as const) : ('Baseline' as const);
-    zones.push({
-      zone: i + 1,
-      meanNdvi: Number(zoneMean.toFixed(3)),
-      areaPercentage: share,
-      scoutingPriority: priority,
-    });
-  }
-  return zones;
-}
-
-/**
- * Returns a verified demonstration benchmark run (Sentinel-2 L2A Punjab Wheat field)
- * with explicit provenance, scene ID, acquisition dates, NDVI time series, and zones.
- * Clearly labeled as benchmark per Decision 0004 & FM-05.
- */
-export function getVerifiedCropSightBenchmark(
-  aoi: CircularAreaOfInterest,
-  numZones = 3,
-  clusteringMethod: 'K-Means' | 'DBSCAN' = 'K-Means',
-): CropSightAnalysisResult {
-  const defaultZonalStats = [
-    {
-      zone: 1,
-      meanNdvi: 0.468,
-      areaPercentage: 28,
-      scoutingPriority: 'High' as const,
-    },
-    {
-      zone: 2,
-      meanNdvi: 0.624,
-      areaPercentage: 46,
-      scoutingPriority: 'Baseline' as const,
-    },
-    {
-      zone: 3,
-      meanNdvi: 0.741,
-      areaPercentage: 26,
-      scoutingPriority: 'Baseline' as const,
-    },
-  ];
-
-  const zonalStats = numZones === 3 ? defaultZonalStats : generateZoneStats(numZones, 0.612, 0.094);
-
-  return {
-    source: 'COPERNICUS/S2_SR_HARMONIZED (Level-2A Surface Reflectance) · Verified Demonstration Benchmark',
-    provider: 'Google Earth Engine (Verified Offline Run)',
-    aoi: {
-      latitude: aoi.latitude ?? 30.9015,
-      longitude: aoi.longitude ?? 75.8524,
-      radiusMeters: aoi.radiusMeters || 250,
-      startDate: aoi.startDate || '2026-01-01',
-      endDate: aoi.endDate || '2026-03-31',
-    },
-    clusteringMethod: `${clusteringMethod} (Weka K-Means via GEE / Scikit-learn)`,
-    zonesIdentified: numZones,
-    processingTime: 1.48,
-    isBenchmark: true,
-    benchmarkSceneId: 'S2B_MSIL2A_20260215T055009_N0500_R076_T43RER',
-    retrievalDate: '2026-03-31T12:00:00Z',
-    ndviStats: {
-      mean: 0.612,
-      stddev: 0.094,
-      min: 0.245,
-      max: 0.842,
-    },
-    ndviTimeSeries: {
-      dates: [
-        '2026-01-05',
-        '2026-01-15',
-        '2026-01-25',
-        '2026-02-04',
-        '2026-02-14',
-        '2026-02-24',
-        '2026-03-06',
-        '2026-03-16',
-        '2026-03-26',
-      ],
-      ndviValues: [0.38, 0.44, 0.52, 0.59, 0.67, 0.73, 0.71, 0.66, 0.58],
-      meanNdvi: 0.587,
-      trend: 'increasing',
-    },
-    rainfallData: {
-      dates: [
-        '2026-01-05',
-        '2026-01-15',
-        '2026-01-25',
-        '2026-02-04',
-        '2026-02-14',
-        '2026-02-24',
-        '2026-03-06',
-        '2026-03-16',
-        '2026-03-26',
-      ],
-      rainfallValues: [0.0, 4.2, 0.0, 12.8, 1.4, 0.0, 8.5, 0.0, 2.1],
-      totalRainfall: 29.0,
-      avgDailyRainfall: 3.22,
-      maxDailyRainfall: 12.8,
-    },
-    zonalStats,
-    recommendations: [
-      `Zone 1 exhibits lower NDVI (mean ${zonalStats[0].meanNdvi.toFixed(3)}) relative to field average. Prioritize ground inspection for soil compaction or irrigation deficit.`,
-      `Upper zones exhibit healthy canopy vigor typical of vegetative wheat (NDVI 0.62–0.74).`,
-      'Observe multi-temporal trend: peak vegetative biomass was recorded around mid-February (0.73).',
-    ],
+    responseReceivedAt: new Date().toISOString(),
   };
 }

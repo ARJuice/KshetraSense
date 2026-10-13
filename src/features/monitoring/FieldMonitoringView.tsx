@@ -1,38 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { FlaskConical, Satellite } from 'lucide-react';
+import { Activity, FlaskConical, Satellite } from 'lucide-react';
 import { SoilInvestigationView } from './SoilInvestigationView';
+import { TelemetryReplayView } from './TelemetryReplayView';
 import { VegetationMonitoringView } from './VegetationMonitoringView';
-import { PUNJAB_WHEAT_SAMPLES } from './seedData';
+import { loadStoredSoilSamples, SOIL_SAMPLES_STORAGE_KEY } from './soilSampleStorage';
 import type { SoilMeasurement } from './types';
-
-const STORAGE_KEY = 'kshetrasense:soil-samples:v1';
 
 export interface FieldMonitoringViewProps {
   onSamplesChange?: (samples: SoilMeasurement[]) => void;
 }
 
 export const FieldMonitoringView: React.FC<FieldMonitoringViewProps> = ({ onSamplesChange }) => {
-  const [activeTab, setActiveTab] = useState<'soil' | 'vegetation'>('soil');
-
-  // Load from localStorage or initialize with Punjab benchmark seed
-  const [samples, setSamples] = useState<SoilMeasurement[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // ignore JSON parse error
-    }
-    return PUNJAB_WHEAT_SAMPLES;
-  });
+  const [activeTab, setActiveTab] = useState<'soil' | 'telemetry' | 'vegetation'>('soil');
+  const [storageLoad] = useState(() => loadStoredSoilSamples(localStorage));
+  const [samples, setSamples] = useState<SoilMeasurement[]>(storageLoad.samples);
 
   // Save to localStorage when samples change
   const handleUpdateSamples = (nextSamples: SoilMeasurement[]) => {
     setSamples(nextSamples);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSamples));
+      localStorage.setItem(SOIL_SAMPLES_STORAGE_KEY, JSON.stringify(nextSamples));
     } catch {
       // ignore storage quota errors
     }
@@ -61,7 +48,7 @@ export const FieldMonitoringView: React.FC<FieldMonitoringViewProps> = ({ onSamp
           </div>
 
           {/* Primary View Switcher */}
-          <div className="flex rounded-lg border border-line-border bg-parchment-50 p-1 shadow-instrument" role="tablist" aria-label="Field Monitoring Modules">
+          <div className="flex flex-wrap rounded-lg border border-line-border bg-parchment-50 p-1 shadow-instrument" role="tablist" aria-label="Field Monitoring Modules">
             <button
               type="button"
               role="tab"
@@ -82,6 +69,20 @@ export const FieldMonitoringView: React.FC<FieldMonitoringViewProps> = ({ onSamp
             <button
               type="button"
               role="tab"
+              aria-selected={activeTab === 'telemetry'}
+              onClick={() => setActiveTab('telemetry')}
+              className={`inline-flex items-center gap-2 rounded-md px-3.5 py-2 text-xs font-semibold transition ${
+                activeTab === 'telemetry'
+                  ? 'bg-sage-700 text-parchment-50 shadow-sm'
+                  : 'text-ink-muted hover:bg-parchment-100 hover:text-ink'
+              }`}
+            >
+              <Activity size={14} />
+              <span>Historical Telemetry Replay</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
               aria-selected={activeTab === 'vegetation'}
               onClick={() => setActiveTab('vegetation')}
               className={`inline-flex items-center gap-2 rounded-md px-3.5 py-2 text-xs font-semibold transition ${
@@ -96,12 +97,25 @@ export const FieldMonitoringView: React.FC<FieldMonitoringViewProps> = ({ onSamp
           </div>
         </header>
 
+        {storageLoad.archivedPresetCount > 0 && (
+          <div className="rounded-lg border border-amberGold/30 bg-amberGold-subtle p-3 text-xs text-amberGold-dark">
+            Archived {storageLoad.archivedPresetCount} legacy synthetic soil preset record(s) from active measurements. Manual and CSV records were preserved.
+          </div>
+        )}
+        {storageLoad.migrationWarning && (
+          <div className="rounded-lg border border-amberGold/30 bg-amberGold-subtle p-3 text-xs text-amberGold-dark">
+            Browser storage could not archive legacy synthetic presets. They remain clearly marked as non-measurements; active measurement summaries exclude them.
+          </div>
+        )}
+
         {/* View Switch */}
         {activeTab === 'soil' ? (
           <SoilInvestigationView
             samples={samples}
             onUpdateSamples={handleUpdateSamples}
           />
+        ) : activeTab === 'telemetry' ? (
+          <TelemetryReplayView />
         ) : (
           <VegetationMonitoringView />
         )}

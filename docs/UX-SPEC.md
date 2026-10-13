@@ -1,6 +1,6 @@
 # UX specification
 
-**Status:** historical UX contract for the previous grid-painting workflow. It is superseded for the current Soil Zoning workflow by the implemented boundary/sample UI in [Phase 2](plans/phase-2-soil-zoning-ui-redesign.md), which uses the `/v2` API. Its two-view Field Monitoring section is also superseded by the three-view design in [Phase 4](plans/phase-4-field-monitoring-transformation.md). Do not use brush/preset interactions below as the current implementation spec. Product scope remains in the [PRD](PRD.md); backend contracts are in the [TRD](TRD.md) and phase plans.
+**Status:** historical UX contract for the previous grid-painting workflow. It is superseded for the current Soil Zoning workflow by the implemented boundary/sample UI in [Phase 2](plans/phase-2-soil-zoning-ui-redesign.md), which uses the `/v2` API. Field Monitoring is implemented as the three independent views in [Phase 4](plans/phase-4-field-monitoring-transformation.md). Do not use brush/preset interactions below as the current implementation spec. Product scope remains in the [PRD](PRD.md); backend contracts are in the [TRD](TRD.md) and phase plans.
 
 The existing prototype UI is not the design baseline. Rebuild the experience from the user's jobs and real module boundaries. There is no presentation-only mock phase, no canned result, and no fake algorithm progress. Use synthetic fixtures only for tests/benchmarks or an explicitly labeled development diagnostic.
 
@@ -60,13 +60,13 @@ Field Monitoring has three separate views; use the detailed current design in [P
 
 The user creates an investigation and enters a dated sample or imports a validated CSV. Each record shows location, collection date/time, sampling depth, method/source, measured parameter, original value/unit, and optional notes. If repeat readings are not comparable (for example, different depths or methods), show them as separate observations rather than a misleading trend.
 
-An optional SoilGrids panel accepts a location/area, supported property, and depth layer. Show the modeled estimate and available uncertainty quantiles, native 250 m resolution, product/date provenance, and the label **Regional modeled context — not a field sample**. Keep this layer visually and semantically distinct from user-measured samples. It does not feed Soil Zoning or Crop Fit automatically.
+An optional SoilGrids panel accepts a location, supported property, and depth layer only when a verified ISRIC-backed provider is available. A successful result must show the modeled estimate and available uncertainty quantiles, native product resolution, property/depth, retrieval/source provenance, and the label **Regional modeled context — not a field sample**. Keep it visually and semantically distinct from user-measured samples. It does not feed Soil Zoning or Crop Fit automatically. In the current build there is no verified provider, so show **unavailable** and no estimate; the former coordinate-derived placeholder was removed. New investigations start empty; legacy synthetic demo rows are archived and excluded from sample summaries/trends.
 
 Useful outputs are a sample register, sample-location map, parameter history where comparable repeat observations exist, missing-context cues, and the separate broad SoilGrids context panel. The initial experience is manual/imported investigations; it does not imply a live sensor network.
 
 #### Historical Telemetry Replay
 
-Show a persistent attribution/time-period/not-live badge for the Parma 2023 trial. Preserve its 100%/60%/30% treatment labels, raw source timestamps, units, and missing values. Soil humidity is `%RH` sensor signal, not VWC. Display the GRU only as an experimental comparison, alongside holdout-versus-persistence metrics; the current model loses to persistence at all horizons. Isolation Forest produces review candidates, not faults. No KshetraSense zone, live gateway, irrigation action, valve, or flow is implied. The calibrated-VWC FAO-56 advisory is a separate optional form with explicit user-provided site parameters and human-review wording.
+Show a persistent attribution/time-period/not-live badge for the Parma 2023 trial. Preserve its 100%/60%/30% treatment labels, raw source timestamps, units, and missing values. Soil humidity is `%RH` sensor signal, not VWC. Display the GRU only as an experimental comparison, alongside holdout-versus-persistence metrics; the current model loses to persistence at all horizons. Isolation Forest produces review candidates, not faults. No KshetraSense zone, live gateway, irrigation action, valve, or flow is implied. The separate calibrated-VWC FAO-56 endpoint remains API-only; it is not surfaced from this `%RH` replay UI.
 
 #### Vegetation Monitoring — CropSight
 
@@ -74,7 +74,7 @@ Vegetation Monitoring runs the pinned CropSight application as an independent lo
 
 Inputs are the center latitude/longitude, circular radius, date window, any supported clustering configuration, and optional crop/stage context used only by the app. Live retrieval requires a correctly configured Google Earth Engine project/account and available quota. Optional rainfall/CHIRPS information must have its own source label and availability state.
 
-Show only data that the running CropSight path actually returns: its NDVI visualization/time series and supported zone summaries, acquisition dates, analysis parameters, coverage/quality context where available, and external-service status. Do not silently relabel a circle as a cadastral parcel. If imagery is unavailable, cloud/coverage is inadequate, authorization fails, or a displayed clustering method is inconsistent with its output, explain the specific limitation and do not substitute a prepared result.
+Show only data that the CropSight API actually returns: aggregate NDVI statistics, its per-scene mean-NDVI time series, optional rainfall context, source/provider, selected AOI/date window, and upstream heuristic text clearly marked unvalidated. The current response does not include an NDVI raster, pixel labels, zone polygons, or per-zone statistics; do not draw a substitute map or claim patch-level coordinates even when the request includes a K-means cluster count. Do not silently relabel a circle as a cadastral parcel. If the service, Earth Engine authorization/quota, or usable imagery is unavailable, explain the specific limitation and do not substitute a prepared result.
 
 The first useful tasks are seasonal pattern review and marking relatively underperforming patches for human scouting. A vegetation anomaly means **inspect here**, not a diagnosis. Variable-rate maps, irrigation decisions, and yield estimates are not implied by this view; they require separate validated data/models and later scope approval.
 
@@ -93,6 +93,7 @@ Use satisfying transitions for edits and result changes, but animate only actual
 | No input | State which input is required; no fabricated default result. |
 | Incomplete/incompatible soil sample | Identify the missing unit, depth, method, or date; keep the record recoverable. |
 | SoilGrids unavailable | Say regional context is unavailable; never replace it with a measured value. |
+| Legacy soil demo records | Archive seed-preset provenance; if storage migration fails, retain a visible synthetic/not-a-measurement label and exclude the records from summaries/trends. |
 | CropSight not configured | Explain the Earth Engine setup requirement and provide a non-secret configuration status, not a fake map. |
 | No usable imagery / poor coverage | Show date range and coverage information available from the service; do not claim reliable zones. |
 | External service error | Keep user input, state the provider/error category, and offer retry when appropriate. |

@@ -1,6 +1,6 @@
 # Delivery plan and acceptance
 
-**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phases 1–3 are complete, Phase 4 UI and Phase 5 leaf contract/verification remain. No visual-only or fixture-output product phase is planned.
+**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phases 1–4 are implemented, and Phase 5 leaf contract/verification remains. SoilGrids and live Earth Engine use have honest provider/setup gates. No visual-only or fixture-output product phase is planned.
 
 ## Delivery principles
 
@@ -17,25 +17,26 @@
 | 1. Backend Algorithmic Core — complete | GeoJSON/UTM grid, IDW, KshetraSense SHI, Auto-K K-means/FCM, adjacent-profile merge, contiguous components, source-sample sensitivity, and WSN/gateway candidates at `/v2/zoning/run`. | Backend tests pass; estimates, provisional score, sensitivity assumptions, and geometry-only candidates are labeled honestly. |
 | 2. Soil Zoning UI Redesign — complete | Boundary/sample input, real `/v2` integration, returned clipped-cell layers/diagnostics, and selected-cell/zone Crop Fit via the existing rules endpoint. | Frontend/service tests pass; no canned result; edits mark prior runs stale; 2D/3D use the same response geometry; 3D obeys cell and triangle limits. |
 | 3. Historical Telemetry Replay & Soil-Signal Forecast — complete | Pinned Parma research data, provenance-aware playback API, experimental `%RH`-signal GRU, candidate-only anomaly screen, and separate calibrated-VWC FAO-56 advisory. | 62 Python tests pass; model/data metadata and source hashes are recorded. The GRU fails to beat persistence at all horizons and is explicitly evaluation-only; no live/zone/actuation claim. |
-| 4. Field Monitoring UI Transformation — next | Build the dedicated historical replay view alongside Soil Investigation and the isolated CropSight workflow; preserve module boundaries. | Replay provenance, raw units, data quality, and weak model performance are visible; provider/data failures are honest; no monitoring output silently changes zoning or Crop Fit. |
+| 4. Field Monitoring UI Transformation — complete | Add the historical replay view alongside empty-by-default Soil Investigation and independent CropSight aggregate analysis; preserve module boundaries. | Frontend/API tests pass; replay provenance, raw units, data quality, and weak model performance are visible; no fake SoilGrids values or CropSight zones; provider/setup failures are honest; no output silently changes zoning or Crop Fit. |
 | 5. Leaf Contract, Verification & Defense — planned | Freeze and verify the 17-class MobileNetV3-Small interface and evaluation/data contract; prepare demonstration and defense materials. | Model, preprocessing, class map, evaluation report, and inference interface agree; image bytes are not persisted by default. |
 
 The sequence permits independent work on the crop model, soil processing, or CropSight environment, but user-visible completion gates remain in order. A visual element may be polished during its functional phase; it must never be used to disguise an unimplemented computation.
 
 ## Monitoring acceptance
 
-Phase 3 backend acceptance is verified by `services/zoning/tests/test_telemetry_data.py`, `test_telemetry_playback.py`, `test_telemetry_water_balance.py`, and `test_telemetry_api.py`, together with the existing zoning tests. This verifies the API/data/model contract only; the dedicated replay screen remains Phase 4 work.
+Phase 3 backend acceptance is verified by its data, playback, water-balance, and API tests together with the existing zoning tests. Phase 4 adds API-client/view-model tests and a production build. Automated verification does not replace a manual browser/accessibility review; the visual browser pass remains pending.
 
 | ID | Pass condition | Evidence | Status |
 | --- | --- | --- | --- |
 | FM-01 | A soil record includes location, collection time, source/method, depth where relevant, parameter, original value, and unit. Missing context is explicit. | `soilSampleValidation.ts`, `csvImport.test.ts`, and form/register UI. | Verified |
 | FM-02 | Repeated soil readings are graphed only when their parameters, units, methods, depths, and time context are comparable; otherwise they remain separate observations. | `comparability.ts` and `comparability.test.ts` (6 unit tests). | Verified |
-| FM-03 | SoilGrids shows property, depth, native resolution, available uncertainty quantiles, retrieval date, and modeled-context label. It never appears as a field sample. | `soilgrids.py`, `soilGrids.test.ts`, and `test_monitoring_api.py`. | Verified |
+| FM-03 | SoilGrids shows property, depth, native resolution, available uncertainty quantiles, retrieval date, and modeled-context label only when a verified provider returns data; otherwise it shows unavailable and no estimate. | `soilgrids.py`, `soilGrids.test.ts`, and `test_monitoring_api.py` verify the current 503/no-fallback contract. | Verified — provider unavailable by design |
 | FM-04 | Soil sample and SoilGrids state do not silently affect Soil Zoning or Crop Fit. | State isolation tests and explicit architectural boundary. | Verified |
-| FM-05 | CropSight's live request carries its own center coordinates, radius, and date window; its result is labeled with source/provider and analysis period. | `monitoringApi.ts` and `cropsight.test.ts`. | Verified |
-| FM-06 | Rendered CropSight maps, selected algorithm labels, and summaries agree with the underlying returned data. Known mismatched methods are disabled or clearly unavailable until verified. | `VegetationMonitoringView.tsx` (DBSCAN disabled with upstream mismatch warning). | Verified |
-| FM-07 | No-image, inadequate-coverage, unavailable-provider, and authentication/quota failures do not display stale/prepared output as current. | `monitoringApi.ts` error classification and benchmark toggle. | Verified |
+| FM-05 | CropSight's request carries its own center coordinates, radius, and date window; displayed results are labeled with actual source/provider and analysis period. | `monitoringApi.ts` and `cropsight.test.ts` verify validation/mapping; live Earth Engine execution awaits user setup. | Contract verified — live provider pending |
+| FM-06 | Displayed CropSight method labels and summaries agree with the returned data; no spatial map is rendered when the response has no raster or zone geometry. | `VegetationMonitoringView.tsx` and `cropsight.test.ts`; K-means is the only enabled method and absence of spatial output is explicit. | Verified — aggregate output only |
+| FM-07 | No-image, unavailable-provider, malformed-response, and authentication/quota failures do not display stale/prepared output as current. | `monitoringApi.ts` error classification and `cropsight.test.ts`; no benchmark toggle or fallback remains. | Verified |
 | FM-08 | Satellite anomaly/scouting language does not claim a cause; VRA, irrigation, and yield claims remain absent until their separate validation gates pass. | `VegetationMonitoringView.tsx` scouting guidance and strict limitations. | Verified |
+| FM-09 | Historical replay UI preserves source timestamps/units, bounded-history gaps, playback controls, model-quality disclosure, and non-operational anomaly semantics. | `telemetryApi.test.ts`, `telemetryViewModel.test.ts`, production build, and Phase 3 API tests. | Verified |
 
 ## Core release acceptance
 
@@ -67,9 +68,9 @@ Phase 3 backend acceptance is verified by `services/zoning/tests/test_telemetry_
 1. Open Field Lab with a real supplied dataset; identify its source and measurement context before running Soil Zoning.
 2. Change one source sample value, show that the previous run is stale but retained, rerun zoning, then inspect the returned summaries and diagnostics.
 3. Open Crop Fit for a selected cell/zone and explain the independent source-backed assessment and any unassessed factors.
-4. In Field Monitoring, inspect dated soil samples, compare only compatible repeated measurements, and view SoilGrids separately as coarse modeled context.
-5. After Phase 4, replay the Parma research series and explain its `%RH` units, source/treatment labels, model-versus-persistence holdout result, anomaly-candidate semantics, and lack of live/actuation behavior.
-6. Open CropSight, enter its own circular AOI and date window, view the actual imagery/NDVI/time-series result, and identify a patch to scout without claiming a diagnosis or prescription.
+4. In Field Monitoring, create/import dated soil samples and compare only compatible repeated measurements. Show the explicit SoilGrids-unavailable state; do not present an estimate until a real provider is configured.
+5. Replay the Parma research series and explain its `%RH` units, source/treatment labels, model-versus-persistence holdout result, anomaly-candidate semantics, and lack of live/actuation behavior.
+6. After the user configures Earth Engine and starts the CropSight service, enter its independent circular AOI/date window and review only returned aggregate NDVI statistics/time series. Explain that the current response has no map-ready raster or zone outputs; do not claim a patch-level prescription or scouting coordinate.
 7. Show the Leaf Diagnosis contract and Evidence & Methods; run a leaf classifier only after its separately built model and inference service pass Phase 5 acceptance.
 8. Show the provenance chain, measured evaluation reports, and unavailable/deferred features.
 
@@ -84,7 +85,7 @@ If a required provider is unavailable during demonstration, show the explicit un
 | CropSight runtime dependencies/configuration are complete. | Test the pinned source in an isolated environment, provide required packages/configuration outside the preserved source when possible, and record setup. |
 | Earth Engine access/quota is available for the college demonstration. | Validate the configured noncommercial project and show distinct authentication/quota/image-coverage errors. |
 | CropSight algorithm names match map outputs. | Verify source-to-display behavior; suppress or mark any known mismatch unavailable without claiming it is valid. |
-| SoilGrids downloads remain available under current service terms. | Use a versioned cache/download route; its API is optional, and absent context stays absent. |
+| SoilGrids access remains available and a usable provider can be configured. | ISRIC currently documents its beta REST API as paused and lists WCS for subsets and WebDAV for global VRTs; implement and verify one real path before showing estimates. Until then, the endpoint returns unavailable. |
 | Soil readings are comparable across time. | Preserve source, units, collection date, method, and depth; do not chart unlike measurements as one trend. |
 | Real field photos generalize beyond controlled datasets. | State tested label scope, report cross-dataset evidence separately, and provide review/unsupported states. |
 | Agronomy thresholds support Crop Fit. | Show raw supported factors/“Not assessed” until source, geography, units, thresholds, and tests exist. |

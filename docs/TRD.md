@@ -1,12 +1,12 @@
 # Technical requirements
 
-**Status:** Phases 1–3 are implemented: field-scale sparse-sample zoning and selected-cell/zone Crop Fit, plus a provenance-checked historical telemetry service with a trained but non-actionable GRU benchmark. The five-phase architecture and current implementation status are indexed in [plans/README.md](plans/README.md); product behavior is defined by the [PRD](PRD.md), domain terms by [GLOSSARY](../GLOSSARY.md), and user-facing interactions by the [UX specification](UX-SPEC.md). Phase 4 owns the telemetry replay UI.
+**Status:** Phases 1–4 are implemented: field-scale sparse-sample zoning and selected-cell/zone Crop Fit; a provenance-checked historical telemetry service; and the three-view Field Monitoring UI. The five-phase architecture and current implementation status are indexed in [plans/README.md](plans/README.md); product behavior is defined by the [PRD](PRD.md), domain terms by [GLOSSARY](../GLOSSARY.md), and user-facing interactions by the [UX specification](UX-SPEC.md). SoilGrids and Earth Engine remain external provider/configuration gates; no stand-in data is generated.
 
 ## System boundary
 
 The product shell is a local browser application. User-authored soil state and each analysis module's view state remain isolated. Clustering, crop-rule evaluation, image inference, and historical telemetry use versioned modules/services behind stable request/result contracts. Field Monitoring owns its sample records, optional SoilGrids context, historical replay controls, and independent vegetation-monitoring session. These flows have no implicit read/write path to Soil Zoning, Crop Fit, or Leaf Diagnosis.
 
-Keep React, TypeScript, and Vite for the host UI, with Three.js/React Three Fiber for the functional field and a complete 2D path. The local FastAPI service uses the repository's NumPy K-means++/FCM implementations and rule-based crop-fit module. Historical replay is mounted in the same FastAPI process under `/v1/telemetry/`, isolated from zoning state. Its trained GRU uses Keras 3 with the CPU PyTorch backend; the distinct image-model runtime remains part of Phase 5 and is not selected here. Run the pinned CropSight Streamlit application as a separate local sub-application with its own dependencies, configuration, and state. Preserve its files as-is; connect it through a separate Field Monitoring route/launch boundary rather than importing its UI code into the host React tree. SoilGrids access is optional and should use a downloaded/cached supported product subset, not require its currently paused REST endpoint.
+Keep React, TypeScript, and Vite for the host UI, with Three.js/React Three Fiber for the functional field and a complete 2D path. The local FastAPI service uses the repository's NumPy K-means++/FCM implementations and rule-based crop-fit module. Historical replay is mounted in the same FastAPI process under `/v1/telemetry/`, isolated from zoning state. Its trained GRU uses Keras 3 with the CPU PyTorch backend; the distinct image-model runtime remains part of Phase 5 and is not selected here. Field Monitoring's React CropSight view calls a separately configured CropSight API (`VITE_CROPSIGHT_API_URL`, defaulting to the local `/cropsight` route); its Earth Engine credentials/configuration remain isolated from host secrets and state. The UI accepts only validated aggregate/time-series output currently returned by that API; no raster or zone geometry is exposed. SoilGrids is optional and currently unavailable: the endpoint returns HTTP 503 until a real ISRIC-backed provider is implemented and verified. Do not use its paused REST API or a local formula as a data source.
 
 ```text
 Browser UI
@@ -18,9 +18,9 @@ Browser UI
 
 Field Monitoring
   ├─ soil investigation records ─> local persistence / validated import
-  ├─ optional SoilGrids context ─> cached/downloaded coarse raster adapter
+  ├─ SoilGrids context ──────────> HTTP 503 until verified WCS/WebDAV adapter exists
   ├─ historical telemetry replay ─> pinned local data + isolated replay/model service
-  └─ vegetation monitoring ─────> isolated CropSight Streamlit sub-application
+  └─ vegetation monitoring ─────> separate CropSight API + user-configured Earth Engine
                                     (own circular AOI, date window, and provider auth)
 
 Versioned local artifacts: feature schema | scenarios/presets | crop profiles/rules
@@ -66,7 +66,7 @@ SoilGridsContextRequest {
   requestedQuantiles?, productVersion?
 }
 
-SoilGridsContextResult {
+SoilGridsContextResult {             // Success contract only; route is currently unavailable (503)
   property, predictedValue, unit, depthLayer, nativeResolution,
   uncertaintyQuantiles?, source, productVersion, retrievalDate,
   label: "modeled regional context; not a field measurement"
@@ -88,7 +88,9 @@ HistoricalTelemetryReplay {
 }
 ```
 
-Soil samples support manual entry and validated CSV import. Keep original values/units and record any explicit conversion. SoilGrids output is a separate contextual result; never create synthetic fine-resolution cells from its 250 m raster or feed it to the default soil-zoning feature matrix. CropSight keeps a circular AOI and its own date/result state; no cadastral parcel, soil samples, zoning assignments, Crop Fit results, or leaf results are passed into it. The as-is workflow depends on its configured Earth Engine access; optional rainfall remains independently sourced and labeled. The current FastAPI endpoint does not expose map-ready NDVI rasters/zone polygons, so the initial reuse target is the standalone Streamlit application, not that API as a shared-map contract.
+Soil samples support manual entry and validated CSV import. New sessions start empty; legacy synthetic preset rows are moved to a separate local archive and excluded from measurement summaries/trends. Keep original values/units and record any explicit conversion. The SoilGrids success schema is reserved for future verified responses; current `GET /v1/monitoring/soilgrids` validates request parameters then returns HTTP 503 because no real provider is configured. It must never generate coordinate-derived estimates, fabricate fine-resolution cells, or feed Soil Zoning/Crop Fit. The official ISRIC docs currently report the beta REST API paused and direct users to WCS for AOI subsets or WebDAV for global VRT products; a later adapter must verify property/depth/quantile/unit/provenance and respect the product's macro-scale use. CropSight keeps a circular AOI and its own date/result state; no cadastral parcel, soil samples, zoning assignments, Crop Fit results, or leaf results are passed into it. Earth Engine access is user-configured and optional rainfall is independently sourced/labeled. The API response currently includes aggregate NDVI statistics, a per-scene time series, optional rainfall, and upstream heuristic strings; it does not include an NDVI raster, pixel labels, zone polygons, or per-zone statistics. Therefore the host UI does not render a spatial map or claim patch-level scouting coordinates.
+
+The separate FAO-56 endpoint accepts only explicit calibrated VWC fractions and site parameters. Phase 4 does not add a UI for it: the historical trial's `%RH` sensor signal is not VWC, and joining the two would be unsafe. The API remains available for separately supplied inputs; no irrigation operation is implemented.
 
 ### Historical telemetry service
 
@@ -173,10 +175,10 @@ Use `.glb` as the runtime interchange format for a justified imported model. The
 - Failures retain edits and the previous immutable run. Do not replace a failure with invented output.
 - Export preserves seed, method/configuration, feature schema/exclusions, pipeline versions, and diagnostics from the returned run; storage across restarts is not implemented.
 - Do not persist uploaded leaf images by default; omit image bytes from logs.
-- The planned Earth Engine dependency for CropSight is an explicit hosted-service exception: it requires project/auth configuration and quota availability but must not require a paid tier for the college build. Document it and show unavailable/error states. No other hosted API, font, asset, or runtime is required for core workflows.
+- The Earth Engine dependency for live CropSight analysis is an explicit external-service requirement: it requires user project/auth configuration and available quota. Document it and show unavailable/error states. No credentials are committed or shown. No other hosted API, font, asset, or runtime is required for core workflows.
 - Mark unavailable Earth Engine credentials, quota exhaustion, no valid image coverage, and provider failures as distinct user-visible states. Never substitute a prepared map or recommendation.
 - Preserve CropSight's pinned source attribution and keep its environment/provider credentials isolated. The missing license file remains an unresolved rights caveat documented in Decision 0004; user acceptance is not a license grant.
-- SoilGrids cache entries record the native product, property, depth, quantiles, resolution, retrieval date, and source terms. Expired/missing context is shown as unavailable, not as a measurement.
+- A future SoilGrids cache/provider must record native product, property, depth, quantiles, resolution, retrieval date, and source terms. Until that adapter is verified, context is unavailable, not approximated or shown as a measurement.
 
 ## Technical verification plan
 
@@ -187,9 +189,9 @@ Use `.glb` as the runtime interchange format for a justified imported model. The
 | Rules | Threshold/source/version/unit/boundary/missing-data behavior and independence from cluster labels. |
 | Vision | Preprocessing/class-map/model version match, 17 labels, review branch, no contextual inputs, transient upload. |
 | Soil investigation | Manual/CSV validation, original-unit preservation, sample metadata completeness, local persistence, export/delete behavior. |
-| SoilGrids | Product/depth/property/quantile/resolution provenance and explicit modeled-context display; no coupling into zoning/crop rules. |
-| CropSight | Pinned source startup, Earth Engine configuration and failure handling, date/AOI correctness, supported map/time-series consistency, no KshetraSense module-data dependency. |
-| Historical telemetry | Source-hash verification, strict parser, unit/source timestamp fidelity, bounded interpolation, deterministic playback, API bounds, GRU shape/split/holdout-vs-persistence metrics, anomaly-candidate semantics, FAO-56 hand calculation, and no zone/actuation coupling. |
+| SoilGrids | Request validation, explicit HTTP 503 when no provider is configured, no coordinate-derived fallback; future provider tests must verify product/depth/property/quantile/resolution provenance and modeled-context labeling, with no zoning/crop-rule coupling. |
+| CropSight | API request validation, user AOI/date fidelity, returned aggregate/time-series validation, no synthetic zone/map fallback, Earth Engine/provider error handling, and no KshetraSense module-data dependency. |
+| Historical telemetry | Source-hash verification, strict parser, unit/source timestamp fidelity, bounded interpolation, deterministic playback, API bounds, GRU shape/split/holdout-vs-persistence metrics, anomaly-candidate semantics, separate FAO-56 hand calculation, replay UI integrity, and no zone/actuation coupling. |
 | UI/renderer | Returned-geometry parity, 2D keyboard path, 3D selection/orbit/fit, reduced motion, scene-budget guard, and fallback behavior. |
 | Performance | Trace against all budgets above on named desktop and constrained/mobile reference devices. |
 
@@ -202,5 +204,5 @@ These choices remain for implementation and benchmarking; they do not change the
 - Device-specific 3D performance after profiling on named hardware.
 - Whether to include Spline after current free-tier/export verification. Its absence must not block any task.
 - Exact local persistence mechanism and validated sample-import file format.
-- CropSight sub-application hosting/embedding mechanics and separate Python dependency lockfile; its AOI/data boundary is fixed by [Decision 0004](decisions/0004-field-monitoring-and-direct-build.md).
-- First supported SoilGrids download/cache format and user-selectable property/depth set.
+- CropSight's external process startup/orchestration and Earth Engine user setup; its AOI/data boundary is fixed by [Decision 0004](decisions/0004-field-monitoring-and-direct-build.md). The current UI is ready to consume validated aggregate/time-series response fields, not spatial raster outputs.
+- First verified SoilGrids WCS/WebDAV-backed adapter, regional cache policy, and user-selectable property/depth set. The REST beta remains paused per the [ISRIC access documentation](https://docs.isric.org/globaldata/soilgrids/SoilGrids_faqs_02.html).
