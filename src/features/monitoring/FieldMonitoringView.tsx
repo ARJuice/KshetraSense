@@ -38,9 +38,6 @@ export const FieldMonitoringView: React.FC<FieldMonitoringViewProps> = ({ onSamp
           <div>
             <div className="mb-1 flex items-center gap-2">
               <span className="font-serif text-2xl font-bold text-ink">Field Monitoring</span>
-              <span className="rounded-full border border-line-border bg-parchment-100 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-ink-muted">
-                Functional Module
-              </span>
             </div>
             <p className="max-w-3xl text-xs leading-6 text-ink-muted">
               Record validated measured soil observations, query coarse 250m regional SoilGrids context, and run Sentinel-2 / Google Earth Engine vegetation monitoring via the independent CropSight sub-application.

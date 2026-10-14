@@ -1,18 +1,26 @@
 import { Component, lazy, Suspense, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import {
   AlertCircle,
+  AlertTriangle,
   Check,
+  CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Crosshair,
+  Database,
   Download,
+  Eye,
   FlaskConical,
   Focus,
+  Info,
+  Layers,
   LoaderCircle,
   Map as MapIcon,
   MapPin,
   Play,
   Plus,
   Settings2,
+  ShieldAlert,
   Sprout,
   Trash2,
   Upload,
@@ -28,6 +36,7 @@ import {
   type SoilSampleDraft,
 } from './field/fieldSamples';
 import { parseSoilSampleCsv } from './field/soilSampleCsv';
+import { DEMO_DATASETS } from './field/demoDatasets';
 import type { FieldZoningOptions, FieldZoningResponse, SoilMeasurements, SoilProperty } from './field/fieldTypes';
 import './zoning.css';
 
@@ -37,22 +46,34 @@ const MAX_IMPORT_BYTES = 2_000_000;
 const MAX_3D_CELLS = 768;
 const MAX_3D_TRIANGLES = 20_000;
 const MAX_3D_OVERLAY_TRIANGLES = 1_300;
+
 const SOIL_LABELS: Record<SoilProperty, string> = {
-  pH: 'pH', ec: 'Electrical conductivity', nitrogen: 'Nitrogen', phosphorus: 'Phosphorus', potassium: 'Potassium',
+  pH: 'pH',
+  ec: 'Electrical conductivity',
+  nitrogen: 'Nitrogen',
+  phosphorus: 'Phosphorus',
+  potassium: 'Potassium',
 };
+
 const SOIL_UNITS: Record<SoilProperty, string> = {
-  pH: 'pH', ec: 'dS/m', nitrogen: 'mg/kg', phosphorus: 'mg/kg', potassium: 'mg/kg',
+  pH: 'pH',
+  ec: 'dS/m',
+  nitrogen: 'mg/kg',
+  phosphorus: 'mg/kg',
+  potassium: 'mg/kg',
 };
+
 const LAYER_OPTIONS: Array<{ value: FieldLayer; label: string; unit: string }> = [
   { value: 'zone', label: 'Management zones', unit: '' },
-  { value: 'pH', label: 'pH', unit: 'pH' },
+  { value: 'pH', label: 'pH (Soil reaction)', unit: 'pH' },
   { value: 'ec', label: 'Electrical conductivity', unit: 'dS/m' },
-  { value: 'nitrogen', label: 'Nitrogen', unit: 'mg/kg' },
-  { value: 'phosphorus', label: 'Phosphorus', unit: 'mg/kg' },
-  { value: 'potassium', label: 'Potassium', unit: 'mg/kg' },
+  { value: 'nitrogen', label: 'Nitrogen (N)', unit: 'mg/kg' },
+  { value: 'phosphorus', label: 'Phosphorus (P)', unit: 'mg/kg' },
+  { value: 'potassium', label: 'Potassium (K)', unit: 'mg/kg' },
   { value: 'shi', label: 'KshetraSense SHI', unit: '0–100' },
-  { value: 'membership', label: 'FCM membership', unit: '0–1' },
+  { value: 'membership', label: 'FCM membership strength', unit: '0–1' },
 ];
+
 const INITIAL_OPTIONS: FieldZoningOptions = {
   cellSizeM: 10,
   method: 'fcm',
@@ -131,8 +152,12 @@ export function ZoningWorkspace() {
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
   const [cropFitScope, setCropFitScope] = useState<'cell' | 'zone'>('cell');
+  const [inspectorTab, setInspectorTab] = useState<'profile' | 'crop'>('profile');
   const [cropContext, setCropContext] = useState<CropFitMeasurementContext>({
-    sourceScope: '', soilTestMethod: 'Not supplied', sampleDepth: 'Not supplied', ecMethod: 'Not supplied',
+    sourceScope: '',
+    soilTestMethod: 'Not supplied',
+    sampleDepth: 'Not supplied',
+    ecMethod: 'Not supplied',
   });
   const [cropFitState, setCropFitState] = useState<CropFitState | null>(null);
   const cropRequestId = useRef(0);
@@ -142,42 +167,48 @@ export function ZoningWorkspace() {
     cropRequestId.current += 1;
     setCropFitState(null);
   };
+
   const markInputsChanged = () => {
     setInputRevision((current) => current + 1);
     setInputError(null);
     invalidateCropFit();
   };
+
   const stale = Boolean(analysis && (analysis.inputRevision !== inputRevision || analysis.boundaryRevision !== boundaryRevision));
   const geometryStale = Boolean(analysis && analysis.boundaryRevision !== boundaryRevision);
   const response = analysis?.response ?? null;
   const displayBoundary = geometryStale ? boundary : response?.field.boundary ?? boundary;
   const displayCells = analysis && !geometryStale ? response?.cells ?? EMPTY_CELLS : EMPTY_CELLS;
   const displayZones = analysis && !geometryStale ? response?.zones ?? [] : [];
+
   const mapSamples = useMemo(() => samples.flatMap((sample) => {
     if (!isFieldPosition(sample.latitude, -80, 84) || !isFieldPosition(sample.longitude, -180, 180)) return [];
     return [{ id: sample.id, latitude: Number(sample.latitude), longitude: Number(sample.longitude) }];
   }), [samples]);
+
   const range = useMemo(
     () => getFieldLayerRange(displayCells, layer, membershipCluster),
     [displayCells, layer, membershipCluster],
   );
+
   const estimated3DTriangles = useMemo(() => {
     if (!displayBoundary) return 0;
     return displayCells.reduce((total, cell) => total + estimateGeometryTriangleCount(cell.geometry), estimateGeometryTriangleCount(displayBoundary))
       + MAX_3D_OVERLAY_TRIANGLES;
   }, [displayBoundary, displayCells]);
+
   const selectedCell = displayCells.find((cell) => cell.cellId === selectedCellId) ?? null;
   const selectedZone = displayZones.find((zone) => zone.zoneId === selectedZoneId) ?? null;
   const selectedSample = samples.find((sample) => sample.id === selectedSampleId) ?? null;
   const activeLayer = LAYER_OPTIONS.find((option) => option.value === layer)!;
   const canUse3D = displayCells.length > 0 && displayCells.length <= MAX_3D_CELLS && estimated3DTriangles <= MAX_3D_TRIANGLES;
   const threeDLimitMessage = displayCells.length > MAX_3D_CELLS
-    ? `3D is limited to ${MAX_3D_CELLS} cells to protect rendering performance.`
+    ? `3D rendering is limited to ${MAX_3D_CELLS} cells to maintain high frame rates.`
     : estimated3DTriangles > MAX_3D_TRIANGLES
-      ? `The field geometry exceeds the ${MAX_3D_TRIANGLES.toLocaleString()}-triangle 3D budget; use the full 2D map.`
+      ? `The field geometry exceeds the ${MAX_3D_TRIANGLES.toLocaleString()}-triangle 3D budget.`
       : undefined;
+
   const completeSampleCount = samples.filter(isSampleComplete).length;
-  const statusLabel = !analysis ? 'Setup required' : stale ? 'Previous analysis · stale' : 'Analysis current';
   const hoveredCell = hoveredCellId ? displayCells.find((cell) => cell.cellId === hoveredCellId) ?? null : null;
 
   const handleBoundaryUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -228,6 +259,24 @@ export function ZoningWorkspace() {
     } catch (reason) {
       setSampleError(reason instanceof Error ? reason.message : 'Could not read this soil-sample CSV.');
     }
+  };
+
+  const handleSelectDemo = (demoId: string) => {
+    if (!demoId) return;
+    const demo = DEMO_DATASETS.find((d) => d.id === demoId);
+    if (!demo) return;
+    setBoundary(demo.boundary);
+    setBoundaryName(`${demo.id}.geojson`);
+    setBoundaryRevision((current) => current + 1);
+    setSamples(demo.samples);
+    setSelectedCellId(null);
+    setSelectedZoneId(null);
+    setSelectedSampleId(null);
+    setPlacementMode(false);
+    setView('2d');
+    setBoundaryError(null);
+    setSampleError(null);
+    markInputsChanged();
   };
 
   const patchSample = (id: string, change: (sample: SoilSampleDraft) => SoilSampleDraft) => {
@@ -411,61 +460,200 @@ export function ZoningWorkspace() {
 
   return (
     <section className="workspace zoning-workspace">
+      {/* Header Bar */}
       <header className="zoning-header">
-        <div>
-          <p className="zoning-eyebrow">FIELD ANALYSIS · SOIL ZONING</p>
-          <h1>Soil zoning</h1>
-          <p>Bring a field boundary and measured soil samples. The map is built only from the analysis service response.</p>
+        <div className="zoning-header-titles">
+          <div className="zoning-breadcrumb">
+            Precision Agriculture <span>/</span> Soil Zoning
+          </div>
+          <h1>Soil Zoning &amp; Management Units</h1>
+          <p className="zoning-header-description">
+            Cluster soil variability using inverse distance weighting (IDW) and unsupervised machine learning (FCM / K-means++).
+          </p>
         </div>
-        <div className={`zoning-run-state ${stale ? 'is-stale' : analysis ? 'is-current' : ''}`} role="status">
-          {stale ? <AlertCircle size={16} /> : analysis ? <Check size={16} /> : <Crosshair size={16} />}
-          <span>{statusLabel}</span>
-          {analysis && <small>Run {shortRunId(response!.runId)}</small>}
+
+        <div className="zoning-header-actions">
+          {/* Quick Demo Dataset Selector */}
+          <div className="zoning-preset-select" title="Load synthetic demonstration field">
+            <Database size={14} className="text-emerald-600" />
+            <select
+              value=""
+              onChange={(e) => handleSelectDemo(e.target.value)}
+              aria-label="Load demo dataset"
+            >
+              <option value="" disabled>Load Demo Field...</option>
+              {DEMO_DATASETS.map((demo) => (
+                <option key={demo.id} value={demo.id}>
+                  {demo.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Chip */}
+          <div
+            className={`zoning-status-chip ${
+              stale ? 'is-stale' : analysis ? 'is-ready' : ''
+            }`}
+            role="status"
+          >
+            {stale ? (
+              <AlertTriangle size={14} />
+            ) : analysis ? (
+              <CheckCircle2 size={14} />
+            ) : (
+              <Info size={14} />
+            )}
+            <span>
+              {!analysis ? 'Awaiting inputs' : stale ? 'Inputs modified' : 'Analysis complete'}
+            </span>
+            {analysis && <small>{shortRunId(response!.runId)}</small>}
+          </div>
+
+          {/* Primary CTA */}
+          <button
+            className="zoning-btn zoning-btn-primary"
+            type="button"
+            onClick={runAnalysis}
+            disabled={isRunning || !boundary || completeSampleCount < 3}
+          >
+            {isRunning ? (
+              <LoaderCircle size={15} className="zoning-spin" />
+            ) : (
+              <Play size={15} />
+            )}
+            <span>{isRunning ? 'Computing Zones…' : 'Run Field Analysis'}</span>
+          </button>
         </div>
       </header>
 
+      {/* Main 3-Column Layout */}
       <div className="zoning-layout">
-        <aside className="zoning-input-column" aria-label="Field input and run settings">
+        {/* Left Column: Configuration & Inputs */}
+        <aside className="zoning-input-column" aria-label="Field inputs and parameters">
+          {/* Boundary Card */}
           <section className="zoning-panel">
-            <div className="zoning-panel__heading">
-              <div><span className="zoning-step">01</span><h2>Field boundary</h2></div>
-              {boundary && <span className="zoning-check"><Check size={13} /> Loaded</span>}
+            <div className="zoning-panel-header">
+              <h2 className="zoning-panel-title">
+                <MapPin size={16} /> Field Geometry
+              </h2>
+              {boundary && (
+                <span className="zoning-panel-badge is-success">
+                  <Check size={12} /> Boundary Loaded
+                </span>
+              )}
             </div>
-            <label className="zoning-upload">
-              <input type="file" accept=".geojson,.json,application/geo+json,application/json" onChange={handleBoundaryUpload} />
-              <MapIcon size={19} />
-              <strong>{boundary ? 'Replace GeoJSON' : 'Import GeoJSON'}</strong>
-              <span>Polygon or Polygon Feature · WGS84</span>
-            </label>
-            {boundaryName && <div className="zoning-file-row"><span title={boundaryName}>{boundaryName}</span><button type="button" onClick={clearBoundary} aria-label="Remove field boundary">Remove</button></div>}
-            {boundaryError && <p className="zoning-inline-error" role="alert"><AlertCircle size={14} />{boundaryError}</p>}
-            <p className="zoning-help">No farm geometry or measurements are preloaded. Self-intersection and projection limits are checked by the service before computation.</p>
+
+            {!boundary ? (
+              <label className="zoning-dropzone">
+                <input
+                  type="file"
+                  accept=".geojson,.json,application/geo+json,application/json"
+                  onChange={handleBoundaryUpload}
+                />
+                <div className="zoning-dropzone-icon">
+                  <Upload size={18} />
+                </div>
+                <span className="zoning-dropzone-title">Upload Field GeoJSON</span>
+                <span className="zoning-dropzone-hint">WGS84 Polygon Feature</span>
+              </label>
+            ) : (
+              <div className="zoning-file-card">
+                <div className="zoning-file-card-info">
+                  <MapIcon size={16} />
+                  <span className="zoning-file-card-name" title={boundaryName}>
+                    {boundaryName || 'Polygon Boundary'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="zoning-btn-remove"
+                  onClick={clearBoundary}
+                  title="Remove boundary"
+                  aria-label="Remove boundary"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )}
+
+            {boundaryError && (
+              <p className="text-xs text-rose-600 flex items-center gap-1.5 m-0" role="alert">
+                <AlertCircle size={14} /> {boundaryError}
+              </p>
+            )}
+            <p className="zoning-caveat">
+              Polygons must be self-consistent and closed. Real farm boundaries or synthetic testing geometries are accepted.
+            </p>
           </section>
 
-          <section className="zoning-panel zoning-samples-panel">
-            <div className="zoning-panel__heading">
-              <div><span className="zoning-step">02</span><h2>Soil samples</h2></div>
-              <span className={`zoning-count ${completeSampleCount >= 3 ? 'is-ready' : ''}`}>{completeSampleCount} / 3 complete</span>
+          {/* Soil Samples Card */}
+          <section className="zoning-panel">
+            <div className="zoning-panel-header">
+              <h2 className="zoning-panel-title">
+                <FlaskConical size={16} /> Measured Samples
+              </h2>
+              <span
+                className={`zoning-panel-badge ${
+                  completeSampleCount >= 3 ? 'is-success' : 'is-warning'
+                }`}
+              >
+                {completeSampleCount} / 3 complete
+              </span>
             </div>
-            <div className="zoning-action-row">
-              <label className="zoning-small-button">
-                <input type="file" accept=".csv,text/csv" onChange={handleSampleCsvUpload} />
-                <Upload size={15} /> Import CSV
+
+            <div className="zoning-actions-bar">
+              <label className="zoning-btn zoning-btn-secondary" style={{ flex: 1 }}>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleSampleCsvUpload}
+                  style={{ display: 'none' }}
+                />
+                <Upload size={14} /> Import CSV
               </label>
-              <button type="button" className="zoning-small-button" onClick={addBlankSample} disabled={samples.length >= 50}>
-                <Plus size={15} /> Add sample
+
+              <button
+                type="button"
+                className="zoning-btn zoning-btn-secondary"
+                onClick={addBlankSample}
+                disabled={samples.length >= 50}
+              >
+                <Plus size={14} /> Add
               </button>
             </div>
-            {boundary && <button type="button" className={`zoning-place-button ${placementMode ? 'is-active' : ''}`} onClick={() => { setView('2d'); setPlacementMode((active) => !active); }}>
-              <MapPin size={15} /> {placementMode ? 'Finish map placement' : 'Place samples on map'}
-            </button>}
-            {sampleError && <p className="zoning-inline-error" role="alert"><AlertCircle size={14} />{sampleError}</p>}
+
+            {boundary && (
+              <button
+                type="button"
+                className={`zoning-btn zoning-btn-secondary zoning-btn-full ${
+                  placementMode ? 'is-active' : ''
+                }`}
+                onClick={() => {
+                  setView('2d');
+                  setPlacementMode((active) => !active);
+                }}
+              >
+                <MapPin size={14} />
+                <span>{placementMode ? 'Exit Map Placement' : 'Click Map to Place Samples'}</span>
+              </button>
+            )}
+
+            {sampleError && (
+              <p className="text-xs text-rose-600 flex items-center gap-1.5 m-0" role="alert">
+                <AlertCircle size={14} /> {sampleError}
+              </p>
+            )}
+
             {samples.length === 0 ? (
-              <div className="zoning-empty-samples"><FlaskConical size={18} /><p>Add measured samples manually or import a CSV. Values are never generated for you.</p></div>
+              <div className="zoning-empty-state">
+                <FlaskConical size={24} />
+                <p>No soil samples added. Import a CSV, load a demo, or add samples manually.</p>
+              </div>
             ) : (
               <div className="zoning-sample-list">
                 {samples.map((sample, index) => (
-                  <SoilSampleCard
+                  <SoilSampleItem
                     key={`${sample.id}-${index}`}
                     sample={sample}
                     index={index}
@@ -477,65 +665,257 @@ export function ZoningWorkspace() {
                 ))}
               </div>
             )}
-            <p className="zoning-help">3–50 samples · 5–10 recommended · pH, EC, N, P and K required · one explicit common depth.</p>
+            <p className="zoning-caveat">
+              Requires 3–50 samples. pH, EC, N, P, and K required at a common depth.
+            </p>
           </section>
 
+          {/* Analysis Settings Card */}
           <section className="zoning-panel">
-            <div className="zoning-panel__heading"><div><span className="zoning-step">03</span><h2>Analysis settings</h2></div><Settings2 size={16} /></div>
-            <div className="zoning-form-grid">
-              <label>Grid cell size<select value={options.cellSizeM} onChange={(event) => updateOptions((current) => ({ ...current, cellSizeM: Number(event.target.value) as 5 | 10 }))}><option value={10}>10 metres</option><option value={5}>5 metres · finer</option></select></label>
-              <label>Clustering method<select value={options.method} onChange={(event) => updateOptions((current) => ({ ...current, method: event.target.value as FieldZoningOptions['method'] }))}><option value="fcm">Fuzzy C-means</option><option value="kmeans">K-means++</option></select></label>
+            <div className="zoning-panel-header">
+              <h2 className="zoning-panel-title">
+                <Settings2 size={16} /> Zoning Model
+              </h2>
             </div>
-            <details className="zoning-advanced">
-              <summary>Advanced parameters <ChevronDown size={14} /></summary>
-              <div className="zoning-form-grid">
-                <p className="zoning-auto-k-note">Auto-K tests valid K values from 2 through 6, then selects the highest silhouette score (ties choose the smaller K). Six is the search ceiling, not the selected cluster count.</p>
-                <label>Random seed<input type="number" value={options.seed} min={0} onChange={(event) => updateOptions((current) => ({ ...current, seed: Number(event.target.value) }))} /></label>
-                <label>Merge threshold Z<input type="number" value={options.mergeThresholdZ} min={0} max={2} step={0.1} onChange={(event) => updateOptions((current) => ({ ...current, mergeThresholdZ: Number(event.target.value) }))} /></label>
-                <label>Sensitivity reruns<input type="number" value={options.perturbationRuns} min={0} max={50} step={1} onChange={(event) => updateOptions((current) => ({ ...current, perturbationRuns: Number(event.target.value) }))} /></label>
-                {options.method === 'fcm' && <>
-                  <label>Fuzziness<input type="number" value={options.fcm.fuzziness} min={1.01} max={5} step={0.1} onChange={(event) => updateOptions((current) => ({ ...current, fcm: { ...current.fcm, fuzziness: Number(event.target.value) } }))} /></label>
-                  <label>FCM iteration limit<input type="number" value={options.fcm.maxIterations} min={1} max={500} step={1} onChange={(event) => updateOptions((current) => ({ ...current, fcm: { ...current.fcm, maxIterations: Number(event.target.value) } }))} /></label>
-                </>}
+
+            <div className="zoning-form-stack">
+              <div className="zoning-form-field">
+                <label>Grid Cell Resolution</label>
+                <select
+                  value={options.cellSizeM}
+                  onChange={(e) =>
+                    updateOptions((c) => ({ ...c, cellSizeM: Number(e.target.value) as 5 | 10 }))
+                  }
+                >
+                  <option value={10}>10 metres (Standard)</option>
+                  <option value={5}>5 metres (High resolution)</option>
+                </select>
               </div>
-              <p>The selected K is automatic; the diagnostics show the tested sweep and result. FCM memberships describe cluster membership strength, not probability.</p>
+
+              <div className="zoning-form-field">
+                <label>Clustering Method</label>
+                <select
+                  value={options.method}
+                  onChange={(e) =>
+                    updateOptions((c) => ({
+                      ...c,
+                      method: e.target.value as FieldZoningOptions['method'],
+                    }))
+                  }
+                >
+                  <option value="fcm">Fuzzy C-means (FCM)</option>
+                  <option value="kmeans">K-means++</option>
+                </select>
+              </div>
+            </div>
+
+            <details className="text-xs text-slate-500">
+              <summary className="cursor-pointer font-medium text-slate-700 py-1 hover:text-emerald-700 flex items-center justify-between">
+                <span>Advanced parameters</span>
+                <ChevronDown size={14} />
+              </summary>
+              <div className="pt-2 flex flex-col gap-2">
+                <div className="zoning-form-grid-2">
+                  <div className="zoning-form-field">
+                    <label>Random Seed</label>
+                    <input
+                      type="number"
+                      value={options.seed}
+                      min={0}
+                      onChange={(e) =>
+                        updateOptions((c) => ({ ...c, seed: Number(e.target.value) }))
+                      }
+                    />
+                  </div>
+                  <div className="zoning-form-field">
+                    <label>Merge Threshold Z</label>
+                    <input
+                      type="number"
+                      value={options.mergeThresholdZ}
+                      min={0}
+                      max={2}
+                      step={0.1}
+                      onChange={(e) =>
+                        updateOptions((c) => ({ ...c, mergeThresholdZ: Number(e.target.value) }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                {options.method === 'fcm' && (
+                  <div className="zoning-form-grid-2">
+                    <div className="zoning-form-field">
+                      <label>Fuzziness (m)</label>
+                      <input
+                        type="number"
+                        value={options.fcm.fuzziness}
+                        min={1.01}
+                        max={5}
+                        step={0.1}
+                        onChange={(e) =>
+                          updateOptions((c) => ({
+                            ...c,
+                            fcm: { ...c.fcm, fuzziness: Number(e.target.value) },
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="zoning-form-field">
+                      <label>Max Iterations</label>
+                      <input
+                        type="number"
+                        value={options.fcm.maxIterations}
+                        min={1}
+                        max={500}
+                        step={1}
+                        onChange={(e) =>
+                          updateOptions((c) => ({
+                            ...c,
+                            fcm: { ...c.fcm, maxIterations: Number(e.target.value) },
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </details>
-            <button className="zoning-run-button" type="button" onClick={runAnalysis} disabled={isRunning || !boundary || samples.length < 3}>
-              {isRunning ? <LoaderCircle size={16} className="zoning-spin" /> : <Play size={16} fill="currentColor" />}
-              {isRunning ? 'Running field analysis…' : 'Run field analysis'}
-            </button>
-            <p className="zoning-help">Runs IDW → SHI → Auto-K clustering → zone post-processing. Higher sensitivity counts may take longer.</p>
-            {inputError && <p className="zoning-inline-error" role="alert"><AlertCircle size={14} />{inputError}</p>}
+
+            {inputError && (
+              <p className="text-xs text-rose-600 flex items-center gap-1.5 m-0" role="alert">
+                <AlertCircle size={14} /> {inputError}
+              </p>
+            )}
           </section>
         </aside>
 
+        {/* Center Column: Map & Stage */}
         <main className="zoning-map-column">
-          <section className="zoning-panel zoning-map-panel" aria-label="Field map">
-            {response && <div className="zoning-result-summary">
-              <div><span>Field area</span><strong>{response.field.areaHectares.toFixed(2)} ha</strong></div>
-              <div><span>Cells</span><strong>{response.field.cellCount.toLocaleString()}</strong></div>
-              <div><span>Zones</span><strong>{response.zoneCount}</strong></div>
-              <div><span>Auto-selected K</span><strong>{response.selectedK}</strong></div>
-              <button type="button" onClick={downloadResult}><Download size={15} /> Export JSON</button>
-            </div>}
-            {stale && <div className="zoning-stale-banner" role="status"><AlertCircle size={16} /><span><strong>Zoning out of date.</strong> This map and its diagnostics still show the last completed response; run analysis again to reflect edited inputs.</span></div>}
-            {response?.sampleWarnings.map((warning) => <div className="zoning-warning" key={warning}><AlertCircle size={14} />{warning}</div>)}
-            <div className="zoning-map-toolbar">
-              <div className="zoning-map-toolbar__left">
-                <label>Map layer<select value={layer} disabled={!displayCells.length} onChange={(event) => setLayer(event.target.value as FieldLayer)}>
-                  {LAYER_OPTIONS.filter((option) => option.value !== 'membership' || response?.method === 'fcm').map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
-                </select></label>
-                {layer === 'membership' && response && <label>Source cluster<select value={membershipCluster} onChange={(event) => setMembershipCluster(Number(event.target.value))}>{Array.from({ length: response.selectedK }, (_, index) => <option value={index} key={index}>Cluster {index + 1}</option>)}</select></label>}
+          {/* Post-Analysis Summary KPIs */}
+          {response && (
+            <div className="zoning-kpi-grid">
+              <div className="zoning-kpi-cell">
+                <span>Field Area</span>
+                <strong>{response.field.areaHectares.toFixed(2)} ha</strong>
               </div>
-              <div className="zoning-map-toolbar__right">
-                <div className="zoning-view-switch" role="group" aria-label="Map rendering mode">
-                  <button type="button" className={view === '2d' ? 'is-active' : ''} onClick={() => setView('2d')}><MapIcon size={14} /> 2D map</button>
-                  <button type="button" className={view === '3d' ? 'is-active' : ''} onClick={() => { setView('3d'); setPlacementMode(false); }} disabled={!canUse3D} title={threeDLimitMessage}><Focus size={14} /> 3D view</button>
+              <div className="zoning-kpi-cell">
+                <span>Interpolated Grid</span>
+                <strong>{response.field.cellCount.toLocaleString()} cells</strong>
+              </div>
+              <div className="zoning-kpi-cell">
+                <span>Management Zones</span>
+                <strong>{response.zoneCount} zones</strong>
+              </div>
+              <div className="zoning-kpi-cell">
+                <span>Auto-Selected K</span>
+                <strong>K = {response.selectedK}</strong>
+              </div>
+              <button
+                type="button"
+                className="zoning-btn zoning-btn-secondary"
+                onClick={downloadResult}
+                title="Download full analysis JSON"
+              >
+                <Download size={14} /> Export JSON
+              </button>
+            </div>
+          )}
+
+          {/* Stale or Warning Notices */}
+          {stale && (
+            <div className="flex items-center gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-800">
+              <AlertTriangle size={15} className="flex-shrink-0" />
+              <span>
+                <strong>Map out of date.</strong> Field inputs were modified; run analysis again to update zones.
+              </span>
+            </div>
+          )}
+
+          {response?.sampleWarnings.map((warning) => (
+            <div key={warning} className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700">
+              <Info size={15} className="flex-shrink-0 text-slate-500" />
+              <span>{warning}</span>
+            </div>
+          ))}
+
+          {/* Map Card */}
+          <section className="zoning-panel zoning-map-card" aria-label="Field map">
+            {/* Map Header Toolbar */}
+            <div className="zoning-map-header">
+              <div className="zoning-map-controls-left">
+                <div className="zoning-layer-select">
+                  <Layers size={14} className="text-slate-400" />
+                  <label htmlFor="map-layer-select" className="sr-only">Map Layer</label>
+                  <select
+                    id="map-layer-select"
+                    value={layer}
+                    disabled={!displayCells.length}
+                    onChange={(e) => setLayer(e.target.value as FieldLayer)}
+                  >
+                    {LAYER_OPTIONS.filter(
+                      (opt) => opt.value !== 'membership' || response?.method === 'fcm',
+                    ).map((opt) => (
+                      <option value={opt.value} key={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                {view === '3d' && <button type="button" className="zoning-fit-button" onClick={() => setFitTrigger((current) => current + 1)} title="Reset 3D camera"><Focus size={15} /><span>Fit</span></button>}
+
+                {layer === 'membership' && response && (
+                  <div className="zoning-layer-select">
+                    <select
+                      value={membershipCluster}
+                      onChange={(e) => setMembershipCluster(Number(e.target.value))}
+                    >
+                      {Array.from({ length: response.selectedK }, (_, i) => (
+                        <option value={i} key={i}>
+                          Cluster {i + 1} Membership
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="zoning-map-controls-right">
+                <div className="zoning-view-switcher" role="group" aria-label="Map perspective">
+                  <button
+                    type="button"
+                    className={`zoning-view-btn ${view === '2d' ? 'is-active' : ''}`}
+                    onClick={() => setView('2d')}
+                  >
+                    <MapIcon size={13} /> 2D Map
+                  </button>
+                  <button
+                    type="button"
+                    className={`zoning-view-btn ${view === '3d' ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setView('3d');
+                      setPlacementMode(false);
+                    }}
+                    disabled={!canUse3D}
+                    title={threeDLimitMessage}
+                  >
+                    <Eye size={13} /> 3D Surface
+                  </button>
+                </div>
+
+                {view === '3d' && (
+                  <button
+                    type="button"
+                    className="zoning-btn zoning-btn-secondary"
+                    onClick={() => setFitTrigger((c) => c + 1)}
+                    title="Reset camera focus"
+                  >
+                    <Focus size={13} /> Fit
+                  </button>
+                )}
               </div>
             </div>
-            <div className={`zoning-map-stage ${placementMode ? 'is-pinning' : ''}`}>
+
+            {/* Map Canvas Stage */}
+            <div className="zoning-map-stage-container">
               {view === '2d' || !displayCells.length ? (
                 <FieldMap2D
                   boundary={displayBoundary}
@@ -557,9 +937,31 @@ export function ZoningWorkspace() {
                   clusterHead={!geometryStale ? response?.clusterHead : null}
                 />
               ) : (
-                <SceneErrorBoundary fallback={<div className="zoning-3d-fallback"><strong>3D rendering is unavailable in this browser.</strong><span>The 2D map retains all field inspection and sample-placement actions.</span><button type="button" onClick={() => setView('2d')}>Return to 2D map</button></div>}>
-                  <Suspense fallback={<div className="zoning-3d-fallback"><LoaderCircle size={18} className="zoning-spin" />Preparing the lightweight 3D field…</div>}>
-                    <div className="zoning-3d-canvas"><FieldScene3D
+                <SceneErrorBoundary
+                  fallback={
+                    <div className="field-map__empty">
+                      <strong>3D rendering unavailable</strong>
+                      <span>Please switch back to the 2D map view.</span>
+                      <button
+                        type="button"
+                        className="zoning-btn zoning-btn-secondary"
+                        onClick={() => setView('2d')}
+                      >
+                        Return to 2D
+                      </button>
+                    </div>
+                  }
+                >
+                  <Suspense
+                    fallback={
+                      <div className="field-map__empty">
+                        <LoaderCircle size={20} className="zoning-spin text-emerald-600" />
+                        <span>Rendering 3D elevation field…</span>
+                      </div>
+                    }
+                  >
+                    <div style={{ width: '100%', height: '100%' }}>
+                      <FieldScene3D
                         result={response!}
                         samples={mapSamples}
                         layer={layer}
@@ -570,82 +972,303 @@ export function ZoningWorkspace() {
                         fitTrigger={fitTrigger}
                         onCellSelect={selectCell}
                         onCellHover={(cell) => setHoveredCellId(cell?.cellId ?? null)}
-                      /></div>
+                      />
+                    </div>
                   </Suspense>
                 </SceneErrorBoundary>
               )}
             </div>
+
+            {/* Map Footer & Dynamic Legend */}
             <div className="zoning-map-footer">
               <div className="zoning-legend">
                 {layer === 'zone' ? (
-                  displayZones.map((zone) => <button type="button" key={zone.zoneId} className={selectedZoneId === zone.zoneId ? 'is-selected' : ''} onClick={() => selectZone(zone.zoneId)}><i style={{ background: zoneColor(zone.zoneId) }} />Zone {zone.zoneId + 1}</button>)
-                ) : <>
-                  <span className="zoning-gradient" aria-hidden="true" />
-                <span>{prettyValue(range[0])} {getUnits(layer)}</span>
-                  <span>to</span>
-                  <span>{prettyValue(range[1])} {getUnits(layer)}</span>
-                </>}
-                <span className="zoning-map-symbol"><i className="is-sample" /> Lab sample</span>
-                {response && <span className="zoning-map-symbol"><i className="is-candidate" /> Suggested node</span>}
+                  displayZones.map((zone) => (
+                    <button
+                      type="button"
+                      key={zone.zoneId}
+                      className={`zoning-legend-btn ${
+                        selectedZoneId === zone.zoneId ? 'is-selected' : ''
+                      }`}
+                      onClick={() => selectZone(zone.zoneId)}
+                    >
+                      <span
+                        className="zoning-legend-swatch"
+                        style={{ background: zoneColor(zone.zoneId) }}
+                      />
+                      <span>Zone {zone.zoneId + 1}</span>
+                    </button>
+                  ))
+                ) : (
+                  <>
+                    <span className="zoning-gradient-bar" aria-hidden="true" />
+                    <span className="text-xs text-slate-600 font-mono">
+                      {prettyValue(range[0])} {getUnits(layer)}
+                    </span>
+                    <span className="text-xs text-slate-400">to</span>
+                    <span className="text-xs text-slate-600 font-mono">
+                      {prettyValue(range[1])} {getUnits(layer)}
+                    </span>
+                  </>
+                )}
+                <span className="zoning-legend-symbol">
+                  <span className="zoning-legend-dot is-sample" /> Sample Pin
+                </span>
+                {response && (
+                  <span className="zoning-legend-symbol">
+                    <span className="zoning-legend-dot is-candidate" /> Sensor Node
+                  </span>
+                )}
               </div>
-              <p>{hoveredCell ? `Row ${hoveredCell.row + 1} · Column ${hoveredCell.column + 1} · ${activeLayer.label}: ${hoveredLayerValue(hoveredCell, layer, membershipCluster) == null ? 'Not available' : `${prettyValue(hoveredLayerValue(hoveredCell, layer, membershipCluster)!)} ${activeLayer.unit}`}` : threeDLimitMessage ? `${response?.field.cellSizeM} m cells · full 2D map retained; ${threeDLimitMessage}` : displayCells.length ? `${response?.field.cellSizeM} m cells · IDW estimates · nearest-sample distance is available per cell` : 'Map extent fits the imported boundary automatically.'}</p>
+
+              <div className="zoning-hover-readout">
+                {hoveredCell
+                  ? `Row ${hoveredCell.row + 1} · Col ${hoveredCell.column + 1} · ${
+                      activeLayer.label
+                    }: ${
+                      hoveredLayerValue(hoveredCell, layer, membershipCluster) == null
+                        ? '—'
+                        : `${prettyValue(
+                            hoveredLayerValue(hoveredCell, layer, membershipCluster)!,
+                          )} ${activeLayer.unit}`
+                    }`
+                  : displayCells.length
+                  ? `${response?.field.cellSizeM} m grid cells · Click any cell to inspect`
+                  : 'Import boundary to activate map extent'}
+              </div>
             </div>
           </section>
 
-          {response && <section className="zoning-panel zoning-zone-list-panel">
-            <div className="zoning-panel__heading"><div><span className="zoning-step">RESULT</span><h2>Zones</h2></div><small>Statistical soil-profile groups, not prescriptions</small></div>
-            <div className="zoning-zone-list">
-              {response.zones.map((zone) => <button type="button" key={zone.zoneId} className={selectedZoneId === zone.zoneId ? 'is-selected' : ''} onClick={() => selectZone(zone.zoneId)}>
-                <i style={{ background: zoneColor(zone.zoneId) }} /><span><strong>Zone {zone.zoneId + 1}</strong><small>{zone.cellCount.toLocaleString()} cells · {zone.areaM2.toFixed(0)} m²</small></span><b>SHI {zone.meanShi.toFixed(0)}</b>
-              </button>)}
-            </div>
-          </section>}
+          {/* Zones Filter Strip */}
+          {response && (
+            <section className="zoning-panel">
+              <div className="zoning-panel-header">
+                <h2 className="zoning-panel-title">
+                  <Layers size={16} /> Contiguous Management Zones
+                </h2>
+                <span className="text-xs text-slate-500">
+                  Statistical cluster units for variable-rate input planning
+                </span>
+              </div>
+              <div className="zoning-zones-strip">
+                {response.zones.map((zone) => (
+                  <button
+                    type="button"
+                    key={zone.zoneId}
+                    className={`zoning-zone-card-btn ${
+                      selectedZoneId === zone.zoneId ? 'is-selected' : ''
+                    }`}
+                    onClick={() => selectZone(zone.zoneId)}
+                  >
+                    <span
+                      className="zoning-legend-swatch"
+                      style={{ background: zoneColor(zone.zoneId), width: 12, height: 12 }}
+                    />
+                    <div className="zoning-zone-card-content">
+                      <strong>Zone {zone.zoneId + 1}</strong>
+                      <small>
+                        {zone.cellCount.toLocaleString()} cells · {zone.areaM2.toFixed(0)} m²
+                      </small>
+                    </div>
+                    <b>SHI {zone.meanShi.toFixed(0)}</b>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
+          {/* Diagnostics Accordion */}
           {response && <Diagnostics response={response} />}
         </main>
 
-        <aside className="zoning-inspector-column" aria-label="Field inspection and crop fit">
-          <section className="zoning-panel zoning-inspector">
-            <div className="zoning-panel__heading"><div><span className="zoning-step">INSPECT</span><h2>Selected profile</h2></div><Crosshair size={16} /></div>
-            {!response ? <div className="zoning-inspector-empty"><Crosshair size={19} /><p>Run a field analysis, then select a cell or zone to inspect its returned values.</p></div>
-              : selectedSample ? <SampleInspection sample={selectedSample} />
-              : selectedCell ? <CellInspection cell={selectedCell} />
-              : selectedZone ? <ZoneInspection zone={selectedZone} />
-              : <div className="zoning-inspector-empty"><Crosshair size={19} /><p>Select a map cell, sample marker, or zone card.</p></div>}
-          </section>
+        {/* Right Column: Inspector & Crop Reference Report */}
+        <aside className="zoning-inspector-column" aria-label="Selected profile and crop suitability report">
+          {/* Tab Switcher */}
+          <div className="zoning-inspector-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={inspectorTab === 'profile'}
+              className={`zoning-inspector-tab-btn ${
+                inspectorTab === 'profile' ? 'is-active' : ''
+              }`}
+              onClick={() => setInspectorTab('profile')}
+            >
+              <Crosshair size={14} /> Profile Inspector
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={inspectorTab === 'crop'}
+              className={`zoning-inspector-tab-btn ${
+                inspectorTab === 'crop' ? 'is-active' : ''
+              }`}
+              onClick={() => setInspectorTab('crop')}
+            >
+              <Sprout size={14} /> Crop Reference
+            </button>
+          </div>
 
-          <section className="zoning-panel zoning-crop-fit">
-            <div className="zoning-panel__heading"><div><span className="zoning-step">CROP FIT · REFERENCE REPORT</span><h2>Crop condition report</h2></div><Sprout size={17} /></div>
-            <p className="zoning-help">See this cell's estimates or the selected zone's mean beside published soil context. The report does not decide whether a crop can be cultivated or recommend what to plant.</p>
-            <div className="zoning-crop-scope" role="group" aria-label="Crop reference report scope">
-              <button type="button" className={cropFitScope === 'cell' ? 'is-active' : ''} onClick={() => { setCropFitScope('cell'); invalidateCropFit(); }} disabled={!selectedCell}>Cell</button>
-              <button type="button" className={cropFitScope === 'zone' ? 'is-active' : ''} onClick={() => { setCropFitScope('zone'); invalidateCropFit(); }} disabled={!selectedZone}>Zone mean</button>
-            </div>
-            {cropTargetLabel && cropProfile ? <>
-              <p className="zoning-crop-target">Assessing <strong>{cropTargetLabel}</strong>{stale && <span> · from previous run</span>}</p>
-              <details className="zoning-advanced zoning-crop-context">
-                <summary>Sample context <ChevronDown size={14} /></summary>
-                <label>Soil test method<input value={cropContext.soilTestMethod} onChange={(event) => updateCropContext('soilTestMethod', event.target.value)} /></label>
-                <label>Common sample depth<input value={cropContext.sampleDepth} onChange={(event) => updateCropContext('sampleDepth', event.target.value)} /></label>
-                <label>EC method<input value={cropContext.ecMethod} onChange={(event) => updateCropContext('ecMethod', event.target.value)} /></label>
-              </details>
-              <p className="zoning-crop-provenance">A cell shows its IDW estimate. A zone shows the area-weighted mean of its IDW-estimated cells. Moisture and soil temperature are not inputs to this field workflow.</p>
-              <button type="button" className="zoning-crop-run" onClick={runCropFit} disabled={currentCropFit?.status === 'loading'}>
-                {currentCropFit?.status === 'loading' ? <LoaderCircle size={15} className="zoning-spin" /> : <Sprout size={15} />}
-                {currentCropFit?.status === 'loading' ? 'Building report…' : 'Build reference report'}
-              </button>
-              {currentCropFit?.status === 'error' && <p className="zoning-inline-error" role="alert"><AlertCircle size={14} />{currentCropFit.error}</p>}
-              {currentCropFit?.status === 'ready' && currentCropFit.response && <CropFitCards response={currentCropFit.response} />}
-            </> : <div className="zoning-inspector-empty"><p>Select a calculated cell or zone first.</p></div>}
-          </section>
+          {/* Tab 1: Profile Inspector */}
+          {inspectorTab === 'profile' && (
+            <section className="zoning-panel">
+              <div className="zoning-panel-header">
+                <h2 className="zoning-panel-title">
+                  <Crosshair size={16} /> Selected Feature
+                </h2>
+                {selectedCell && <span className="zoning-panel-badge">Grid Cell</span>}
+                {selectedZone && <span className="zoning-panel-badge">Zone Mean</span>}
+                {selectedSample && <span className="zoning-panel-badge">Lab Sample</span>}
+              </div>
+
+              {!response ? (
+                <div className="zoning-empty-state">
+                  <Crosshair size={24} />
+                  <p>Run a field analysis, then click any grid cell or zone to inspect its properties.</p>
+                </div>
+              ) : selectedSample ? (
+                <SampleInspection sample={selectedSample} />
+              ) : selectedCell ? (
+                <CellInspection cell={selectedCell} />
+              ) : selectedZone ? (
+                <ZoneInspection zone={selectedZone} />
+              ) : (
+                <div className="zoning-empty-state">
+                  <Crosshair size={24} />
+                  <p>Select a cell, sample pin, or zone card to inspect properties.</p>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Tab 2: Crop Reference Report */}
+          {inspectorTab === 'crop' && (
+            <section className="zoning-panel">
+              <div className="zoning-panel-header">
+                <h2 className="zoning-panel-title">
+                  <Sprout size={16} /> Crop Fit Reference
+                </h2>
+              </div>
+
+              <p className="zoning-caveat">
+                Compares observed or estimated soil values against published agronomic intervals. Does not prescribe planting decisions.
+              </p>
+
+              <div className="zoning-inspector-tabs" role="group" aria-label="Evaluation scope">
+                <button
+                  type="button"
+                  className={`zoning-inspector-tab-btn ${
+                    cropFitScope === 'cell' ? 'is-active' : ''
+                  }`}
+                  onClick={() => {
+                    setCropFitScope('cell');
+                    invalidateCropFit();
+                  }}
+                  disabled={!selectedCell}
+                >
+                  Current Cell
+                </button>
+                <button
+                  type="button"
+                  className={`zoning-inspector-tab-btn ${
+                    cropFitScope === 'zone' ? 'is-active' : ''
+                  }`}
+                  onClick={() => {
+                    setCropFitScope('zone');
+                    invalidateCropFit();
+                  }}
+                  disabled={!selectedZone}
+                >
+                  Zone Mean
+                </button>
+              </div>
+
+              {cropTargetLabel && cropProfile ? (
+                <div className="flex flex-col gap-3">
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 flex justify-between items-center">
+                    <span>Target: <strong>{cropTargetLabel}</strong></span>
+                    {stale && <span className="text-amber-600 font-medium">Stale run</span>}
+                  </div>
+
+                  <details className="text-xs text-slate-500">
+                    <summary className="cursor-pointer font-medium text-slate-700 py-1 flex items-center justify-between">
+                      <span>Method &amp; Depth Context</span>
+                      <ChevronDown size={14} />
+                    </summary>
+                    <div className="pt-2 flex flex-col gap-2">
+                      <div className="zoning-form-field">
+                        <label>Soil Test Method</label>
+                        <input
+                          value={cropContext.soilTestMethod}
+                          onChange={(e) => updateCropContext('soilTestMethod', e.target.value)}
+                        />
+                      </div>
+                      <div className="zoning-form-field">
+                        <label>Sample Depth</label>
+                        <input
+                          value={cropContext.sampleDepth}
+                          onChange={(e) => updateCropContext('sampleDepth', e.target.value)}
+                        />
+                      </div>
+                      <div className="zoning-form-field">
+                        <label>EC Method</label>
+                        <input
+                          value={cropContext.ecMethod}
+                          onChange={(e) => updateCropContext('ecMethod', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </details>
+
+                  <button
+                    type="button"
+                    className="zoning-btn zoning-btn-primary zoning-btn-full"
+                    onClick={runCropFit}
+                    disabled={currentCropFit?.status === 'loading'}
+                  >
+                    {currentCropFit?.status === 'loading' ? (
+                      <LoaderCircle size={15} className="zoning-spin" />
+                    ) : (
+                      <Sprout size={15} />
+                    )}
+                    <span>
+                      {currentCropFit?.status === 'loading'
+                        ? 'Evaluating Reference Factors…'
+                        : 'Build Crop Reference Report'}
+                    </span>
+                  </button>
+
+                  {currentCropFit?.status === 'error' && (
+                    <p className="text-xs text-rose-600 flex items-center gap-1.5 m-0" role="alert">
+                      <AlertCircle size={14} /> {currentCropFit.error}
+                    </p>
+                  )}
+
+                  {currentCropFit?.status === 'ready' && currentCropFit.response && (
+                    <CropFitCards response={currentCropFit.response} />
+                  )}
+                </div>
+              ) : (
+                <div className="zoning-empty-state">
+                  <Sprout size={24} />
+                  <p>Select an interpolated cell or management zone first to generate a crop reference evaluation.</p>
+                </div>
+              )}
+            </section>
+          )}
         </aside>
       </div>
     </section>
   );
 }
 
-function SoilSampleCard({
-  sample, index, selected, onSelect, onRemove, onChange,
+function SoilSampleItem({
+  sample,
+  index,
+  selected,
+  onSelect,
+  onRemove,
+  onChange,
 }: {
   sample: SoilSampleDraft;
   index: number;
@@ -654,155 +1277,466 @@ function SoilSampleCard({
   onRemove: () => void;
   onChange: (change: (sample: SoilSampleDraft) => SoilSampleDraft) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const complete = isSampleComplete(sample);
-  const setField = (field: SampleTextField, value: string) => onChange((current) => ({ ...current, [field]: value }));
+  const setField = (field: SampleTextField, value: string) =>
+    onChange((current) => ({ ...current, [field]: value }));
+
   return (
-    <article className={`zoning-sample-card ${selected ? 'is-selected' : ''}`}>
-      <div className="zoning-sample-card__heading">
-        <button type="button" onClick={onSelect} aria-pressed={selected}><MapPin size={13} /><strong>{sample.id || `Sample ${index + 1}`}</strong><span>{complete ? 'Complete' : 'Incomplete'}</span></button>
-        <button type="button" onClick={onRemove} aria-label={`Remove soil sample ${sample.id}`}><Trash2 size={14} /></button>
+    <article className={`zoning-sample-item ${selected ? 'is-selected' : ''}`}>
+      <div
+        className="zoning-sample-item-header"
+        onClick={() => {
+          onSelect();
+          setExpanded((c) => !c);
+        }}
+      >
+        <span className="zoning-sample-id">
+          <MapPin size={13} />
+          <strong>{sample.id || `Sample ${index + 1}`}</strong>
+          <span
+            className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+              complete ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {complete ? 'Complete' : 'Draft'}
+          </span>
+        </span>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="zoning-btn-remove"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            title="Remove sample"
+            aria-label={`Remove soil sample ${sample.id}`}
+          >
+            <Trash2 size={13} />
+          </button>
+          <ChevronRight
+            size={14}
+            className={`text-slate-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
+          />
+        </div>
       </div>
-      <div className="zoning-sample-grid zoning-sample-grid--coordinates">
-        <label>Sample ID<input value={sample.id} onChange={(event) => setField('id', event.target.value)} aria-label={`Sample ${index + 1} ID`} /></label>
-        <label>Latitude<input type="number" step="any" value={sample.latitude} onChange={(event) => setField('latitude', event.target.value)} aria-label={`${sample.id} latitude`} /></label>
-        <label>Longitude<input type="number" step="any" value={sample.longitude} onChange={(event) => setField('longitude', event.target.value)} aria-label={`${sample.id} longitude`} /></label>
-        <label>Depth interval, cm<input value={sample.depthCm} placeholder="e.g. 0–15" onChange={(event) => setField('depthCm', event.target.value)} aria-label={`${sample.id} common soil depth interval`} /></label>
+
+      <div className="zoning-sample-chips">
+        <span className="zoning-chip">
+          pH <strong>{sample.measurements.pH || '—'}</strong>
+        </span>
+        <span className="zoning-chip">
+          EC <strong>{sample.measurements.ec || '—'}</strong>
+        </span>
+        <span className="zoning-chip">
+          N <strong>{sample.measurements.nitrogen || '—'}</strong>
+        </span>
+        <span className="zoning-chip">
+          P <strong>{sample.measurements.phosphorus || '—'}</strong>
+        </span>
+        <span className="zoning-chip">
+          K <strong>{sample.measurements.potassium || '—'}</strong>
+        </span>
       </div>
-      <div className="zoning-sample-grid zoning-sample-grid--soil">
-        {SOIL_PROPERTIES.map((property) => <label key={property}>{SOIL_LABELS[property]} <small>{SOIL_UNITS[property]}</small><input type="number" min={0} max={property === 'pH' ? 14 : undefined} step="any" value={sample.measurements[property]} onChange={(event) => onChange((current) => ({ ...current, measurements: { ...current.measurements, [property]: event.target.value } }))} aria-label={`${sample.id} ${SOIL_LABELS[property]} in ${SOIL_UNITS[property]}`} /></label>)}
-      </div>
-      <div className="zoning-sample-grid zoning-sample-grid--provenance">
-        <label>Collection date<input type="date" value={sample.collectionDate} onChange={(event) => setField('collectionDate', event.target.value)} /></label>
-        <label>Lab method<input value={sample.labMethod} placeholder="Optional" onChange={(event) => setField('labMethod', event.target.value)} /></label>
-      </div>
-      <details className="zoning-sample-uncertainty"><summary>Optional measurement uncertainty</summary><div className="zoning-sample-grid zoning-sample-grid--soil">
-        {SOIL_PROPERTIES.map((property) => <label key={property}>{SOIL_LABELS[property]} σ<input type="number" min={0} step="any" value={sample.standardUncertainty[property] ?? ''} onChange={(event) => onChange((current) => ({ ...current, standardUncertainty: { ...current.standardUncertainty, [property]: event.target.value } }))} aria-label={`${sample.id} ${SOIL_LABELS[property]} standard uncertainty`} /></label>)}
-      </div></details>
+
+      {expanded && (
+        <div className="zoning-sample-edit-drawer">
+          <div className="zoning-form-grid-2">
+            <div className="zoning-form-field">
+              <label>Sample ID</label>
+              <input
+                value={sample.id}
+                onChange={(e) => setField('id', e.target.value)}
+              />
+            </div>
+            <div className="zoning-form-field">
+              <label>Depth Interval</label>
+              <input
+                value={sample.depthCm}
+                placeholder="e.g. 0-15"
+                onChange={(e) => setField('depthCm', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="zoning-form-grid-2">
+            <div className="zoning-form-field">
+              <label>Latitude</label>
+              <input
+                type="number"
+                step="any"
+                value={sample.latitude}
+                onChange={(e) => setField('latitude', e.target.value)}
+              />
+            </div>
+            <div className="zoning-form-field">
+              <label>Longitude</label>
+              <input
+                type="number"
+                step="any"
+                value={sample.longitude}
+                onChange={(e) => setField('longitude', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="zoning-form-grid-3">
+            {SOIL_PROPERTIES.map((property) => (
+              <div className="zoning-form-field" key={property}>
+                <label>
+                  {property.toUpperCase()} <small>({SOIL_UNITS[property]})</small>
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={sample.measurements[property]}
+                  onChange={(e) =>
+                    onChange((current) => ({
+                      ...current,
+                      measurements: { ...current.measurements, [property]: e.target.value },
+                    }))
+                  }
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="zoning-form-grid-2">
+            <div className="zoning-form-field">
+              <label>Collection Date</label>
+              <input
+                type="date"
+                value={sample.collectionDate}
+                onChange={(e) => setField('collectionDate', e.target.value)}
+              />
+            </div>
+            <div className="zoning-form-field">
+              <label>Lab Method</label>
+              <input
+                value={sample.labMethod}
+                placeholder="Method identifier"
+                onChange={(e) => setField('labMethod', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </article>
   );
 }
 
 function SampleInspection({ sample }: { sample: SoilSampleDraft }) {
-  return <div className="zoning-profile-content"><p className="zoning-profile-kicker"><MapPin size={14} /> Measured lab sample</p><h3>{sample.id}</h3><p className="zoning-profile-note">Entered laboratory data; these values are inputs, not interpolated estimates.</p><dl className="zoning-metric-list">
-    <Metric label="Latitude" value={sample.latitude || 'Not entered'} />
-    <Metric label="Longitude" value={sample.longitude || 'Not entered'} />
-    <Metric label="Depth" value={sample.depthCm || 'Not entered'} />
-    {SOIL_PROPERTIES.map((property) => <Metric key={property} label={SOIL_LABELS[property]} value={`${sample.measurements[property] || 'Not entered'} ${SOIL_UNITS[property]}`} />)}
-    <Metric label="Collection date" value={sample.collectionDate || 'Not recorded'} />
-    <Metric label="Lab method" value={sample.labMethod || 'Not recorded'} />
-  </dl></div>;
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-800 m-0">{sample.id}</h3>
+        <span className="text-xs text-slate-500">Laboratory Tested Soil Sample</span>
+      </div>
+
+      <div className="zoning-metric-grid">
+        <div className="zoning-metric-box">
+          <dt>Latitude</dt>
+          <dd>{sample.latitude || '—'}</dd>
+        </div>
+        <div className="zoning-metric-box">
+          <dt>Longitude</dt>
+          <dd>{sample.longitude || '—'}</dd>
+        </div>
+        <div className="zoning-metric-box">
+          <dt>Depth Interval</dt>
+          <dd>{sample.depthCm || '—'} cm</dd>
+        </div>
+        <div className="zoning-metric-box">
+          <dt>Collection Date</dt>
+          <dd>{sample.collectionDate || '—'}</dd>
+        </div>
+
+        {SOIL_PROPERTIES.map((prop) => (
+          <div className="zoning-metric-box" key={prop}>
+            <dt>{SOIL_LABELS[prop]}</dt>
+            <dd>
+              {sample.measurements[prop] || '—'} <small className="text-[10px] font-normal text-slate-500">{SOIL_UNITS[prop]}</small>
+            </dd>
+          </div>
+        ))}
+      </div>
+      <p className="zoning-caveat">
+        These values are direct laboratory measurement inputs.
+      </p>
+    </div>
+  );
 }
 
 function CellInspection({ cell }: { cell: FieldZoningResponse['cells'][number] }) {
-  return <div className="zoning-profile-content"><p className="zoning-profile-kicker"><Crosshair size={14} /> IDW-interpolated estimate</p><h3>Cell R{cell.row + 1} · C{cell.column + 1}</h3><p className="zoning-profile-note">Zone {cell.zoneId + 1} · {cell.areaM2.toFixed(1)} m² · {cell.nearestSampleDistanceM.toFixed(1)} m to nearest sample</p><dl className="zoning-metric-list">
-    {SOIL_PROPERTIES.map((property) => <Metric key={property} label={SOIL_LABELS[property]} value={`${prettyValue(cell.soilValues[property])} ${SOIL_UNITS[property]}`} />)}
-    <Metric label="KshetraSense SHI" value={`${cell.shi.toFixed(1)} / 100`} />
-    {cell.clusterMemberships?.map((membership, index) => <Metric key={index} label={`Cluster ${index + 1} membership`} value={`${(membership * 100).toFixed(1)}%`} />)}
-  </dl><p className="zoning-caveat">SHI is a provisional project-defined screen, not a crop score or official soil-health index. FCM membership is not probability.</p></div>;
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-800 m-0">
+          Cell R{cell.row + 1} · C{cell.column + 1}
+        </h3>
+        <span className="text-xs text-slate-500">
+          Zone {cell.zoneId + 1} · {cell.areaM2.toFixed(0)} m² · {cell.nearestSampleDistanceM.toFixed(1)} m to nearest sample
+        </span>
+      </div>
+
+      <div className="zoning-metric-grid">
+        {SOIL_PROPERTIES.map((prop) => (
+          <div className="zoning-metric-box" key={prop}>
+            <dt>{SOIL_LABELS[prop]}</dt>
+            <dd>
+              {prettyValue(cell.soilValues[prop])} <small className="text-[10px] font-normal text-slate-500">{SOIL_UNITS[prop]}</small>
+            </dd>
+          </div>
+        ))}
+        <div className="zoning-metric-box">
+          <dt>KshetraSense SHI</dt>
+          <dd>{cell.shi.toFixed(1)} / 100</dd>
+        </div>
+        {cell.clusterMemberships?.map((membership, idx) => (
+          <div className="zoning-metric-box" key={idx}>
+            <dt>Cluster {idx + 1} Weight</dt>
+            <dd>{(membership * 100).toFixed(1)}%</dd>
+          </div>
+        ))}
+      </div>
+      <p className="zoning-caveat">
+        Cell values are inverse distance weighted (IDW p=2) estimates, not discrete in-situ sensor measurements.
+      </p>
+    </div>
+  );
 }
 
 function ZoneInspection({ zone }: { zone: FieldZoningResponse['zones'][number] }) {
-  return <div className="zoning-profile-content"><p className="zoning-profile-kicker"><Crosshair size={14} /> Contiguous management zone</p><h3>Zone {zone.zoneId + 1}</h3><p className="zoning-profile-note">{zone.cellCount.toLocaleString()} cells · {zone.areaM2.toFixed(1)} m² · source cluster{zone.sourceClusterIds.length === 1 ? '' : 's'} {zone.sourceClusterIds.map((id) => id + 1).join(', ')}</p><dl className="zoning-metric-list">
-    {SOIL_PROPERTIES.map((property) => <Metric key={property} label={`Mean ${SOIL_LABELS[property]}`} value={`${prettyValue(zone.meanSoilValues[property])} ${SOIL_UNITS[property]}`} />)}
-    <Metric label="Mean SHI" value={`${zone.meanShi.toFixed(1)} / 100`} />
-  </dl><p className="zoning-caveat">Zone means summarize IDW estimates, not additional laboratory measurements. SHI is not a crop suitability score.</p></div>;
-}
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-800 m-0">Zone {zone.zoneId + 1} Summary</h3>
+        <span className="text-xs text-slate-500">
+          {zone.cellCount.toLocaleString()} cells · {zone.areaM2.toFixed(0)} m² ({((zone.areaM2 / 10000)).toFixed(2)} ha)
+        </span>
+      </div>
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return <div><dt>{label}</dt><dd>{value}</dd></div>;
+      <div className="zoning-metric-grid">
+        {SOIL_PROPERTIES.map((prop) => (
+          <div className="zoning-metric-box" key={prop}>
+            <dt>Mean {SOIL_LABELS[prop]}</dt>
+            <dd>
+              {prettyValue(zone.meanSoilValues[prop])} <small className="text-[10px] font-normal text-slate-500">{SOIL_UNITS[prop]}</small>
+            </dd>
+          </div>
+        ))}
+        <div className="zoning-metric-box">
+          <dt>Mean SHI Index</dt>
+          <dd>{zone.meanShi.toFixed(1)} / 100</dd>
+        </div>
+      </div>
+      <p className="zoning-caveat">
+        Zone means represent the area-weighted average of interpolated cell estimates across this contiguous management cluster.
+      </p>
+    </div>
+  );
 }
 
 function CropFitCards({ response }: { response: CropFitResponse }) {
   const featureLabels: Record<string, string> = {
-    pH: 'pH', ec: 'Electrical conductivity', nitrogen: 'Nitrogen', phosphorus: 'Phosphorus',
-    potassium: 'Potassium', soilTemperature: 'Soil temperature', moisture: 'Soil moisture',
+    pH: 'pH (Reaction)',
+    ec: 'Electrical Conductivity',
+    nitrogen: 'Nitrogen (N)',
+    phosphorus: 'Phosphorus (P)',
+    potassium: 'Potassium (K)',
+    soilTemperature: 'Soil Temperature',
+    moisture: 'Soil Moisture',
   };
-  const stateLabels: Record<string, string> = {
-    within_reference_range: 'Inside cited pH interval',
-    below_reference_range: 'Below cited pH interval',
-    above_reference_range: 'Above cited pH interval',
-    context_required: 'Method/context required',
-    not_provided: 'Not measured in this workflow',
+
+  const stateLabels: Record<string, { label: string; icon: typeof Check }> = {
+    within_reference_range: { label: 'Inside Cited Range', icon: CheckCircle2 },
+    below_reference_range: { label: 'Below Cited Range', icon: AlertTriangle },
+    above_reference_range: { label: 'Above Cited Range', icon: AlertTriangle },
+    context_required: { label: 'Context Required', icon: Info },
+    not_provided: { label: 'Not Measured', icon: ShieldAlert },
   };
-  return <div className="zoning-crop-results">
-    {response.assessments.map((assessment) => <article className="zoning-crop-card" key={assessment.crop}>
-      <div className="zoning-crop-card__heading"><strong>{assessment.crop}</strong><span>Reference only · no crop verdict</span></div>
-      <div className="zoning-crop-table-scroll" role="region" aria-label={`${assessment.crop} soil-factor report`} tabIndex={0}>
-        <table className="zoning-crop-table">
-          <thead><tr><th scope="col">Factor</th><th scope="col">Cell / zone value</th><th scope="col">Published range / context</th><th scope="col">Report note</th></tr></thead>
-          <tbody>{assessment.factors.map((factor) => <tr key={factor.feature}>
-            <th scope="row">{featureLabels[factor.feature] ?? factor.feature}</th>
-            <td>{factor.observedValue === null ? 'Not supplied' : `${prettyValue(factor.observedValue)} ${factor.unit}`}</td>
-            <td><span>{factor.supportedRange ? `${factor.supportedRange.min}–${factor.supportedRange.max} ${factor.supportedRange.unit}` : factor.referenceText}</span>{factor.source && <small><a href={factor.source.url} target="_blank" rel="noreferrer">{factor.source.label}</a><br />{factor.source.context}</small>}</td>
-            <td><b className={`is-${factor.state}`}>{stateLabels[factor.state] ?? 'Review context'}</b><p>{factor.reason}</p></td>
-          </tr>)}</tbody>
-        </table>
-      </div>
-    </article>)}
-    {response.dataLimitations.map((limitation) => <p className="zoning-caveat" key={limitation}>{limitation}</p>)}
-  </div>;
+
+  return (
+    <div className="zoning-crop-list">
+      {response.assessments.map((assessment) => (
+        <article className="zoning-crop-card" key={assessment.crop}>
+          <div className="zoning-crop-card-header">
+            <strong>{assessment.crop}</strong>
+            <span>Agronomic Reference Profile</span>
+          </div>
+
+          <div className="zoning-crop-factor-list">
+            {assessment.factors.map((factor) => {
+              const stateInfo = stateLabels[factor.state] ?? { label: 'Review', icon: Info };
+              const Icon = stateInfo.icon;
+              return (
+                <div className="zoning-crop-factor-row" key={factor.feature}>
+                  <div className="zoning-crop-factor-main">
+                    <span className="zoning-crop-factor-name">
+                      {featureLabels[factor.feature] ?? factor.feature}
+                    </span>
+                    <span className="zoning-crop-factor-val">
+                      {factor.observedValue === null
+                        ? 'Not measured'
+                        : `${prettyValue(factor.observedValue)} ${factor.unit}`}
+                    </span>
+                  </div>
+
+                  <div className="zoning-crop-factor-ref">
+                    <span>
+                      {factor.supportedRange
+                        ? `Cited: ${factor.supportedRange.min}–${factor.supportedRange.max} ${factor.supportedRange.unit}`
+                        : factor.referenceText}
+                    </span>
+                    <span className={`zoning-factor-badge is-${factor.state}`}>
+                      <Icon size={11} /> {stateInfo.label}
+                    </span>
+                  </div>
+
+                  <p className="zoning-crop-factor-reason">{factor.reason}</p>
+                </div>
+              );
+            })}
+          </div>
+        </article>
+      ))}
+
+      {response.dataLimitations.map((limitation, i) => (
+        <p className="zoning-caveat" key={i}>
+          {limitation}
+        </p>
+      ))}
+    </div>
+  );
 }
 
 function Diagnostics({ response }: { response: FieldZoningResponse }) {
-  return <section className="zoning-panel zoning-diagnostics">
-    <div className="zoning-panel__heading"><div><span className="zoning-step">EVIDENCE</span><h2>Analysis diagnostics</h2></div><small>{response.method === 'fcm' ? 'Fuzzy C-means' : 'K-means++'} · {response.processingDurationMs.toFixed(0)} ms</small></div>
-    <div className="zoning-diagnostic-grid">
-      <article><span>Auto-K selection</span><strong>K = {response.autoK.optimalK}</strong><small>{response.autoK.selectionCriterion}</small></article>
-      <article><span>Silhouette</span><strong>{response.autoK.sweep.find((entry) => entry.k === response.selectedK)?.silhouette?.toFixed(3) ?? 'Not available'}</strong><small>Internal separation; not agronomic validation</small></article>
-      <article><span>Grid coverage</span><strong>{response.field.gridCoveragePercent.toFixed(1)}%</strong><small>{response.field.cellSizeM} m grid · {response.field.utmCrs}</small></article>
-      <article><span>FCM convergence</span><strong>{response.autoK.selectedAlgorithmConverged ? 'Converged' : 'Iteration limit'}</strong><small>{response.method === 'fcm' ? 'Memberships are not probabilities' : 'K-means++ / Lloyd iterations'}</small></article>
-    </div>
-    <details className="zoning-diagnostic-details">
-      <summary>Auto-K silhouette sweep <ChevronDown size={14} /></summary>
-      <SilhouetteChart response={response} />
-      <p>{response.autoK.silhouetteInterpretation}</p>
-      {response.method === 'fcm' && <p>FPC is a secondary fuzzy-partition diagnostic; Auto-K is selected by silhouette, not FPC.</p>}
+  return (
+    <details className="zoning-panel zoning-diagnostics-card">
+      <summary className="zoning-diagnostics-summary">
+        <h2 className="zoning-panel-title">
+          <CheckCircle2 size={16} /> Analysis Diagnostics &amp; Verification
+        </h2>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500 font-mono">
+            {response.method === 'fcm' ? 'FCM' : 'K-means++'} · {response.processingDurationMs.toFixed(0)} ms
+          </span>
+          <ChevronDown size={14} className="text-slate-400" />
+        </div>
+      </summary>
+
+      <div className="zoning-diagnostics-content">
+        <div className="zoning-kpi-grid">
+          <div className="zoning-kpi-cell">
+            <span>Optimal K</span>
+            <strong>K = {response.autoK.optimalK}</strong>
+          </div>
+          <div className="zoning-kpi-cell">
+            <span>Silhouette Separation</span>
+            <strong>
+              {response.autoK.sweep.find((entry) => entry.k === response.selectedK)?.silhouette?.toFixed(3) ?? '—'}
+            </strong>
+          </div>
+          <div className="zoning-kpi-cell">
+            <span>Grid Coverage</span>
+            <strong>{response.field.gridCoveragePercent.toFixed(1)}%</strong>
+          </div>
+          <div className="zoning-kpi-cell">
+            <span>Convergence</span>
+            <strong>{response.autoK.selectedAlgorithmConverged ? 'Converged' : 'Limit reached'}</strong>
+          </div>
+        </div>
+
+        {/* Silhouette Chart */}
+        <div>
+          <h4 className="text-xs font-semibold text-slate-700 mb-2">Auto-K Silhouette Sweep</h4>
+          <SilhouetteChart response={response} />
+          <p className="zoning-caveat mt-2">{response.autoK.silhouetteInterpretation}</p>
+        </div>
+
+        {/* LOOCV Grid */}
+        <div>
+          <h4 className="text-xs font-semibold text-slate-700 mb-2">
+            Leave-One-Out Cross Validation (IDW p={response.interpolation.power})
+          </h4>
+          <div className="zoning-loocv-grid">
+            {SOIL_PROPERTIES.map((property) => {
+              const item = response.interpolation.crossValidation[property];
+              return (
+                <div className="zoning-loocv-card" key={property}>
+                  <strong>{SOIL_LABELS[property]}</strong>
+                  <span>{item.sampleCount} cross-folds</span>
+                  <small>
+                    RMSE {item.rmse.toFixed(2)} · MAE {item.mae.toFixed(2)} {SOIL_UNITS[property]}
+                  </small>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Stability & Sensor Nodes */}
+        <div className="flex flex-col gap-2 pt-2 border-t border-slate-200">
+          <div className="text-xs text-slate-700 flex items-center justify-between">
+            <span>Perturbation Stability (Adjusted Rand Index):</span>
+            <strong className="font-mono">Mean ARI {response.stability.meanARI?.toFixed(3) ?? '—'}</strong>
+          </div>
+          <p className="zoning-caveat">
+            Candidate node coordinates: {response.wsnNodes.map((n) => `Z${n.zoneId + 1} (${n.positionWgs84.latitude.toFixed(4)}, ${n.positionWgs84.longitude.toFixed(4)})`).join(', ')}.
+          </p>
+        </div>
+      </div>
     </details>
-    <details className="zoning-diagnostic-details">
-      <summary>Interpolation and sample validation <ChevronDown size={14} /></summary>
-      <div className="zoning-loocv-grid">{SOIL_PROPERTIES.map((property) => {
-        const item = response.interpolation.crossValidation[property];
-        return <article key={property}><strong>{SOIL_LABELS[property]}</strong><span>{item.sampleCount} folds</span><small>RMSE {item.rmse.toFixed(2)} · MAE {item.mae.toFixed(2)} {SOIL_UNITS[property]}</small></article>;
-      })}</div>
-      <p>IDW uses p={response.interpolation.power} with {response.interpolation.distanceMetric}. Cross-validation is diagnostic and depends on the small sample set.</p>
-      <p>{response.shi.name} v{response.shi.version} is independent of clustering and not locally calibrated.</p>
-    </details>
-    <details className="zoning-diagnostic-details">
-      <summary>Sensitivity and zone merging <ChevronDown size={14} /></summary>
-      <div className="zoning-diagnostic-inline"><strong>Mean ARI: {response.stability.meanARI?.toFixed(3) ?? 'Not computed'}</strong><span>Minimum: {response.stability.minARI?.toFixed(3) ?? '—'}</span><span>Reruns: {response.stability.perturbationRuns}</span></div>
-      <p>{response.stability.limitations}</p>
-      {response.mergeLog.length ? <ul>{response.mergeLog.map((entry, index) => <li key={index}>Clusters {entry.mergedClusters.map((id) => id + 1).join(' + ')}: profile distance Z {entry.profileDistanceZ.toFixed(3)} across {entry.sharedGridEdges} shared grid edges.</li>)}</ul> : <p>No adjacent cluster merges were needed.</p>}
-    </details>
-    <details className="zoning-diagnostic-details">
-      <summary>Suggested sensor and gateway candidates <ChevronDown size={14} /></summary>
-      <p>Geometric planning candidates only. Radio coverage, access, power, terrain and installation feasibility have not been validated.</p>
-      <ul>{response.wsnNodes.map((node) => <li key={node.zoneId}>Zone {node.zoneId + 1}: {node.placementStatus} · {node.positionWgs84.latitude.toFixed(5)}, {node.positionWgs84.longitude.toFixed(5)}</li>)}</ul>
-      <p>Gateway: {response.clusterHead.placementStatus} · straight-line total {response.clusterHead.totalDistanceToNodesM.toFixed(1)} m; not a radio link budget.</p>
-    </details>
-  </section>;
+  );
 }
 
 function SilhouetteChart({ response }: { response: FieldZoningResponse }) {
   const entries = response.autoK.sweep;
   const chartWidth = 400;
-  const chartHeight = 128;
-  const innerWidth = 350;
-  const left = 34;
-  const base = 96;
-  return <svg className="zoning-silhouette-chart" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label="Silhouette scores for each tested cluster count">
-    <line x1={left} y1={base} x2={chartWidth - 10} y2={base} />
-    <text x="2" y="17">1.0</text><text x="12" y={base + 3}>0</text><text x="2" y="119">−1.0</text>
-    {entries.map((entry, index) => {
-      const score = entry.silhouette;
-      const x = left + (index + 0.5) * (innerWidth / entries.length);
-      const barHeight = score == null ? 0 : Math.max(1, (score + 1) * 38);
-      return <g key={entry.k} aria-label={`K ${entry.k}: ${score?.toFixed(3) ?? 'unavailable'}`}>
-        <rect x={x - 15} y={base - barHeight} width="30" height={barHeight} rx="4" className={entry.k === response.selectedK ? 'is-selected' : ''} />
-        <text x={x} y={base + 17} textAnchor="middle">K {entry.k}</text>
-        {score != null && <text x={x} y={base - barHeight - 5} textAnchor="middle">{score.toFixed(2)}</text>}
-      </g>;
-    })}
-  </svg>;
+  const chartHeight = 110;
+  const innerWidth = 340;
+  const left = 30;
+  const base = 80;
+
+  return (
+    <svg
+      className="zoning-silhouette-chart"
+      viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+      role="img"
+      aria-label="Silhouette scores for tested cluster counts"
+    >
+      <line x1={left} y1={base} x2={chartWidth - 10} y2={base} />
+      <text x="4" y="16">1.0</text>
+      <text x="12" y={base + 4}>0</text>
+      <text x="4" y={chartHeight - 6}>−1.0</text>
+      {entries.map((entry, index) => {
+        const score = entry.silhouette;
+        const x = left + (index + 0.5) * (innerWidth / entries.length);
+        const barHeight = score == null ? 0 : Math.max(2, (score + 1) * 34);
+        return (
+          <g key={entry.k} aria-label={`K ${entry.k}: ${score?.toFixed(3) ?? 'unavailable'}`}>
+            <rect
+              x={x - 14}
+              y={base - barHeight}
+              width="28"
+              height={barHeight}
+              className={entry.k === response.selectedK ? 'is-selected' : ''}
+            />
+            <text x={x} y={base + 16} textAnchor="middle">
+              K={entry.k}
+            </text>
+            {score != null && (
+              <text x={x} y={base - barHeight - 4} textAnchor="middle">
+                {score.toFixed(2)}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
 }
 
 function SceneErrorBoundary({ children, fallback }: { children: ReactNode; fallback: ReactNode }) {
@@ -811,11 +1745,19 @@ function SceneErrorBoundary({ children, fallback }: { children: ReactNode; fallb
 
 class SceneBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
   state = { failed: false };
-  static getDerivedStateFromError() { return { failed: true }; }
-  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
 }
 
-function hoveredLayerValue(cell: FieldZoningResponse['cells'][number], selectedLayer: FieldLayer, cluster: number): number | null {
+function hoveredLayerValue(
+  cell: FieldZoningResponse['cells'][number],
+  selectedLayer: FieldLayer,
+  cluster: number,
+): number | null {
   if (selectedLayer === 'membership') return cell.clusterMemberships?.[cluster] ?? null;
   if (selectedLayer === 'zone') return cell.zoneId;
   if (selectedLayer === 'shi') return cell.shi;
