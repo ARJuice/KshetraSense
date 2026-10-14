@@ -1,0 +1,15 @@
+{
+  "type": "Feature",
+  "properties": {
+    "demoId": "low-nitrogen",
+    "scenario": "Low illustrative nitrogen values",
+    "dataStatus": "SYNTHETIC DEMO ONLY — NOT A REAL FIELD",
+    "collectionDate": "2026-01-30",
+    "sampleDepth": "0-15 cm",
+    "pairedSamplesCsv": "low-nitrogen.csv"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[[77.606, 12.982], [77.6072, 12.982], [77.6072, 12.9832], [77.606, 12.9832], [77.606, 12.982]]]
+  }
+}

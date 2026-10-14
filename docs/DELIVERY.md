@@ -50,8 +50,8 @@ Phase 3 backend acceptance is verified by its data, playback, water-balance, and
 | AC-06 | The Phase 1 field run uses only pH, EC, N, P, and K with fixed units and a common explicit depth; unsupported properties are not silently mixed in. | Request-schema and UI validation tests. |
 | AC-07 | FCM memberships are correctly mapped and described as membership strength, not confidence. | Algorithm/UI tests. |
 | AC-08 | Soil, zoning, and membership modes have distinct titles/legends; zone meaning does not rely on color alone. | Accessibility/visual review. |
-| AC-09 | Crop Fit shows factor status, value/unit when present, source/profile version, and missing-data state. | Rules/UI integration test. |
-| AC-10 | Crop compatibility is unchanged when only cluster labels change and never names a best/recommended crop. | Unit test and copy scan. |
+| AC-09 | Crop Fit shows selected values/units, cited context/source, method limitations, and missing-input states. | Crop Fit API and zoning UI tests. |
+| AC-10 | Crop Fit has no crop-level verdict/ranking and its factor rows do not depend on cluster labels. | API test and copy scan. |
 | AC-11 | Leaf result contains the 17 ranked classes, model/preprocessing/map versions, measured latency, and review/unsupported state. | Model contract test. |
 | AC-12 | Leaf inference receives no zone, soil, SHI, or selected-crop feature. | Request-schema test. |
 | AC-13 | All core workflows remain available without WebGL; mobile defaults to a usable 2D path. | Browser run with WebGL disabled and responsive tests. |
@@ -67,7 +67,7 @@ Phase 3 backend acceptance is verified by its data, playback, water-balance, and
 
 1. Open Field Lab with a real supplied dataset; identify its source and measurement context before running Soil Zoning.
 2. Change one source sample value, show that the previous run is stale but retained, rerun zoning, then inspect the returned summaries and diagnostics.
-3. Open Crop Fit for a selected cell/zone and explain the independent source-backed assessment and any unassessed factors.
+3. Open the factor-by-factor Crop Fit reference report for a selected cell/zone. Show the values and method limits; explain that the report does not declare a crop fit or make the planting decision.
 4. In Field Monitoring, create/import dated soil samples and compare only compatible repeated measurements. Query SoilGrids as separate nominal-250 m context; explain that no-data or provider outage gives no estimate and never fills a local sample or field cell.
 5. Replay the Parma research series and explain its `%RH` units, source/treatment labels, model-versus-persistence holdout result, anomaly-candidate semantics, and lack of live/actuation behavior.
 6. After the user configures Earth Engine and ensures the CropSight sub-application/dependencies are available, enter its independent circular AOI/date window and review only returned aggregate NDVI statistics/time series. Explain that the current response has no map-ready raster or zone outputs; do not claim a patch-level prescription or scouting coordinate.
@@ -88,7 +88,7 @@ If a required provider is unavailable during demonstration, show the explicit un
 | Public WCS availability can change or be temporarily unavailable. | Recheck at demonstration time; retry only the real request and show explicit provider/no-data errors. The adapter uses no credentials and does not create a substitute estimate. |
 | Soil readings are comparable across time. | Preserve source, units, collection date, method, and depth; do not chart unlike measurements as one trend. |
 | Real field photos generalize beyond controlled datasets. | State tested label scope, report cross-dataset evidence separately, and provide review/unsupported states. |
-| Agronomy thresholds support Crop Fit. | Show raw supported factors/“Not assessed” until source, geography, units, thresholds, and tests exist. |
+| Agronomy references support a complete Crop Fit verdict. | Show factor values and only defensible source context; keep non-comparable ranges unassessed and never issue a crop-level verdict. |
 | 3D harms speed or access. | Build 2D interaction, instance geometry, bound the scene, and profile fallback/mobile paths. |
 | Spline export or embed is restricted/heavy. | Keep optional, lazy, decorative, and replaceable by SVG/Three.js. |
 

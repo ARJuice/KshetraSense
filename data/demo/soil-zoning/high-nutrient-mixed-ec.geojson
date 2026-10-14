@@ -1,0 +1,15 @@
+{
+  "type": "Feature",
+  "properties": {
+    "demoId": "high-nutrient-mixed-ec",
+    "scenario": "Higher nutrient values with mixed EC profile",
+    "dataStatus": "SYNTHETIC DEMO ONLY — NOT A REAL FIELD",
+    "collectionDate": "2026-02-17",
+    "sampleDepth": "0-15 cm",
+    "pairedSamplesCsv": "high-nutrient-mixed-ec.csv"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[[77.618, 12.991], [77.6192, 12.991], [77.6192, 12.9922], [77.618, 12.9922], [77.618, 12.991]]]
+  }
+}

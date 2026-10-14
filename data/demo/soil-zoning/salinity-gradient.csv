@@ -1,0 +1,6 @@
+id,latitude,longitude,depth_cm,ph,ec,nitrogen,phosphorus,potassium,collection_date,lab_method,uncertainty_ph,uncertainty_ec,uncertainty_nitrogen,uncertainty_phosphorus,uncertainty_potassium
+salinity-01,12.97915,77.60215,0-15,6.1,2.40,55,26,130,2026-05-21,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+salinity-02,12.97915,77.60305,0-15,6.3,3.20,60,29,140,2026-05-21,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+salinity-03,12.97960,77.60260,0-15,6.4,4.60,63,31,145,2026-05-21,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+salinity-04,12.98005,77.60215,0-15,6.2,3.80,58,27,135,2026-05-21,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+salinity-05,12.98005,77.60305,0-15,6.5,2.80,66,34,150,2026-05-21,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8

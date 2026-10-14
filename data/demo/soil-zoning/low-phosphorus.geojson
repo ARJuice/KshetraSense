@@ -1,0 +1,15 @@
+{
+  "type": "Feature",
+  "properties": {
+    "demoId": "low-phosphorus",
+    "scenario": "Low illustrative phosphorus values",
+    "dataStatus": "SYNTHETIC DEMO ONLY — NOT A REAL FIELD",
+    "collectionDate": "2026-03-03",
+    "sampleDepth": "0-15 cm",
+    "pairedSamplesCsv": "low-phosphorus.csv"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[[77.61, 12.985], [77.6112, 12.985], [77.6112, 12.9862], [77.61, 12.9862], [77.61, 12.985]]]
+  }
+}

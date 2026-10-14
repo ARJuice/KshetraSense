@@ -485,11 +485,11 @@ export function ZoningWorkspace() {
             <div className="zoning-form-grid">
               <label>Grid cell size<select value={options.cellSizeM} onChange={(event) => updateOptions((current) => ({ ...current, cellSizeM: Number(event.target.value) as 5 | 10 }))}><option value={10}>10 metres</option><option value={5}>5 metres · finer</option></select></label>
               <label>Clustering method<select value={options.method} onChange={(event) => updateOptions((current) => ({ ...current, method: event.target.value as FieldZoningOptions['method'] }))}><option value="fcm">Fuzzy C-means</option><option value="kmeans">K-means++</option></select></label>
-              <label>Maximum tested K<select value={options.maxK} onChange={(event) => updateOptions((current) => ({ ...current, maxK: Number(event.target.value) }))}>{[2, 3, 4, 5, 6].map((value) => <option value={value} key={value}>{value} clusters</option>)}</select></label>
             </div>
             <details className="zoning-advanced">
               <summary>Advanced parameters <ChevronDown size={14} /></summary>
               <div className="zoning-form-grid">
+                <p className="zoning-auto-k-note">Auto-K tests valid K values from 2 through 6, then selects the highest silhouette score (ties choose the smaller K). Six is the search ceiling, not the selected cluster count.</p>
                 <label>Random seed<input type="number" value={options.seed} min={0} onChange={(event) => updateOptions((current) => ({ ...current, seed: Number(event.target.value) }))} /></label>
                 <label>Merge threshold Z<input type="number" value={options.mergeThresholdZ} min={0} max={2} step={0.1} onChange={(event) => updateOptions((current) => ({ ...current, mergeThresholdZ: Number(event.target.value) }))} /></label>
                 <label>Sensitivity reruns<input type="number" value={options.perturbationRuns} min={0} max={50} step={1} onChange={(event) => updateOptions((current) => ({ ...current, perturbationRuns: Number(event.target.value) }))} /></label>
@@ -498,7 +498,7 @@ export function ZoningWorkspace() {
                   <label>FCM iteration limit<input type="number" value={options.fcm.maxIterations} min={1} max={500} step={1} onChange={(event) => updateOptions((current) => ({ ...current, fcm: { ...current.fcm, maxIterations: Number(event.target.value) } }))} /></label>
                 </>}
               </div>
-              <p>Auto-K selects the silhouette-best tested K. FCM memberships describe cluster membership strength, not probability.</p>
+              <p>The selected K is automatic; the diagnostics show the tested sweep and result. FCM memberships describe cluster membership strength, not probability.</p>
             </details>
             <button className="zoning-run-button" type="button" onClick={runAnalysis} disabled={isRunning || !boundary || samples.length < 3}>
               {isRunning ? <LoaderCircle size={16} className="zoning-spin" /> : <Play size={16} fill="currentColor" />}
@@ -615,9 +615,9 @@ export function ZoningWorkspace() {
           </section>
 
           <section className="zoning-panel zoning-crop-fit">
-            <div className="zoning-panel__heading"><div><span className="zoning-step">CROP FIT</span><h2>Independent crop checks</h2></div><Sprout size={17} /></div>
-            <p className="zoning-help">Apple, tomato and potato are assessed separately for the selected cell or zone mean. This is not a probability, ranking, yield estimate or prescription.</p>
-            <div className="zoning-crop-scope" role="group" aria-label="Crop-fit scope">
+            <div className="zoning-panel__heading"><div><span className="zoning-step">CROP FIT · REFERENCE REPORT</span><h2>Crop condition report</h2></div><Sprout size={17} /></div>
+            <p className="zoning-help">See this cell's estimates or the selected zone's mean beside published soil context. The report does not decide whether a crop can be cultivated or recommend what to plant.</p>
+            <div className="zoning-crop-scope" role="group" aria-label="Crop reference report scope">
               <button type="button" className={cropFitScope === 'cell' ? 'is-active' : ''} onClick={() => { setCropFitScope('cell'); invalidateCropFit(); }} disabled={!selectedCell}>Cell</button>
               <button type="button" className={cropFitScope === 'zone' ? 'is-active' : ''} onClick={() => { setCropFitScope('zone'); invalidateCropFit(); }} disabled={!selectedZone}>Zone mean</button>
             </div>
@@ -629,9 +629,10 @@ export function ZoningWorkspace() {
                 <label>Common sample depth<input value={cropContext.sampleDepth} onChange={(event) => updateCropContext('sampleDepth', event.target.value)} /></label>
                 <label>EC method<input value={cropContext.ecMethod} onChange={(event) => updateCropContext('ecMethod', event.target.value)} /></label>
               </details>
+              <p className="zoning-crop-provenance">A cell shows its IDW estimate. A zone shows the area-weighted mean of its IDW-estimated cells. Moisture and soil temperature are not inputs to this field workflow.</p>
               <button type="button" className="zoning-crop-run" onClick={runCropFit} disabled={currentCropFit?.status === 'loading'}>
                 {currentCropFit?.status === 'loading' ? <LoaderCircle size={15} className="zoning-spin" /> : <Sprout size={15} />}
-                {currentCropFit?.status === 'loading' ? 'Checking profiles…' : 'Run crop fit'}
+                {currentCropFit?.status === 'loading' ? 'Building report…' : 'Build reference report'}
               </button>
               {currentCropFit?.status === 'error' && <p className="zoning-inline-error" role="alert"><AlertCircle size={14} />{currentCropFit.error}</p>}
               {currentCropFit?.status === 'ready' && currentCropFit.response && <CropFitCards response={currentCropFit.response} />}
@@ -712,14 +713,31 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 function CropFitCards({ response }: { response: CropFitResponse }) {
+  const featureLabels: Record<string, string> = {
+    pH: 'pH', ec: 'Electrical conductivity', nitrogen: 'Nitrogen', phosphorus: 'Phosphorus',
+    potassium: 'Potassium', soilTemperature: 'Soil temperature', moisture: 'Soil moisture',
+  };
+  const stateLabels: Record<string, string> = {
+    within_reference_range: 'Inside cited pH interval',
+    below_reference_range: 'Below cited pH interval',
+    above_reference_range: 'Above cited pH interval',
+    context_required: 'Method/context required',
+    not_provided: 'Not measured in this workflow',
+  };
   return <div className="zoning-crop-results">
     {response.assessments.map((assessment) => <article className="zoning-crop-card" key={assessment.crop}>
-      <div className="zoning-crop-card__heading"><strong>{assessment.crop}</strong><span>Independent screen</span></div>
-      {assessment.factors.map((factor) => <div className="zoning-crop-factor" key={factor.feature}>
-        <div><span>{factor.feature}</span><b className={`is-${factor.state}`}>{factor.state === 'within_contextual_range' ? 'Within context' : factor.state === 'outside_contextual_range' ? 'Review' : 'Not assessed'}</b></div>
-        <p>{factor.reason}</p>
-        {factor.supportedRange && <small>{factor.supportedRange.min}–{factor.supportedRange.max} {factor.supportedRange.unit}{factor.source && <> · <a href={factor.source.url} target="_blank" rel="noreferrer">{factor.source.label}</a></>}</small>}
-      </div>)}
+      <div className="zoning-crop-card__heading"><strong>{assessment.crop}</strong><span>Reference only · no crop verdict</span></div>
+      <div className="zoning-crop-table-scroll" role="region" aria-label={`${assessment.crop} soil-factor report`} tabIndex={0}>
+        <table className="zoning-crop-table">
+          <thead><tr><th scope="col">Factor</th><th scope="col">Cell / zone value</th><th scope="col">Published range / context</th><th scope="col">Report note</th></tr></thead>
+          <tbody>{assessment.factors.map((factor) => <tr key={factor.feature}>
+            <th scope="row">{featureLabels[factor.feature] ?? factor.feature}</th>
+            <td>{factor.observedValue === null ? 'Not supplied' : `${prettyValue(factor.observedValue)} ${factor.unit}`}</td>
+            <td><span>{factor.supportedRange ? `${factor.supportedRange.min}–${factor.supportedRange.max} ${factor.supportedRange.unit}` : factor.referenceText}</span>{factor.source && <small><a href={factor.source.url} target="_blank" rel="noreferrer">{factor.source.label}</a><br />{factor.source.context}</small>}</td>
+            <td><b className={`is-${factor.state}`}>{stateLabels[factor.state] ?? 'Review context'}</b><p>{factor.reason}</p></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
     </article>)}
     {response.dataLimitations.map((limitation) => <p className="zoning-caveat" key={limitation}>{limitation}</p>)}
   </div>;

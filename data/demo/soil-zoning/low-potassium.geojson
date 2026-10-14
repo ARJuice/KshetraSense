@@ -1,0 +1,15 @@
+{
+  "type": "Feature",
+  "properties": {
+    "demoId": "low-potassium",
+    "scenario": "Low illustrative potassium values",
+    "dataStatus": "SYNTHETIC DEMO ONLY — NOT A REAL FIELD",
+    "collectionDate": "2025-11-06",
+    "sampleDepth": "0-15 cm",
+    "pairedSamplesCsv": "low-potassium.csv"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[[77.614, 12.988], [77.6152, 12.988], [77.6152, 12.9892], [77.614, 12.9892], [77.614, 12.988]]]
+  }
+}

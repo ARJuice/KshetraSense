@@ -1,0 +1,15 @@
+{
+  "type": "Feature",
+  "properties": {
+    "demoId": "salinity-gradient",
+    "scenario": "Spatial EC contrast with varied nutrient values",
+    "dataStatus": "SYNTHETIC DEMO ONLY — NOT A REAL FIELD",
+    "collectionDate": "2026-05-21",
+    "sampleDepth": "0-15 cm",
+    "pairedSamplesCsv": "salinity-gradient.csv"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[[77.602, 12.979], [77.6032, 12.979], [77.6032, 12.9802], [77.602, 12.9802], [77.602, 12.979]]]
+  }
+}

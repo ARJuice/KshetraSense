@@ -1,0 +1,15 @@
+{
+  "type": "Feature",
+  "properties": {
+    "demoId": "balanced-reference",
+    "scenario": "Moderate mixed values around common pH context",
+    "dataStatus": "SYNTHETIC DEMO ONLY — NOT A REAL FIELD",
+    "collectionDate": "2026-06-15",
+    "sampleDepth": "0-15 cm",
+    "pairedSamplesCsv": "balanced-reference.csv"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[[77.59, 12.97], [77.5912, 12.97], [77.5912, 12.9712], [77.59, 12.9712], [77.59, 12.97]]]
+  }
+}

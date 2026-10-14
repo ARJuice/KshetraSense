@@ -1,0 +1,15 @@
+{
+  "type": "Feature",
+  "properties": {
+    "demoId": "alkaline-high-phosphorus",
+    "scenario": "Higher pH and higher P values",
+    "dataStatus": "SYNTHETIC DEMO ONLY — NOT A REAL FIELD",
+    "collectionDate": "2025-12-18",
+    "sampleDepth": "0-15 cm",
+    "pairedSamplesCsv": "alkaline-high-phosphorus.csv"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[[77.598, 12.976], [77.5992, 12.976], [77.5992, 12.9772], [77.598, 12.9772], [77.598, 12.976]]]
+  }
+}

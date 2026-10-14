@@ -20,7 +20,7 @@ This is a runnable, versioned implementation of the scoped field pipeline—not 
 | `algorithms.py` | Retain the NumPy K-Means++ and Bezdek FCM implementations; use a bounded-memory exact silhouette calculation and a vectorized FCM membership update. Keep existing `/v1` behavior. |
 | `schemas.py` | **EXTEND.** Add new request/response models for the redesigned pipeline. |
 | `service.py` | Keep `run_zoning()` for `/v1`; add `run_field_zoning()` to orchestrate the new pipeline behind `/v2`. |
-| `crop_fit.py` | **KEEP AS-IS.** Crop Fit consumes zone summaries — its interface doesn't change. |
+| `crop_fit.py` | Keep the selected-profile request contract; the later Crop Fit response is a factor-by-factor reference report per [Decision 0011](../decisions/0011-crop-reference-report-and-autok.md), not a crop-level verdict. |
 | `soilgrids.py` | Outside Phase 1's field pipeline. It now provides optional public ISRIC WCS regional context; see [Decision 0010](../decisions/0010-soilgrids-wcs-context-adapter.md). |
 | `main.py` | **EXTEND.** Add new API endpoints for the redesigned pipeline. |
 

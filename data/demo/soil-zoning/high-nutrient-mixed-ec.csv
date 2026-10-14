@@ -1,0 +1,6 @@
+id,latitude,longitude,depth_cm,ph,ec,nitrogen,phosphorus,potassium,collection_date,lab_method,uncertainty_ph,uncertainty_ec,uncertainty_nitrogen,uncertainty_phosphorus,uncertainty_potassium
+high-mix-01,12.99115,77.61815,0-15,5.9,1.50,90,70,220,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+high-mix-02,12.99115,77.61905,0-15,6.1,2.10,110,95,280,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+high-mix-03,12.99160,77.61860,0-15,6.4,1.90,125,105,310,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+high-mix-04,12.99205,77.61815,0-15,6.6,2.80,140,88,340,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+high-mix-05,12.99205,77.61905,0-15,6.2,3.30,130,115,295,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8

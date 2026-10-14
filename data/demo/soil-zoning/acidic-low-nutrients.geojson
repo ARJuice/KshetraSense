@@ -1,0 +1,15 @@
+{
+  "type": "Feature",
+  "properties": {
+    "demoId": "acidic-low-nutrients",
+    "scenario": "Lower pH and lower nutrient values",
+    "dataStatus": "SYNTHETIC DEMO ONLY — NOT A REAL FIELD",
+    "collectionDate": "2026-04-12",
+    "sampleDepth": "0-15 cm",
+    "pairedSamplesCsv": "acidic-low-nutrients.csv"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[[77.594, 12.973], [77.5952, 12.973], [77.5952, 12.9742], [77.594, 12.9742], [77.594, 12.973]]]
+  }
+}

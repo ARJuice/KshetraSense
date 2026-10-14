@@ -1,0 +1,15 @@
+{
+  "type": "Feature",
+  "properties": {
+    "demoId": "contrasting-ph-patches",
+    "scenario": "Low-to-high pH contrast across sample points",
+    "dataStatus": "SYNTHETIC DEMO ONLY — NOT A REAL FIELD",
+    "collectionDate": "2026-07-07",
+    "sampleDepth": "0-15 cm",
+    "pairedSamplesCsv": "contrasting-ph-patches.csv"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[[77.622, 12.994], [77.6232, 12.994], [77.6232, 12.9952], [77.622, 12.9952], [77.622, 12.994]]]
+  }
+}

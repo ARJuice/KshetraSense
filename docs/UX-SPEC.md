@@ -18,7 +18,7 @@ The existing prototype UI is not the design baseline. Rebuild the experience fro
 | --- | --- |
 | Overview | Explain the four capabilities and direct the user to a useful starting task. |
 | Field Lab | Inspect/edit soil data and run K-means or Fuzzy C-means Soil Zoning. |
-| Crop Fit | A contextual panel within Field Lab for three separate, source-backed per-crop soil assessments. It is not a new global destination. |
+| Crop Fit | A contextual panel within Field Lab for three separate factor-by-factor crop reference reports. It is not a new global destination and does not make cultivation decisions. |
 | Leaf Diagnosis | Submit a leaf image to the shared MobileNetV3-Small classifier and inspect its actual result. |
 | Field Monitoring | Separate workspace with Soil Investigation, historical telemetry replay, and independent Vegetation Monitoring. |
 | Evidence & Methods | Explain datasets, algorithms, provenance, actual evaluation, and limitations. |
@@ -36,14 +36,14 @@ The first screen should briefly explain the available jobs, then let the user ch
 1. Select or create a soil dataset/field and review data source, supported features, units, and missing-measurement warnings.
 2. Inspect cells and measurements. A cell or zone selection opens an accessible inspector with values, units, measurement context, and source.
 3. Edit one parameter using the approved preset or brush interaction. Show affected cells and exact before/after values; support undo/redo. Any prior real result becomes stale without being discarded.
-4. Select K-means or Fuzzy C-means, a supported cluster count, and the feature set; validate the request before enabling **Run zoning**.
+4. Select K-means or Fuzzy C-means and the supported run settings; Auto-K evaluates valid cluster counts from 2 through 6 and chooses by silhouette. The UI does not let the user set the final K or expose the search ceiling as a chosen cluster count.
 5. On a real service response, show zone assignments, profiles, adjacency, diagnostics, and FCM membership where relevant. Show an indeterminate pending state tied to the real request; never invent progress, centroid motion, or convergence.
 
 Zone identity uses labels/patterns as well as color. A map shows cluster similarity, not “good/bad soil,” a crop recommendation, or a treatment prescription. Cell height is a bounded visual encoding of a selected feature, not geospatial elevation.
 
 ### Crop Fit
 
-Crop Fit remains a separate rules calculation accessed in the Field Lab context. The user explicitly selects a cell or zone and opens **Crop Fit**; the panel says what measurement set and rule/profile version it assessed. Show equal, independent Apple, Tomato, and Potato cards, factor-by-factor evidence, applicable sourced range, source, missingness, and within-zone variation. Do not rank crops or normalize values into a 100% probability split. Missing or unsupported factors say **Not assessed**.
+Crop Fit is a selected-scope reference report inside the Field Lab, not a crop decision. For a cell, show its returned IDW estimates; for a zone, show the already-calculated area-weighted means of IDW cell estimates. Show the same observed pH, EC, N, P, and K values in equal Apple, Tomato, and Potato tables with columns for factor, cell/zone value, published interval/context, and a neutral report note. pH may be described as numerically inside/below/above its cited pH interval only; do not turn that single-factor comparison into a crop verdict. Show EC's published ECe context without comparing an unverified generic EC value to it. For N/P/K, show the value and explain when method-/region-specific interpretation is required instead of inventing portable bands. Moisture and soil temperature say **Not measured in this workflow**. Show the reference source and context, and keep a clear statement that the user makes the cultivation decision. Do not rank crops, use green/red suitability badges, or normalize values into probabilities.
 
 ### Leaf Diagnosis
 

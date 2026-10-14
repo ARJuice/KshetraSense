@@ -71,7 +71,7 @@ Use a readable sequential/diverging scale with a visible numeric legend, units, 
 
 ### 2.3.4 Auto-K, Clustering, and Contiguous Zones
 
-- Each run selects **K-means++** or **Fuzzy C-means**; the backend sweeps K from 2 to the requested maximum (2–6) and selects maximum silhouette, breaking ties toward smaller K. The user may change the maximum K and rerun, but cannot override the selected K in this API version.
+- Each run selects **K-means++** or **Fuzzy C-means**; the backend tests valid K values from 2 through the request's maximum (2–6) and selects maximum silhouette, breaking ties toward smaller K. The current UI fixes the search ceiling at 6; it does not expose a manual final-K selector. The selected K is shown in diagnostics. The API retains `maxK` as a search ceiling for other callers.
 - Plot the returned silhouette for every tested K; show FPC only for FCM as a diagnostic, not as the selection rule. Describe silhouette as internal separation of interpolated profiles, not agronomic validation.
 - For FCM, visualize membership to each original cluster as membership strength (not probability or confidence). Since adjacent clusters may be merged and disconnected components split afterward, keep source-cluster membership distinct from final zone labels.
 - Explain each merge from `mergeLog.profileDistanceZ` and `sharedGridEdges`; the default threshold is `mergeThresholdZ = 0.5` in standardized multivariate feature space. Do not describe it as an SHI difference. Every disconnected four-connected component receives its own zone; small components are not silently removed.
@@ -89,7 +89,7 @@ Use a readable sequential/diverging scale with a visible numeric legend, units, 
 ### 2.3.7 Cell/Zone-scoped Crop Fit
 
 - When the user selects a returned zone, send its exact `meanSoilValues`; for a selected cell, send its exact `soilValues`. Include the selected scope as context in the existing `POST /v1/crop-fit/evaluate` request. Do not use SHI, cluster IDs, FCM memberships, or WSN candidates as crop-fit inputs.
-- Show three independent Apple, Tomato, and Potato assessments with factor state, source, and limitations. The current backend has a sourced pH screen only; N/P/K and EC remain “not assessed.” Do not rank crops or normalize results to 100%.
+- Show equal Apple, Tomato, and Potato factor-reference tables with the selected cell's `soilValues` or zone's `meanSoilValues` (the backend's area-weighted average of IDW-estimated cell profiles). Include each observed pH/EC/N/P/K value, published interval/context, source, and neutral report note. Only pH is numerically compared with a cited interval; generic EC requires a verified ECe/root-zone method, and N/P/K require local method-specific calibration. Moisture and soil temperature are absent from the field-zoning sample contract and must be labeled not measured. The response must not classify any crop as fit/suitable, rank crops, provide planting advice, or normalize results to 100%.
 - Keep the Crop Fit panel inside Soil Zoning's selected-cell/zone detail; it is not a separate top-level module in this Phase 2 workflow.
 
 ---
@@ -107,7 +107,7 @@ export interface FieldZoningRequest {
   boundary: GeoJsonPolygon;
   cellSizeM: 5 | 10;
   method: 'kmeans' | 'fcm';
-  maxK: 2 | 3 | 4 | 5 | 6;
+  maxK: 2 | 3 | 4 | 5 | 6; // API search ceiling; current UI always sends 6
   seed: number;
   mergeThresholdZ: number; // 0–2; default 0.5
   perturbationRuns: number; // 0–50; default 10, up to 50 for deeper sensitivity analysis
@@ -247,7 +247,7 @@ export interface FieldZoningResponse {
 2. **Real run — implemented:** the workspace submits to `/v2/zoning/run`, displays the returned result, and reports service failures without substituting fixtures.
 3. **Layer/diagnostic fidelity — implemented:** pH, EC, N, P, K, project-defined SHI, zone, and FCM-membership views read the response; Auto-K, LOOCV, merges, and sensitivity data are shown with their limits.
 4. **Stale result and export — implemented:** changed inputs preserve the previous immutable response as stale; export downloads the actual response JSON.
-5. **Crop Fit — implemented:** selected cell values or zone means are sent to `/v1/crop-fit/evaluate`; three independent source-backed crop assessments remain contextual to Soil Zoning.
+5. **Crop Fit reference report — implemented:** selected cell values or area-weighted zone means are sent to `/v1/crop-fit/evaluate`; three independent factor tables show values and source context without a crop-level verdict.
 6. **2D/3D map — implemented:** accessible 2D is complete and default; 3D is lazy, uses returned clipped geometry, supports orbit/zoom/fit and selection, and is disabled above 768 cells or the 20,000-triangle estimate.
 
 **Verification on 2026-10-14:** 38 frontend tests passed, TypeScript typecheck passed, 51 zoning-service tests passed, and the production build succeeded. The browser layout was checked at desktop and narrow widths. The build emits an optional 3D chunk of approximately 824 kB raw / 223 kB gzip; the main app bundle is approximately 289 kB raw / 87 kB gzip. Device frame-time profiling and a full UI run against real farm measurements remain unverified; no real-field or performance claim is made.

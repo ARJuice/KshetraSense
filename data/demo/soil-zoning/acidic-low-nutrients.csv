@@ -1,0 +1,6 @@
+id,latitude,longitude,depth_cm,ph,ec,nitrogen,phosphorus,potassium,collection_date,lab_method,uncertainty_ph,uncertainty_ec,uncertainty_nitrogen,uncertainty_phosphorus,uncertainty_potassium
+acidic-01,12.97315,77.59415,0-15,4.8,0.35,18,5,36,2026-04-12,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+acidic-02,12.97315,77.59505,0-15,5.0,0.42,22,7,42,2026-04-12,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+acidic-03,12.97360,77.59460,0-15,5.2,0.55,28,10,48,2026-04-12,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+acidic-04,12.97405,77.59415,0-15,5.5,0.72,35,12,55,2026-04-12,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+acidic-05,12.97405,77.59505,0-15,5.1,0.50,26,8,45,2026-04-12,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8

@@ -79,3 +79,21 @@ def test_constant_features_are_excluded_but_variable_feature_runs():
 def test_crop_fit_endpoint_rejects_unknown_profile():
     response = client.post("/v1/crop-fit/evaluate", json={"profileVersion": "unknown", "measurements": {"pH": 6.2}})
     assert response.status_code == 422
+
+
+def test_crop_fit_endpoint_returns_factor_values_without_a_crop_level_verdict():
+    measurements = {"pH": 5.7, "ec": 1.8, "nitrogen": 24, "phosphorus": 12, "potassium": 85}
+    response = client.post("/v1/crop-fit/evaluate", json={"measurements": measurements})
+
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["profileVersion"]
+    assert len(result["assessments"]) == 3
+    assert all("assessmentState" not in assessment for assessment in result["assessments"])
+    for assessment in result["assessments"]:
+        factors = {factor["feature"]: factor for factor in assessment["factors"]}
+        for feature, value in measurements.items():
+            assert factors[feature]["observedValue"] == value
+    apple_factors = {factor["feature"]: factor for factor in result["assessments"][0]["factors"]}
+    assert apple_factors["pH"]["state"] == "below_reference_range"
+    assert apple_factors["ec"]["state"] == "context_required"

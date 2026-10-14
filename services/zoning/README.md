@@ -1,6 +1,6 @@
 # KshetraSense zoning service
 
-Local FastAPI service for legacy grid zoning, field-scale sparse-sample zoning, zone-level crop-fit screening, and the isolated historical telemetry replay API. It is deliberately independent from the browser UI and does not share state between zoning, Crop Fit, and telemetry.
+Local FastAPI service for legacy grid zoning, field-scale sparse-sample zoning, selected-cell/zone crop reference reports, and the isolated historical telemetry replay API. It is deliberately independent from the browser UI and does not share state between zoning, Crop Fit, and telemetry.
 
 ## What it does
 
@@ -62,7 +62,9 @@ The frontend displays all supported cells in 2D. Its optional 3D scene is lazy-l
 
 ## Data and evidence boundaries
 
-The crop profiles currently assess only pH. N/P/K, EC, soil temperature, moisture, drainage, texture, rooting depth, climate, cultivar, and management are returned as **not assessed** rather than invented rules. The documented pH ranges are contextual examples retained with source URLs; they are not a complete land-suitability evaluation. See `docs/research/crop-suitability-probability.md` in the repository for the product evidence boundary.
+Crop Fit returns three independent factor-by-factor reference reports, not a crop-level verdict. It displays all selected pH, EC, N, P, and K values; for zones it receives the response's area-weighted means of IDW cell estimates. A pH value is compared numerically with a cited contextual interval. EC salinity references are shown as context only because the field EC method/root-zone ECe context is not verified. N/P/K are shown but have no portable numeric bands in the current input contract because analyte, extractant, region, and local calibration are not sufficiently specified. Moisture and soil temperature are not supplied by this zoning workflow. No result says a crop is fit/suitable or recommends planting. See [the source review](../../docs/research/soil-reference-intervals.md) and [crop-suitability evidence boundary](../../docs/research/crop-suitability-probability.md).
+
+Ten clearly labeled synthetic input pairs (GeoJSON boundary + complete dated soil-sample CSV) are provided under [`data/demo/soil-zoning`](../../data/demo/soil-zoning/README.md) for workflow demonstrations and tests. They are not real field or laboratory data.
 
 The KshetraSense SHI is a versioned provisional score, not an official USDA/NRCS index, a crop-specific score, or a probability. The stability report is sensitivity under declared noise assumptions, not a confidence interval. Medoid and gateway outputs are geometric suggestions; `radioCoverageValidated` is false.
 

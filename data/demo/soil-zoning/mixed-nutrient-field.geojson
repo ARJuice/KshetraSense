@@ -1,0 +1,15 @@
+{
+  "type": "Feature",
+  "properties": {
+    "demoId": "mixed-nutrient-field",
+    "scenario": "Contrasting nutrient and EC patterns",
+    "dataStatus": "SYNTHETIC DEMO ONLY — NOT A REAL FIELD",
+    "collectionDate": "2026-08-22",
+    "sampleDepth": "0-15 cm",
+    "pairedSamplesCsv": "mixed-nutrient-field.csv"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[[77.626, 12.997], [77.6272, 12.997], [77.6272, 12.9982], [77.626, 12.9982], [77.626, 12.997]]]
+  }
+}

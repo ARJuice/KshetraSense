@@ -162,19 +162,26 @@
 .zoning-crop-context > label { margin-top: 7px; }
 .zoning-crop-context input { margin-top: 4px; }
 .zoning-crop-run { min-height: 32px; margin-top: 8px; font-size: 9px; }
+.zoning-crop-provenance, .zoning-auto-k-note { margin: 7px 0 0; color: #7c897f; font-size: 8px; line-height: 1.5; }
+.zoning-auto-k-note { grid-column: 1 / -1; margin: 0; }
 .zoning-crop-results { display: grid; gap: 7px; margin-top: 9px; }
 .zoning-crop-card { padding: 8px; border: 1px solid #e3eae1; border-radius: 7px; background: #fbfdfb; }
 .zoning-crop-card__heading { display: flex; align-items: center; justify-content: space-between; gap: 7px; margin-bottom: 6px; }
 .zoning-crop-card__heading strong { color: #395a43; font-size: 10px; text-transform: capitalize; }
 .zoning-crop-card__heading span { color: #849087; font-size: 7px; }
-.zoning-crop-factor { margin-top: 6px; padding-top: 6px; border-top: 1px solid #edf1eb; }
-.zoning-crop-factor > div { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: #637266; font-size: 8px; }
-.zoning-crop-factor b { padding: 3px 5px; border-radius: 20px; color: #728075; background: #edf1ed; font-size: 7px; font-weight: 750; }
-.zoning-crop-factor b.is-within_contextual_range { color: #39734d; background: #e7f3e7; }
-.zoning-crop-factor b.is-outside_contextual_range { color: #976625; background: #fff3df; }
-.zoning-crop-factor p { margin: 5px 0; color: #758277; font-size: 8px; line-height: 1.45; }
-.zoning-crop-factor small, .zoning-crop-factor a { color: #819085; font-size: 7px; line-height: 1.4; }
-.zoning-crop-factor a { color: #417152; }
+.zoning-crop-table-scroll { overflow-x: auto; border: 1px solid #e6ece4; border-radius: 6px; outline-offset: 2px; }
+.zoning-crop-table { width: 100%; min-width: 560px; border-collapse: collapse; text-align: left; }
+.zoning-crop-table th, .zoning-crop-table td { padding: 6px; border-bottom: 1px solid #edf1eb; color: #66756a; font-size: 7px; line-height: 1.45; vertical-align: top; }
+.zoning-crop-table thead th { color: #536657; background: #f2f6f0; font-size: 7px; font-weight: 800; }
+.zoning-crop-table tbody th { width: 88px; color: #536657; font-size: 7px; font-weight: 750; }
+.zoning-crop-table td:nth-child(2) { min-width: 72px; color: #354f3e; font: 700 8px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.zoning-crop-table td:nth-child(3) { min-width: 120px; }
+.zoning-crop-table td:nth-child(4) { min-width: 185px; }
+.zoning-crop-table td small { display: block; margin-top: 4px; color: #859186; font-size: 7px; font-weight: 400; }
+.zoning-crop-table a { color: #417152; }
+.zoning-crop-table td b { display: inline-block; padding: 2px 4px; border-radius: 20px; color: #69776c; background: #edf1ed; font-size: 6px; font-weight: 800; white-space: nowrap; }
+  .zoning-crop-table td b.is-within_reference_range, .zoning-crop-table td b.is-below_reference_range, .zoning-crop-table td b.is-above_reference_range, .zoning-crop-table td b.is-context_required, .zoning-crop-table td b.is-not_provided { color: #536657; background: #edf2ed; }
+.zoning-crop-table td p { margin: 3px 0 0; color: #758277; font-size: 7px; line-height: 1.45; }
 .zoning-diagnostics .zoning-panel__heading { margin-bottom: 9px; }
 .zoning-diagnostic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .zoning-diagnostic-grid article { display: grid; min-width: 0; gap: 4px; padding: 8px; border: 1px solid #e8ede6; border-radius: 7px; background: #fbfcfa; }

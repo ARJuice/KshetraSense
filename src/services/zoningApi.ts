@@ -27,15 +27,15 @@ export interface CropFitFactor {
   feature: string;
   observedValue: number | null;
   unit: string;
-  state: 'within_contextual_range' | 'outside_contextual_range' | 'not_assessed';
+  state: 'within_reference_range' | 'below_reference_range' | 'above_reference_range' | 'context_required' | 'not_provided';
   reason: string;
+  referenceText?: string;
   supportedRange: { min: number; max: number; unit: string } | null;
   source: { label: string; url: string; context: string } | null;
 }
 
 export interface CropFitAssessment {
   crop: string;
-  assessmentState: string;
   factors: CropFitFactor[];
   limitations: string[];
 }
