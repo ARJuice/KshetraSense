@@ -9,8 +9,10 @@ from datetime import datetime, timedelta
 from sklearn.cluster import KMeans, DBSCAN, MeanShift
 from sklearn.mixture import GaussianMixture
 import json
+import os
 
 app = FastAPI(title="NDVI Field Segmentation API")
+EARTHENGINE_PROJECT = os.getenv("EARTHENGINE_PROJECT", "kshetrasense-earth-engine")
 
 # Add CORS middleware
 app.add_middleware(
@@ -23,7 +25,7 @@ app.add_middleware(
 
 # Initialize Earth Engine
 try:
-    ee.Initialize(project='ndvi-field-segmentation')
+    ee.Initialize(project=EARTHENGINE_PROJECT)
 except Exception:
     # For production, you'll need to set up service account authentication
     pass
