@@ -6,7 +6,7 @@
 **Produces:** A clearly labeled historical replay, a trained two-layer GRU for a raw soil-sensor humidity signal, unsupervised anomaly candidates, and a separate unit-checked FAO-56 MAD advisory calculator.
 **Decision records:** [Decision 0007](../decisions/0007-phase-3-telemetry-evidence-and-boundaries.md) · [Decision 0008](../decisions/0008-gru-holdout-quality-and-use.md)
 
-The implementation is mounted in the existing FastAPI service. The pinned source/model artifacts are present, and the current Python suite passes **62 tests** (including telemetry API, parser, playback, FAO-56, and the existing zoning tests). The trained GRU was worse than persistence on all three holdout horizons: MAE 0.378/1.265/0.980 `%RH` at +6/+12/+24h versus 0.083/0.140/0.204 for persistence. It remains an evaluation artifact only; see Decision 0008.
+The implementation is mounted in the existing FastAPI service. The pinned source/model artifacts are present. At the Phase 3 completion checkpoint, the Python suite passed **62 tests** (including telemetry API, parser, playback, FAO-56, and the then-existing zoning tests); the current full-suite result is recorded in the [Phase 5 verification matrix](phase-5-leaf-contract-and-verification.md). The trained GRU was worse than persistence on all three holdout horizons: MAE 0.378/1.265/0.980 `%RH` at +6/+12/+24h versus 0.083/0.140/0.204 for persistence. It remains an evaluation artifact only; see Decision 0008.
 
 ---
 

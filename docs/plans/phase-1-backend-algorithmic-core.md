@@ -21,7 +21,7 @@ This is a runnable, versioned implementation of the scoped field pipeline—not 
 | `schemas.py` | **EXTEND.** Add new request/response models for the redesigned pipeline. |
 | `service.py` | Keep `run_zoning()` for `/v1`; add `run_field_zoning()` to orchestrate the new pipeline behind `/v2`. |
 | `crop_fit.py` | **KEEP AS-IS.** Crop Fit consumes zone summaries — its interface doesn't change. |
-| `soilgrids.py` | **KEEP AS-IS.** Remains optional Phase 0 regional context. |
+| `soilgrids.py` | Outside Phase 1's field pipeline. It now provides optional public ISRIC WCS regional context; see [Decision 0010](../decisions/0010-soilgrids-wcs-context-adapter.md). |
 | `main.py` | **EXTEND.** Add new API endpoints for the redesigned pipeline. |
 
 ---
@@ -541,7 +541,7 @@ services/zoning/
 │   ├── schemas.py             # EXTENDED — new request/response models
 │   ├── service.py             # Legacy /v1 plus new /v2 orchestration
 │   ├── shi.py                 # NEW — provisional KshetraSense SHI
-│   ├── soilgrids.py           # KEPT
+│   ├── soilgrids.py           # OPTIONAL ISRIC WCS CONTEXT (outside Phase 1)
 │   ├── spatial.py             # NEW — boundary discretization
 │   ├── validation.py          # NEW — perturbation stability
 │   └── wsn_placement.py       # NEW — zone medoid + cluster head

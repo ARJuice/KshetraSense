@@ -22,7 +22,7 @@ Replace the earlier mock-data-demo-first milestone with a direct build of functi
 
 ## Phase 4 implementation clarification (2026-10-14)
 
-The implemented UI preserves these boundaries: new Soil Investigation sessions start empty, old synthetic seed-preset rows are archived rather than counted as measurements, SoilGrids remains unavailable until a real ISRIC provider is verified, CropSight displays only aggregate values returned by its API (which currently has no raster or spatial-zone output), and historical replay keeps `%RH` forecasts and anomaly candidates explicitly non-operational. The implementation findings and autonomous choices are recorded in [Decision 0009](0009-monitoring-data-provenance-and-provider-readiness.md).
+The Phase 4 UI preserved these boundaries: new Soil Investigation sessions start empty, old synthetic seed-preset rows are archived rather than counted as measurements, CropSight displays only aggregate values returned by its API (which currently has no raster or spatial-zone output), and historical replay keeps `%RH` forecasts and anomaly candidates explicitly non-operational. Decision 0009 recorded the original SoilGrids provider gate; Decision 0010 supersedes that availability detail with the verified public WCS adapter. Provenance and module-separation constraints remain unchanged.
 
 ## Alternatives considered
 

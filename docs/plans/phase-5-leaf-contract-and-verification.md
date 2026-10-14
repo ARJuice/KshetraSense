@@ -115,12 +115,12 @@ Phase 4 automated checks pass. The leaf contract is documentation-only until the
 
 | Scope | Command | Target Pass Criteria |
 |---|---|---|
-| **Python backend** | From `services/zoning`, `python -m pytest tests -q` | **Passed:** 62 tests. Covers zoning, SoilGrids unavailable/no-fallback behavior, and telemetry; not USDA SHI, live devices, valve actuation, or CropSight Earth Engine execution. |
-| **Frontend unit tests** | `npm test` | **Passed:** 45 tests across 13 files, including Soil Investigation storage, CropSight response/error contract, telemetry API client and timestamp/gap view model. No leaf model/API tests exist yet. |
+| **Python backend** | From `services/zoning`, `python -m pytest tests -q` | **Passed:** 75 tests, including all eight SoilGrids scale mappings, WCS raster/cell validation, provider errors, and telemetry. Tests do not establish live devices, valve actuation, or CropSight Earth Engine execution. |
+| **Frontend unit tests** | `npm test` | **Passed:** 46 tests across 13 files, including Soil Investigation storage, SoilGrids response validation, CropSight response/error contract, telemetry API client and timestamp/gap view model. No leaf model/API tests exist yet. |
 | **TypeScript typecheck** | `npm run typecheck` | **Passed:** no TypeScript errors. |
 | **Production build** | `npm run build` | **Passed:** build succeeds; existing 824.24 kB `FieldScene3D` chunk exceeds Vite's 500 kB advisory threshold. |
 | **Telemetry model evidence** | `services/telemetry/models/soil_signal_gru_metadata.json` and [Decision 0008](../decisions/0008-gru-holdout-quality-and-use.md) | Existing chronological held-out results are recorded; GRU is worse than persistence at 6/12/24 hours. Regenerating the model is not required for this documentation milestone. |
-| **Live providers** | Manual Earth Engine setup; future SoilGrids WCS/WebDAV adapter | **Not run/not available:** user setup is deferred; SoilGrids endpoint returns 503 without a verified provider. |
+| **Live providers** | ISRIC SoilGrids WCS; manual Earth Engine setup | **SoilGrids WCS smoke-tested** for quantile responses and property mappings. Earth Engine execution remains pending user setup; external providers may be unavailable. |
 | **Leaf API/model** | Future classifier implementation and contract tests | **Not implemented by design:** audit dataset/classes, train/version MobileNetV3-Small, implement route, test preprocessing/calibration/resource limits, then integrate UI. |
 
 ---
@@ -177,9 +177,9 @@ Use these rigorous mathematical, agronomic, and architectural answers during rev
 
 ---
 
-### Question 9: "Why is SoilGrids shown as unavailable instead of filling gaps in the soil sample register?"
+### Question 9: "Why is SoilGrids shown separately from field samples?"
 > **Defense Answer:**
-> “A previous local implementation generated coordinate-derived numbers without querying ISRIC, so it was removed rather than presented as modeled data. ISRIC currently reports its beta REST API paused and identifies WCS for subsets and WebDAV for global VRT access. Until a real provider is configured and its property, depth, units, quantiles, and provenance are tested, the product returns unavailable and does not treat regional predictions as field samples. ([ISRIC access FAQ](https://docs.isric.org/globaldata/soilgrids/SoilGrids_faqs_02.html))”
+> “The former coordinate-derived formula was not a real provider and was removed. The app now queries ISRIC's public WCS and returns the selected cell's real property/depth estimate and Q0.05/Q0.50/Q0.95 quantiles with official unit conversion and source metadata. SoilGrids has nominal 250 m global cells, so it is broad modeled context—not a laboratory result or a reliable way to fill within-field zoning gaps. Masked cells and service errors return no estimate. ([ISRIC WCS](https://docs.isric.org/globaldata/soilgrids/wcs.html), [layers and scale](https://docs.isric.org/globaldata/soilgrids/SoilGrids_faqs_01.html))”
 
 ---
 
@@ -191,4 +191,4 @@ Use these rigorous mathematical, agronomic, and architectural answers during rev
 
 ### Question 11: "What can we demonstrate today, and what still needs external setup?"
 > **Defense Answer:**
-> “The soil-zoning workflow and Crop Fit use the local service, and historical telemetry can be replayed with its source/unit/model limitations visible. Soil Investigation accepts manual/CSV samples but starts empty. SoilGrids currently reports unavailable because no real data adapter is configured. CropSight needs its mounted sub-application/dependencies and Earth Engine project/authentication; its current API is aggregate-only. Leaf diagnosis has a frozen image-only contract but no route or model weights. These are explicit gates, not hidden simulated successes.”
+> “The soil-zoning workflow and Crop Fit use the local service, and historical telemetry can be replayed with its source/unit/model limitations visible. Soil Investigation accepts manual/CSV samples but starts empty; the separate SoilGrids panel queries real nominal-250 m ISRIC WCS context and reports no-data/provider errors rather than fabricating values. CropSight needs its mounted sub-application/dependencies and Earth Engine project/authentication; its current API is aggregate-only. Leaf diagnosis has a frozen image-only contract but no route or model weights. These are explicit gates, not hidden simulated successes.”

@@ -32,12 +32,21 @@ describe('SoilGrids client contract', () => {
   });
 
   it('surfaces provider unavailability instead of returning a local estimate', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: 'No verified ISRIC data adapter is configured.' }), { status: 503 })));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: 'ISRIC SoilGrids WCS returned HTTP 503.' }), { status: 503 })));
 
     await expect(fetchSoilGridsContext(12.9716, 77.5946)).rejects.toMatchObject({
       status: 503,
-      message: 'No verified ISRIC data adapter is configured.',
+      message: 'ISRIC SoilGrids WCS returned HTTP 503.',
     });
+  });
+
+  it('rejects crossed quantiles or mismatched median values', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      ...context,
+      mappedValue: 6.7,
+    }))));
+
+    await expect(fetchSoilGridsContext(12.9716, 77.5946)).rejects.toThrow(/consistent estimate, quantiles, and provenance/);
   });
 
   it('rejects invalid coordinates before network access', async () => {

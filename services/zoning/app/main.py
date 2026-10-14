@@ -26,6 +26,7 @@ from app.schemas import (
 from app.service import ALGORITHM_VERSION, ZoningValidationError, run_field_zoning, run_zoning
 from app.soilgrids import (
     SOILGRIDS_VERSION,
+    SOILGRIDS_STATUS,
     SoilGridsUnavailable,
     get_soilgrids_context,
 )
@@ -76,7 +77,7 @@ def health() -> dict:
         "algorithmVersion": ALGORITHM_VERSION,
         "cropProfileVersion": PROFILE_VERSION,
         "soilGridsVersion": SOILGRIDS_VERSION,
-        "soilGridsStatus": "unavailable-until-verified-provider-configured",
+        "soilGridsStatus": SOILGRIDS_STATUS,
         "cropsightMounted": cropsight_mounted,
     }
 

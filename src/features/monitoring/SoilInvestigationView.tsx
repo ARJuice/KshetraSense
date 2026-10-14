@@ -634,14 +634,14 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                 <h2 className="font-serif text-lg font-bold text-ink">Regional SoilGrids Context (FM-03, FM-04)</h2>
               </div>
               <p className="text-xs text-ink-muted">
-                Intended for broad modeled context only—not field measurements or zoning inputs. The local SoilGrids provider is currently unavailable.
+                Live ISRIC WCS context at a nominal 250 m resolution—not a field measurement or an input to zoning or Crop Fit.
               </p>
             </div>
-            <StatusPill tone="amber">Modeled Regional Context</StatusPill>
+            <StatusPill tone="sage">ISRIC SoilGrids 2.0 · WCS</StatusPill>
           </div>
 
-          <div role="status" className="rounded-lg border border-amberGold/30 bg-amberGold-subtle p-3 text-xs leading-5 text-amberGold-dark">
-            No verified ISRIC data adapter is configured in this build. The former local coordinate formula has been removed; no regional estimate will be shown until a real WCS/WebDAV-backed provider is implemented and verified.
+          <div role="note" className="rounded-lg border border-line-border bg-parchment-100/70 p-3 text-xs leading-5 text-ink-muted">
+            Each query retrieves the lower, median, and upper model quantiles for the SoilGrids cell at this coordinate. Water, urban, or otherwise masked cells return no estimate; provider outages remain visible as errors.
           </div>
 
           {/* Query Inputs Card */}
@@ -657,7 +657,7 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                 <option value="phh2o">Soil pH (in H2O)</option>
                 <option value="nitrogen">Total Nitrogen (g/kg)</option>
                 <option value="soc">Soil Organic Carbon (g/kg)</option>
-                <option value="cec">Cation Exchange Capacity (cmol(+)/kg)</option>
+                <option value="cec">Cation Exchange Capacity (cmol(c)/kg)</option>
                 <option value="bdod">Bulk Density (kg/dm³)</option>
                 <option value="clay">Clay Content (%)</option>
                 <option value="sand">Sand Content (%)</option>
@@ -677,7 +677,7 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
 
             <div className="sm:col-span-2 lg:col-span-4 flex items-center justify-between gap-3 border-t border-line-subtle pt-3">
               <div className="text-[11px] text-ink-subtle">
-                Supported UI properties and depth layers are listed; this is not proof of provider availability.
+                Nominal product resolution: 250 m. Retrieval requires a network connection to ISRIC's public WCS service.
               </div>
               <button
                 type="button"

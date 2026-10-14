@@ -1,6 +1,6 @@
 # Delivery plan and acceptance
 
-**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phases 1–4 are implemented, Phase 5 contract/defense materials are prepared, and the leaf classifier release gate remains open. SoilGrids and live Earth Engine use have honest provider/setup gates. No visual-only or fixture-output product phase is planned.
+**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phases 1–4 are implemented, Phase 5 contract/defense materials are prepared, and the leaf classifier release gate remains open. SoilGrids uses the public ISRIC WCS with honest no-data/outage states; live Earth Engine use still requires user setup. No visual-only or fixture-output product phase is planned.
 
 ## Delivery principles
 
@@ -30,7 +30,7 @@ Phase 3 backend acceptance is verified by its data, playback, water-balance, and
 | --- | --- | --- | --- |
 | FM-01 | A soil record includes location, collection time, source/method, depth where relevant, parameter, original value, and unit. Missing context is explicit. | `soilSampleValidation.ts`, `csvImport.test.ts`, and form/register UI. | Verified |
 | FM-02 | Repeated soil readings are graphed only when their parameters, units, methods, depths, and time context are comparable; otherwise they remain separate observations. | `comparability.ts` and `comparability.test.ts` (6 unit tests). | Verified |
-| FM-03 | SoilGrids shows property, depth, native resolution, available uncertainty quantiles, retrieval date, and modeled-context label only when a verified provider returns data; otherwise it shows unavailable and no estimate. | `soilgrids.py`, `soilGrids.test.ts`, and `test_monitoring_api.py` verify the current 503/no-fallback contract. | Verified — provider unavailable by design |
+| FM-03 | SoilGrids shows property, depth, nominal resolution, Q0.05/Q0.50/Q0.95, retrieval date, and modeled-context label only from a real ISRIC WCS cell; no-data/provider errors show no estimate. | `soilgrids.py`, `test_soilgrids.py`, `soilGrids.test.ts`, and live WCS smoke test. | Verified — WCS adapter active; upstream uptime external |
 | FM-04 | Soil sample and SoilGrids state do not silently affect Soil Zoning or Crop Fit. | State isolation tests and explicit architectural boundary. | Verified |
 | FM-05 | CropSight's request carries its own center coordinates, radius, and date window; displayed results are labeled with actual source/provider and analysis period. | `monitoringApi.ts` and `cropsight.test.ts` verify validation/mapping; live Earth Engine execution awaits user setup. | Contract verified — live provider pending |
 | FM-06 | Displayed CropSight method labels and summaries agree with the returned data; no spatial map is rendered when the response has no raster or zone geometry. | `VegetationMonitoringView.tsx` and `cropsight.test.ts`; K-means is the only enabled method and absence of spatial output is explicit. | Verified — aggregate output only |
@@ -68,7 +68,7 @@ Phase 3 backend acceptance is verified by its data, playback, water-balance, and
 1. Open Field Lab with a real supplied dataset; identify its source and measurement context before running Soil Zoning.
 2. Change one source sample value, show that the previous run is stale but retained, rerun zoning, then inspect the returned summaries and diagnostics.
 3. Open Crop Fit for a selected cell/zone and explain the independent source-backed assessment and any unassessed factors.
-4. In Field Monitoring, create/import dated soil samples and compare only compatible repeated measurements. Show the explicit SoilGrids-unavailable state; do not present an estimate until a real provider is configured.
+4. In Field Monitoring, create/import dated soil samples and compare only compatible repeated measurements. Query SoilGrids as separate nominal-250 m context; explain that no-data or provider outage gives no estimate and never fills a local sample or field cell.
 5. Replay the Parma research series and explain its `%RH` units, source/treatment labels, model-versus-persistence holdout result, anomaly-candidate semantics, and lack of live/actuation behavior.
 6. After the user configures Earth Engine and ensures the CropSight sub-application/dependencies are available, enter its independent circular AOI/date window and review only returned aggregate NDVI statistics/time series. Explain that the current response has no map-ready raster or zone outputs; do not claim a patch-level prescription or scouting coordinate.
 7. Show the Leaf Diagnosis contract and Evidence & Methods; run a leaf classifier only after its separately built model and inference service pass Phase 5 acceptance.
@@ -85,7 +85,7 @@ If a required provider is unavailable during demonstration, show the explicit un
 | CropSight runtime dependencies/configuration are complete. | Test the pinned source in an isolated environment, provide required packages/configuration outside the preserved source when possible, and record setup. |
 | Earth Engine access/quota is available for the college demonstration. | Validate the configured noncommercial project and show distinct authentication/quota/image-coverage errors. |
 | CropSight algorithm names match map outputs. | Verify source-to-display behavior; suppress or mark any known mismatch unavailable without claiming it is valid. |
-| SoilGrids access remains available and a usable provider can be configured. | ISRIC currently documents its beta REST API as paused and lists WCS for subsets and WebDAV for global VRTs; implement and verify one real path before showing estimates. Until then, the endpoint returns unavailable. |
+| Public WCS availability can change or be temporarily unavailable. | Recheck at demonstration time; retry only the real request and show explicit provider/no-data errors. The adapter uses no credentials and does not create a substitute estimate. |
 | Soil readings are comparable across time. | Preserve source, units, collection date, method, and depth; do not chart unlike measurements as one trend. |
 | Real field photos generalize beyond controlled datasets. | State tested label scope, report cross-dataset evidence separately, and provide review/unsupported states. |
 | Agronomy thresholds support Crop Fit. | Show raw supported factors/“Not assessed” until source, geography, units, thresholds, and tests exist. |

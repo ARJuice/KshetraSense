@@ -29,7 +29,7 @@ export async function fetchSoilGridsContext(
   const url = `${BASE_URL}/v1/monitoring/soilgrids?latitude=${latitude}&longitude=${longitude}&property=${encodeURIComponent(property)}&depth=${encodeURIComponent(depth)}`;
   let response: Response;
   try {
-    response = await fetch(url);
+    response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   } catch (error) {
     throw new MonitoringApiError(error instanceof Error ? error.message : 'SoilGrids service is unreachable.');
   }
@@ -52,8 +52,12 @@ export async function fetchSoilGridsContext(
   const q05 = data.quantiles?.['Q0.05'] ?? data.quantiles?.Q0_05;
   const q50 = data.quantiles?.['Q0.50'] ?? data.quantiles?.Q0_50;
   const q95 = data.quantiles?.['Q0.95'] ?? data.quantiles?.Q0_95;
-  if (![data.mappedValue, q05, q50, q95].every(Number.isFinite)) {
-    throw new MonitoringApiError('SoilGrids service response did not include a mapped estimate and quantiles.');
+  if (
+    ![data.mappedValue, q05, q50, q95, data.latitude, data.longitude].every(Number.isFinite) ||
+    q05 > q50 || q50 > q95 || data.mappedValue !== q50 ||
+    !['property', 'propertyName', 'depth', 'nativeResolution', 'unit', 'source', 'retrievalDate', 'modeledContextLabel', 'uncertaintyDisclosure', 'disclaimer'].every((key) => typeof data[key] === 'string')
+  ) {
+    throw new MonitoringApiError('SoilGrids service response did not include a consistent estimate, quantiles, and provenance.');
   }
   return {
     property: data.property,

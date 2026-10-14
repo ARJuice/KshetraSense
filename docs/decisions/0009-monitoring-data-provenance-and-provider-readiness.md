@@ -1,8 +1,10 @@
 # Decision 0009: Field Monitoring provenance and provider readiness
 
-**Status:** accepted and implemented for Phase 4
+**Status:** accepted for Phase 4; the SoilGrids provider-readiness clause is superseded by [Decision 0010](0010-soilgrids-wcs-context-adapter.md)
 **Date:** 2026-10-14
 **Scope:** Soil Investigation, SoilGrids, CropSight vegetation monitoring, and historical telemetry replay.
+
+This decision records the Phase 4 provenance state. Decision 0010 changes only the provider-readiness outcome: SoilGrids now queries the public WCS. The no-synthetic-data, macro-scale disclosure, and module-isolation decisions here remain in force.
 
 ## Context
 
@@ -19,7 +21,7 @@ The user directed the implementation to proceed autonomously, with Earth Engine 
 - If local storage prevents the migration, retained seed records are labeled `Legacy synthetic demo preset — not a field measurement`, their misleading lab-report reference is removed, and the UI excludes them from measurement summaries and comparable trends.
 - No user measurement is deleted by the migration. Legacy rows remain recoverable from the separate local archive.
 
-### 2. SoilGrids remains unavailable until a real provider is verified
+### 2. SoilGrids remained unavailable at the time of Decision 0009
 
 - Remove the former local coordinate/arithmetic formula. It was not an ISRIC SoilGrids query and must not be labeled or presented as modeled soil data.
 - Validate request coordinates, property, and depth; return HTTP 503 while no verified data provider is configured. The UI shows the unavailable state and no estimate.
@@ -50,16 +52,16 @@ The user directed the implementation to proceed autonomously, with Earth Engine 
 | Should the telemetry replay expose FAO-56 advice from its soil-humidity signal? | No. The trial signal is `%RH`, not calibrated VWC; keep the advisory API separate. |
 | Does deferred Earth Engine setup block finishing the rest of Field Monitoring? | No. Complete the validated UI/service boundary and leave the live-provider run for the user's later setup. |
 
-## Consequences and open gates
+## Consequences and open gates at that phase
 
 - Fresh Field Monitoring is honest but less populated until a user imports/enters measurements or completes provider setup.
-- SoilGrids has no working estimate in the current build. A future WCS/WebDAV adapter needs data/product mapping, validation, provenance, quantile handling, and tests before re-enablement.
+- At that point, SoilGrids had no working estimate. Decision 0010 now implements and verifies the WCS adapter; the remaining external risk is WCS uptime.
 - CropSight is usable as a form and validated result view after its separate API and Earth Engine configuration are available, but its present contract cannot provide spatial zoning or variable-rate outputs.
 - The UI can be automated-tested against valid API response fixtures, but live Earth Engine execution is not verified until the user configures credentials/project and starts the service.
 - Manual visual/accessibility review remains pending; automated browser inspection stopped before opening a confidently identified page URL.
 - The frontend production build still emits a Vite advisory for the existing 824.24 kB `FieldScene3D` chunk, which exceeds the 500 kB warning threshold; it did not fail the build.
 
-## Validation evidence
+## Phase 4 validation evidence (recorded at the time)
 
 - Frontend: 45 tests across 13 files pass; `npm run typecheck` and `npm run build` pass.
 - Backend: 62 Python tests pass. The SoilGrids API is directly checked to return HTTP 503 with an explicit provider-unavailable explanation; health reports the same unavailable status.

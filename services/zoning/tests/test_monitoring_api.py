@@ -13,16 +13,9 @@ def test_health_reports_monitoring_status():
     data = response.json()
     assert data["service"] == "kshetrasense-zoning-and-monitoring"
     assert data["soilGridsVersion"] == "2.0"
-    assert data["soilGridsStatus"] == "unavailable-until-verified-provider-configured"
+    assert data["soilGridsStatus"] == "configured-via-isric-wcs"
     assert "cropsightMounted" in data
     assert data["cropsightMounted"] is True
-
-
-def test_soilgrids_endpoint_valid_request():
-    response = client.get("/v1/monitoring/soilgrids?latitude=12.9716&longitude=77.5946&property=phh2o&depth=0-5cm")
-    assert response.status_code == 503
-    assert "No verified ISRIC data adapter is configured" in response.json()["detail"]
-    assert "WCS/WebDAV" in response.json()["detail"]
 
 
 def test_soilgrids_endpoint_invalid_property():

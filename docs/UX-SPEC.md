@@ -60,7 +60,7 @@ Field Monitoring has three separate views; use the detailed current design in [P
 
 The user creates an investigation and enters a dated sample or imports a validated CSV. Each record shows location, collection date/time, sampling depth, method/source, measured parameter, original value/unit, and optional notes. If repeat readings are not comparable (for example, different depths or methods), show them as separate observations rather than a misleading trend.
 
-An optional SoilGrids panel accepts a location, supported property, and depth layer only when a verified ISRIC-backed provider is available. A successful result must show the modeled estimate and available uncertainty quantiles, native product resolution, property/depth, retrieval/source provenance, and the label **Regional modeled context — not a field sample**. Keep it visually and semantically distinct from user-measured samples. It does not feed Soil Zoning or Crop Fit automatically. In the current build there is no verified provider, so show **unavailable** and no estimate; the former coordinate-derived placeholder was removed. New investigations start empty; legacy synthetic demo rows are archived and excluded from sample summaries/trends.
+An optional SoilGrids panel queries ISRIC's public WCS for a location, supported property, and depth layer. It shows the median model estimate plus Q0.05/Q0.95 quantiles, nominal 250 m product resolution, property/depth, retrieval/source provenance, and the label **Regional modeled context — not a field sample**. Keep it visually and semantically distinct from user-measured samples. It does not feed Soil Zoning or Crop Fit automatically. Masked/no-data locations and WCS outages show no estimate and an explicit error; never replace them with a coordinate formula or stale result. New investigations start empty; legacy synthetic demo rows are archived and excluded from sample summaries/trends.
 
 Useful outputs are a sample register, sample-location map, parameter history where comparable repeat observations exist, missing-context cues, and the separate broad SoilGrids context panel. The initial experience is manual/imported investigations; it does not imply a live sensor network.
 
@@ -92,7 +92,7 @@ Use satisfying transitions for edits and result changes, but animate only actual
 | --- | --- |
 | No input | State which input is required; no fabricated default result. |
 | Incomplete/incompatible soil sample | Identify the missing unit, depth, method, or date; keep the record recoverable. |
-| SoilGrids unavailable | Say regional context is unavailable; never replace it with a measured value. |
+| SoilGrids no-data/provider error | Explain that the selected cell is masked or the public WCS is unavailable; do not show a substitute estimate. |
 | Legacy soil demo records | Archive seed-preset provenance; if storage migration fails, retain a visible synthetic/not-a-measurement label and exclude the records from summaries/trends. |
 | CropSight not configured | Explain the Earth Engine setup requirement and provide a non-secret configuration status, not a fake map. |
 | No usable imagery / poor coverage | Show date range and coverage information available from the service; do not claim reliable zones. |

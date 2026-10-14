@@ -1,8 +1,8 @@
 # Phase 4: Field Monitoring UI Transformation
 
-**Status:** Implemented and automated checks passed on 2026-10-14. Manual visual/accessibility review and live Earth Engine execution remain pending.
+**Status:** Implemented and automated checks passed on 2026-10-14. The SoilGrids WCS adapter is implemented and live-smoke-tested; manual visual/accessibility review and live Earth Engine execution remain pending.
 **Scope:** `src/features/monitoring/` — Soil Investigation, historical telemetry replay, and the independent CropSight vegetation workflow.
-**Depends on:** Phase 3 telemetry API and CropSight aggregate-analysis API. SoilGrids is not enabled because no verified data provider is configured.
+**Depends on:** Phase 3 telemetry API, ISRIC SoilGrids public WCS, and CropSight aggregate-analysis API. Only live CropSight analysis depends on user-configured Earth Engine credentials/project/quota.
 **Manual setup:** Google Earth Engine authentication/project configuration is deferred until the user performs it; the rest of the Field Monitoring UI must work without it.
 
 ---
@@ -17,7 +17,7 @@ Field Monitoring is a desktop-first work area with three distinct tasks:
 
 Do not remove the existing Soil Investigation workflow or its sample forms to make room for replay. A user can switch among these work areas without silently sharing values or presenting one module's data as another's. New installs no longer preload synthetic sample presets. Previously stored `seed-preset` rows are copied to a separate legacy archive and removed from the active register; manual/CSV rows are preserved. If browser storage prevents migration, retained synthetic rows are visibly marked as non-measurements and excluded from summaries/trends.
 
-The former local SoilGrids coordinate formula was not a SoilGrids query and has been removed. `GET /v1/monitoring/soilgrids` validates inputs and returns HTTP 503 until a real ISRIC provider is configured; the UI shows no estimate. ISRIC's official documentation currently reports the beta REST API paused and points to WCS for spatial subsets and WebDAV for global VRT data. A future provider must return real, provenance-bearing values before this view can present them. See [Decision 0009](../decisions/0009-monitoring-data-provenance-and-provider-readiness.md).
+The former local SoilGrids coordinate formula was not a SoilGrids query and has been removed. `GET /v1/monitoring/soilgrids` queries the public ISRIC WCS for Q0.05/Q0.50/Q0.95 GeoTIFF subsets, selects the georeferenced cell containing the coordinate, and applies the official property scale factor. It supports eight documented properties and six standard depths. The result is nominal-250 m modeled regional context—not a sample or zoning input. Provider/no-data/malformed responses return HTTP 503 without a fallback. The beta REST API remains paused; ISRIC documents WCS for spatial subsets and WebDAV for global VRT data. See [Decision 0009](../decisions/0009-monitoring-data-provenance-and-provider-readiness.md), [Decision 0010](../decisions/0010-soilgrids-wcs-context-adapter.md), and the [WCS evidence note](../research/soilgrids-wcs-provider-verification.md).
 
 ---
 
@@ -63,7 +63,7 @@ src/features/monitoring/
 └── telemetryViewModel.ts          # Timestamp/gap-preserving chart series
 ```
 
-`src/services/telemetryApi.ts` consumes Phase 3 `/v1/telemetry/metadata`, `/state`, `/control`, `/stream`, `/history`, and read-only WebSocket snapshots. `src/services/monitoringApi.ts` validates SoilGrids and CropSight requests/responses. SoilGrids currently returns HTTP 503 rather than synthetic values. CropSight displays only the validated aggregate/time-series fields its API returns. Failures preserve inputs and show retryable status; no fabricated telemetry, benchmark, SoilGrids estimate, or CropSight spatial zones are substituted.
+`src/services/telemetryApi.ts` consumes Phase 3 `/v1/telemetry/metadata`, `/state`, `/control`, `/stream`, `/history`, and read-only WebSocket snapshots. `src/services/monitoringApi.ts` validates SoilGrids and CropSight requests/responses. SoilGrids queries real WCS coverages; no-data/provider results return errors rather than synthetic values. CropSight displays only the validated aggregate/time-series fields its API returns. Failures preserve inputs and show retryable status; no fabricated telemetry, benchmark, SoilGrids estimate, or CropSight spatial zones are substituted.
 
 ---
 
@@ -84,14 +84,14 @@ src/features/monitoring/
 3. Raw observations retain timestamps/units and chart gaps; model-grid interpolation is disclosed separately. **Implemented and view-model tested.**
 4. Forecast values, horizons, input completeness, holdout metrics, and persistence comparison match the API. The failed baseline comparison is explicit. **Implemented.**
 5. Anomalies are review candidates only. No live gateway, valve, flow, VWC threshold, or actuation UI is shown. **Implemented.**
-6. SoilGrids returns HTTP 503 without a verified provider; legacy preset records are archived or visibly disclaimed; CropSight shows no stale or fabricated result. **Implemented and tested.**
+6. SoilGrids returns only real mapped WCS cells with documented units/quantiles and provenance; masked cells/provider failures show no estimate. Legacy preset records are archived or visibly disclaimed; CropSight shows no stale or fabricated result. **Implemented and tested; live WCS smoke test passed.**
 7. CropSight only displays returned aggregate NDVI statistics, time series, optional rainfall, and unvalidated heuristic notes. Its current API provides no raster or spatial zones, so none are shown. **Implemented and tested with response fixtures.**
-8. Automated verification: `npm test` passed 45 tests in 13 files; `npm run typecheck` and `npm run build` passed; the zoning suite passed 62 Python tests. The Vite build reports the existing 824.24 kB `FieldScene3D` chunk above the 500 kB advisory threshold.
+8. Automated verification (2026-10-14): `npm test` passed 46 tests in 13 files; `npm run typecheck` and `npm run build` passed; the full Python suite passed 75 tests. The Vite build reports the existing 824.24 kB `FieldScene3D` chunk above the 500 kB advisory threshold.
 9. Manual browser/accessibility inspection is still pending. The UI automation safety check stopped before opening a confidently identified page URL, so a screenshot-based visual pass is not claimed.
 
 ### Remaining manual/provider gates
 
 - The user will configure Earth Engine project/authentication and ensure the CropSight sub-application is mounted with its required dependencies later. Until then, live imagery analysis has not been verified.
-- Implement and verify a real SoilGrids WCS/WebDAV-backed adapter before showing estimates. ISRIC currently reports the beta REST API paused and documents WCS for subsets and WebDAV for global VRT data ([ISRIC access FAQ](https://docs.isric.org/globaldata/soilgrids/SoilGrids_faqs_02.html)).
+- Recheck live ISRIC WCS availability at demonstration time; the public service is external and may be down. Do not substitute a local estimate. No SoilGrids credential/setup action is required. The user still configures Earth Engine and ensures CropSight dependencies are available before live satellite analysis.
 - A separately scoped UI may expose the calibrated-VWC FAO-56 endpoint later; never connect it to the replay's `%RH` signal.
 - Manually verify browser accessibility/layout and profile the oversized 3D bundle in a later review.
