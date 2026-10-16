@@ -6,8 +6,9 @@ from typing import Any
 
 import numpy as np
 from pyproj import Transformer
-from shapely import contains_xy, transform
+from shapely import contains_xy, intersects, transform
 from shapely.geometry import Polygon, box, mapping
+from shapely.ops import unary_union
 
 MAX_FIELD_CELLS = 5_000
 MAX_GRID_CANDIDATES = 100_000
@@ -79,11 +80,13 @@ def discretize_field(boundary: dict[str, Any], cell_size_m: float) -> Discretize
             f"The boundary requires {candidates:,} candidate cells; reduce the field extent or use a larger cell size."
         )
 
+    half_size = cell_size_m / 2
     x_centers = min_x + (np.arange(columns, dtype=float) + 0.5) * cell_size_m
     y_centers = max_y - (np.arange(rows, dtype=float) + 0.5) * cell_size_m
     xx, yy = np.meshgrid(x_centers, y_centers)
-    inside = contains_xy(polygon_utm, xx, yy)
-    row_indices, column_indices = np.nonzero(inside)
+    candidate_boxes = [box(x - half_size, y - half_size, x + half_size, y + half_size) for x, y in zip(xx.ravel(), yy.ravel())]
+    inter_mask = intersects(polygon_utm, candidate_boxes).reshape(rows, columns)
+    row_indices, column_indices = np.nonzero(inter_mask)
     if len(row_indices) > MAX_FIELD_CELLS:
         raise SpatialValidationError(
             f"The field creates {len(row_indices):,} cells; the maximum supported by this API is {MAX_FIELD_CELLS:,}."
@@ -92,24 +95,46 @@ def discretize_field(boundary: dict[str, Any], cell_size_m: float) -> Discretize
         raise SpatialValidationError("The boundary contains no cell centers at the requested cell size.")
 
     cells: list[GridCell] = []
-    half_size = cell_size_m / 2
-    for index, (row, column) in enumerate(zip(row_indices, column_indices, strict=True), start=1):
+    cell_index = 0
+    for row, column in zip(row_indices, column_indices, strict=True):
         x = float(xx[row, column])
         y = float(yy[row, column])
         footprint_utm = polygon_utm.intersection(box(x - half_size, y - half_size, x + half_size, y + half_size))
+        if footprint_utm.is_empty or footprint_utm.area <= 1e-6:
+            continue
+        if footprint_utm.geom_type == "GeometryCollection":
+            polys = [geom for geom in footprint_utm.geoms if geom.geom_type in ("Polygon", "MultiPolygon") and geom.area > 1e-6]
+            if not polys:
+                continue
+            footprint_utm = unary_union(polys)
+        if footprint_utm.geom_type not in ("Polygon", "MultiPolygon") or footprint_utm.is_empty or footprint_utm.area <= 1e-6:
+            continue
+        cell_index += 1
         footprint_wgs84 = transform(footprint_utm, to_wgs84.transform, interleaved=False)
         clipped_area = footprint_utm.area
-        lon, lat = to_wgs84.transform(x, y)
+        if contains_xy(polygon_utm, x, y):
+            cx, cy = x, y
+        else:
+            rep = footprint_utm.representative_point()
+            cx, cy = float(rep.x), float(rep.y)
+        lon, lat = to_wgs84.transform(cx, cy)
         cells.append(
             GridCell(
-                id=f"cell-{index:04d}",
+                id=f"cell-{cell_index:04d}",
                 row=int(row),
                 column=int(column),
-                center_utm=(x, y),
+                center_utm=(cx, cy),
                 center_wgs84=(float(lon), float(lat)),
                 area_m2=float(clipped_area),
                 geometry_wgs84=mapping(footprint_wgs84),
             )
+        )
+
+    if not cells:
+        raise SpatialValidationError("The boundary contains no cell centers at the requested cell size.")
+    if len(cells) > MAX_FIELD_CELLS:
+        raise SpatialValidationError(
+            f"The field creates {len(cells):,} cells; the maximum supported by this API is {MAX_FIELD_CELLS:,}."
         )
 
     return DiscretizedField(

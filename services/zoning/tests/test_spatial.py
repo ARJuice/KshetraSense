@@ -52,3 +52,46 @@ def test_discretize_field_rejects_self_intersecting_polygon():
 
     with pytest.raises(SpatialValidationError, match="valid, non-self-intersecting"):
         discretize_field(boundary, cell_size_m=10)
+
+
+def test_discretize_field_covers_full_boundary_without_edge_gaps():
+    # Boundary not an exact multiple of 10m (131.6m x 134.1m)
+    boundary = _boundary_from_utm_rings(
+        [[(500_000, 1_400_000), (500_131.6, 1_400_000), (500_131.6, 1_400_134.1), (500_000, 1_400_134.1), (500_000, 1_400_000)]]
+    )
+
+    field = discretize_field(boundary, cell_size_m=10)
+
+    # 14 columns x 14 rows = 196 cells fully tessellating the field
+    assert len(field.cells) == 196
+    total_cell_area = sum(cell.area_m2 for cell in field.cells)
+    expected_area_m2 = 131.6 * 134.1
+    assert total_cell_area == pytest.approx(expected_area_m2, rel=1e-5)
+    # Check that rows 0..13 and columns 0..13 are all present
+    assert {cell.row for cell in field.cells} == set(range(14))
+    assert {cell.column for cell in field.cells} == set(range(14))
+
+
+def test_discretize_field_rejects_boundary_with_no_usable_cells():
+    # Microscopic polygon (1mm x 1mm, area = 1e-6 m2)
+    boundary = _boundary_from_utm_rings(
+        [[(500_000, 1_400_000), (500_000.001, 1_400_000), (500_000.001, 1_400_000.001), (500_000, 1_400_000.001), (500_000, 1_400_000)]]
+    )
+
+    with pytest.raises(SpatialValidationError, match="contains no cell centers"):
+        discretize_field(boundary, cell_size_m=10)
+
+
+def test_discretize_field_cell_geometries_are_strictly_polygons():
+    # Triangle boundary creating partial triangular and clipped cells
+    boundary = _boundary_from_utm_rings(
+        [[(500_000, 1_400_000), (500_050, 1_400_000), (500_000, 1_400_050), (500_000, 1_400_000)]]
+    )
+
+    field = discretize_field(boundary, cell_size_m=10)
+    assert len(field.cells) > 0
+    for cell in field.cells:
+        geom_type = cell.geometry_wgs84.get("type")
+        assert geom_type in ("Polygon", "MultiPolygon"), f"Unexpected geom type {geom_type}"
+
+

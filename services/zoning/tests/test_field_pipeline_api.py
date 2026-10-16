@@ -143,3 +143,53 @@ def test_full_pipeline_rejects_blank_sampling_depth():
 
     assert response.status_code == 422
     assert "depthCm" in response.text
+
+
+def test_all_demo_presets_achieve_full_boundary_coverage():
+    import json
+    from pathlib import Path
+    demo_json_path = Path(__file__).resolve().parents[3] / "src" / "features" / "zoning" / "field" / "demoData.json"
+    if not demo_json_path.exists():
+        pytest.skip("demoData.json not found")
+
+    with open(demo_json_path, encoding="utf-8") as f:
+        demos = json.load(f)
+
+    for demo in demos:
+        lines = [l.strip() for l in demo["csv"].strip().split("\n") if l.strip()]
+        header = lines[0].split(",")
+        samples = []
+        for l in lines[1:]:
+            parts = l.split(",")
+            row = dict(zip(header, parts))
+            samples.append({
+                "id": row["id"],
+                "latitude": float(row["latitude"]),
+                "longitude": float(row["longitude"]),
+                "depthCm": row["depth_cm"],
+                "collectionDate": row["collection_date"],
+                "labMethod": row["lab_method"],
+                "measurements": {
+                    "pH": float(row["ph"]),
+                    "ec": float(row["ec"]),
+                    "nitrogen": float(row["nitrogen"]),
+                    "phosphorus": float(row["phosphorus"]),
+                    "potassium": float(row["potassium"]),
+                },
+            })
+        payload = {
+            "boundary": demo["geojson"]["geometry"],
+            "samples": samples,
+            "cellSizeM": 10,
+            "method": "fcm",
+            "maxK": 6,
+            "seed": 42,
+            "mergeThresholdZ": 0.5,
+            "perturbationRuns": 2,
+            "fcm": {"fuzziness": 2.0, "maxIterations": 150, "tolerance": 1e-5},
+        }
+        res = client.post("/v2/zoning/run", json=payload)
+        assert res.status_code == 200, f"Preset {demo['id']} failed: {res.text}"
+        data = res.json()
+        assert data["field"]["gridCoveragePercent"] == pytest.approx(100.0, rel=1e-4)
+
