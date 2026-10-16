@@ -1,6 +1,6 @@
 # Decision 0011: Factor-by-factor crop reference report and automatic K
 
-**Status:** Accepted
+**Status:** Accepted; crop catalog superseded by [Decision 0012](0012-karnataka-crop-reference-catalog.md)
 **Date:** 2026-10-14
 
 ## Context
@@ -12,7 +12,7 @@ The user asked the report to expose those values beside crop reference context, 
 ## Decision
 
 1. Keep Crop Fit inside Soil Zoning, but make it a **factor-by-factor reference report**, not a crop classifier or planting decision.
-2. For each selected cell or zone, show the observed pH, EC, N, P, and K value for Apple, Tomato, and Potato. A cell value is an IDW estimate. A zone value is the field service's area-weighted mean of IDW-estimated cell values, not another laboratory measurement.
+2. For each selected cell or zone, show the observed pH, EC, N, P, and K value for three independent crops. The original Apple/Tomato/Potato list is replaced by Finger Millet (Ragi), Tomato, and Groundnut in Decision 0012. A cell value is an IDW estimate. A zone value is the field service's area-weighted mean of IDW-estimated cell values, not another laboratory measurement.
 3. Compare pH numerically with the cited pH interval only. Phrase the state as a numeric relation to that interval, not a whole-crop status. Make all state badges visually neutral.
 4. Show published EC salinity context, but do not compare the generic field EC value with a threshold: FAO references use root-zone mean ECe from a saturated-paste extract, while the current field input does not verify that method or sampling context.
 5. Keep N/P/K visible but do not invent universal numeric bands. The field schema only says mg/kg; it does not identify nutrient analyte, extractant, regional calibration, or crop-specific production context. Moisture and soil temperature are not field-zoning inputs and remain “Not measured in this workflow.”

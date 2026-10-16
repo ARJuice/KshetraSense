@@ -191,7 +191,7 @@ class CropFitRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    profileVersion: str = Field(default="2026.10-crop-reference-report-v2", min_length=1, max_length=128)
+    profileVersion: str = Field(default="2026.10-crop-reference-report-v3", min_length=1, max_length=128)
     measurements: dict[str, float | None]
     measurementContext: dict[str, str] = Field(default_factory=dict)
 

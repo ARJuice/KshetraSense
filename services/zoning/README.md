@@ -1,6 +1,6 @@
 # KshetraSense zoning service
 
-Local FastAPI service for legacy grid zoning, field-scale sparse-sample zoning, selected-cell/zone crop reference reports, and the isolated historical telemetry replay API. It is deliberately independent from the browser UI and does not share state between zoning, Crop Fit, and telemetry.
+Local FastAPI service for legacy grid zoning, field-scale sparse-sample zoning, selected-cell/zone crop reference reports, historical telemetry replay, and image-only leaf diagnosis. It is deliberately independent from the browser UI and does not share state between zoning, Crop Fit, telemetry, and leaf diagnosis.
 
 ## What it does
 
@@ -8,7 +8,7 @@ Local FastAPI service for legacy grid zoning, field-scale sparse-sample zoning, 
 - Uses a recorded feature-wise z-score normalization policy and returns its parameters.
 - Excludes incomplete cells rather than silently imputing values; excludes constant features because they cannot distinguish zones.
 - Returns assignments, raw and normalized centroids, zone summaries, grid adjacency, a silhouette diagnostic, and FCM memberships when applicable.
-- Evaluates caller-supplied selected-zone means or a selected-cell profile against the limited, versioned crop-profile rules in `app/crop_profiles.py`. It is an independent, per-crop compatibility screen—not a probability, crop ranking, yield estimate, or prescription.
+- Evaluates caller-supplied selected-zone means or a selected-cell profile against the limited, versioned crop-reference contexts in `app/crop_profiles.py`. It is an independent factor report—not a crop verdict, probability, ranking, yield estimate, or prescription.
 - Runs `POST /v2/zoning/run` from a WGS84 GeoJSON Polygon plus 3–50 georeferenced samples (5–10 recommended): IDW p=2 estimates, project-defined SHI, silhouette Auto-K K-means/FCM, adjacent-profile merging, connected-component splitting, sample-perturbation sensitivity, and geometric WSN/gateway candidates.
 
 ## Run locally
@@ -40,7 +40,8 @@ python -m pytest -q
 | `POST /v1/telemetry/control` | Play/pause, bounded UTC seek, or set playback speed (1/10/60/360). |
 | `WS /v1/telemetry/ws` | Read-only historical snapshots. |
 | `POST /v1/telemetry/water-balance/advisory` | Independent FAO-56 TAW/RAW screen; requires explicit VWC fractions and site calibration inputs. |
-| `GET /cropsight/health`, `POST /cropsight/analyze-field` | Optional CropSight sub-application, mounted only when its Python imports are available; live Earth Engine access still requires user configuration. Aliased under `/api/v1/cropsight/`. |
+| `POST /v1/leaf/predict` | Transient JPEG/PNG upload for all 17 PlantVillage Apple/Potato/Tomato classes; all scores require manual review. |
+| `GET /cropsight/health`, `POST /cropsight/analyze-field` | Optional CropSight sub-application, mounted only when its Python imports are available; live Earth Engine access requires a project, local authentication, quota, and imagery coverage. Aliased under `/api/v1/cropsight/`. |
 | `GET /v1/monitoring/soilgrids` | Retrieves real ISRIC WCS GeoTIFF quantiles for one nominal 250 m cell; returns explicit HTTP 503 on no-data, invalid provider output, or upstream failure. |
 | `POST /v1/zoning/run` | Validate cells and run `kmeans` or `fuzzy-c-means`. |
 | `POST /v2/zoning/run` | Run the boundary + sparse-sample field pipeline and return per-cell estimates, contiguous zones, diagnostics, and candidate locations. |
@@ -50,7 +51,7 @@ python -m pytest -q
 
 SoilGrids uses the public ISRIC Web Coverage Service, not the paused beta REST API or the former local coordinate formula. Each request retrieves Q0.05/Q0.50/Q0.95 subsets in EPSG:4326, reads the single georeferenced cell containing the requested coordinate, and applies the documented integer scale factor for the selected property. Supported properties are pH in water, nitrogen, soil organic carbon, CEC, bulk density, clay, sand, and silt across the six standard depths. Results are labeled as nominal-250 m modeled context, never field measurements, and never enter Soil Zoning or Crop Fit. The adapter bounds the requested window, response size, timeout, and raster dimensions; masked cells, malformed content, inconsistent quantiles, and WCS failures return HTTP 503 with no fallback. See [Decision 0010](../../docs/decisions/0010-soilgrids-wcs-context-adapter.md) and the [provider verification note](../../docs/research/soilgrids-wcs-provider-verification.md).
 
-CropSight is mounted as a sub-application under `/cropsight` (and `/api/v1/cropsight`) only if its imports succeed in the zoning environment; `GET /health` exposes `cropsightMounted` for this mount state. That flag means the app mounted, not that Earth Engine authentication, project access, quota, or imagery coverage is valid. Install/configure its dependencies and Earth Engine access before attempting live analysis. The current API response does not return raster or spatial-zone outputs; the host UI intentionally shows only validated aggregate/time-series fields.
+CropSight is mounted as a sub-application under `/cropsight` (and `/api/v1/cropsight`) only if its imports succeed in the zoning environment; `GET /health` exposes `cropsightMounted` for this mount state. That flag means the app mounted, not that Earth Engine authentication, project access, quota, or imagery coverage is valid. Set `EARTHENGINE_PROJECT` when the project differs from the configured default and authenticate Earth Engine locally before live analysis; credentials must not be stored in the repository. The local Parma research-site smoke test passed on 2026-10-14. The current API response does not return raster or spatial-zone outputs; the host UI intentionally shows only validated aggregate/time-series fields.
 
 For the host UI, `/api/v1/zoning/run` is a compatibility alias. It accepts both the documented nested-cell request and the UI's compact request: `cluster_count`, `method: "fuzzy-c-means"`, and flat cell measurements. The response exposes the compact `assignments` map, plus `assignmentDetails` with coordinates and FCM memberships.
 
@@ -62,7 +63,7 @@ The frontend displays all supported cells in 2D. Its optional 3D scene is lazy-l
 
 ## Data and evidence boundaries
 
-Crop Fit returns three independent factor-by-factor reference reports, not a crop-level verdict. It displays all selected pH, EC, N, P, and K values; for zones it receives the response's area-weighted means of IDW cell estimates. A pH value is compared numerically with a cited contextual interval. EC salinity references are shown as context only because the field EC method/root-zone ECe context is not verified. N/P/K are shown but have no portable numeric bands in the current input contract because analyte, extractant, region, and local calibration are not sufficiently specified. Moisture and soil temperature are not supplied by this zoning workflow. No result says a crop is fit/suitable or recommends planting. See [the source review](../../docs/research/soil-reference-intervals.md) and [crop-suitability evidence boundary](../../docs/research/crop-suitability-probability.md).
+Crop Fit returns three independent Finger Millet (Ragi), Tomato, and Groundnut factor-by-factor reference reports, not a crop-level verdict. It displays all selected pH, EC, N, P, and K values; for zones it receives the response's area-weighted means of IDW cell estimates. A pH value is compared numerically with a cited contextual interval. EC salinity references are shown as context only because the field EC method/root-zone ECe context is not verified. N/P/K are shown but have no portable numeric bands in the current input contract because analyte, extractant, region, and local calibration are not sufficiently specified. Moisture and soil temperature are not supplied by this zoning workflow. No result says a crop is fit/suitable or recommends planting. See [the current crop-selection research](../../docs/research/crop-fit-crop-selection.md), [Decision 0012](../../docs/decisions/0012-karnataka-crop-reference-catalog.md), and the [crop-suitability evidence boundary](../../docs/research/crop-suitability-probability.md). Three synthetic bundles have a documented uniform -0.10 pH display offset so zone-level pH comparisons are not all simultaneously inside the three cited intervals; within-field z-score cluster assignments remain unchanged, but pH-based SHI values shift slightly. EC/N/P/K samples remain unchanged because method-unspecified values do not justify invented crop-specific thresholds.
 
 Ten clearly labeled synthetic input pairs (GeoJSON boundary + complete dated soil-sample CSV) are provided under [`data/demo/soil-zoning`](../../data/demo/soil-zoning/README.md) for workflow demonstrations and tests. They are not real field or laboratory data.
 

@@ -13,7 +13,8 @@ def test_crop_report_shows_all_available_fields_without_a_crop_level_verdict():
         )
     )
 
-    assert [item["crop"] for item in result["assessments"]] == ["apple", "tomato", "potato"]
+    assert [item["crop"] for item in result["assessments"]] == ["finger_millet", "tomato", "groundnut"]
+    assert [item["name"] for item in result["assessments"]] == ["Finger Millet (Ragi)", "Tomato", "Groundnut"]
     assert all("assessmentState" not in item for item in result["assessments"])
     assert "does not determine whether a crop should be planted" in result["dataLimitations"][0]
     for assessment in result["assessments"]:
@@ -33,10 +34,33 @@ def test_pH_report_is_only_a_numeric_reference_comparison():
     result = evaluate_crop_fit(CropFitRequest(measurements={"pH": 5.7}))
     factors = {item["crop"]: {factor["feature"]: factor for factor in item["factors"]} for item in result["assessments"]}
 
-    assert factors["apple"]["pH"]["state"] == "below_reference_range"
+    assert factors["finger_millet"]["pH"]["state"] == "within_reference_range"
     assert factors["tomato"]["pH"]["state"] == "below_reference_range"
-    assert factors["potato"]["pH"]["state"] == "within_reference_range"
+    assert factors["groundnut"]["pH"]["state"] == "within_reference_range"
     assert all(factors[crop]["ec"]["state"] == "not_provided" for crop in factors)
+
+
+def test_demo_ph_extremes_produce_distinct_neutral_reference_states():
+    def ph_states(value: float) -> dict[str, str]:
+        result = evaluate_crop_fit(CropFitRequest(measurements={"pH": value}))
+        return {
+            assessment["crop"]: next(factor["state"] for factor in assessment["factors"] if factor["feature"] == "pH")
+            for assessment in result["assessments"]
+        }
+
+    acidic = ph_states(5.0)
+    alkaline = ph_states(7.8)
+
+    assert acidic == {
+        "finger_millet": "within_reference_range",
+        "tomato": "below_reference_range",
+        "groundnut": "below_reference_range",
+    }
+    assert alkaline == {
+        "finger_millet": "within_reference_range",
+        "tomato": "above_reference_range",
+        "groundnut": "above_reference_range",
+    }
 
 
 def test_crop_report_rejects_unknown_profile_versions():

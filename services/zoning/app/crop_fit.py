@@ -18,12 +18,14 @@ def evaluate_crop_fit(request: CropFitRequest) -> dict:
     for profile in PROFILES:
         factors = [
             _ph_factor(p_h, profile.ph_min, profile.ph_max, profile.source_label, profile.source_url, profile.context),
-            _ec_factor(ec, profile.ec_reference, profile.ec_source_label, profile.ec_source_url),
+            _ec_factor(ec, profile.ec_reference, profile.ec_source_label, profile.ec_source_url, profile.ec_context),
         ]
         factors.extend(_context_factor(name, request.measurements.get(name), reason) for name, reason in UNASSESSED_FEATURES)
         assessments.append(
             {
                 "crop": profile.crop,
+                "name": profile.name,
+                "scientificName": profile.scientific_name,
                 "factors": factors,
                 "limitations": [
                     "This report compares individual soil values with the cited context where possible; it does not decide whether the crop should be planted.",
@@ -69,7 +71,7 @@ def _ph_factor(value: float | None, low: float, high: float, source_label: str, 
     }
 
 
-def _ec_factor(value: float | None, reference: str, source_label: str, source_url: str) -> dict:
+def _ec_factor(value: float | None, reference: str, source_label: str, source_url: str, context: str) -> dict:
     return {
         "feature": "ec",
         "observedValue": value,
@@ -82,7 +84,7 @@ def _ec_factor(value: float | None, reference: str, source_label: str, source_ur
         ),
         "referenceText": reference,
         "supportedRange": None,
-        "source": {"label": source_label, "url": source_url, "context": "General FAO salinity reference; cultivar, climate, soil, and management can change crop response."},
+        "source": {"label": source_label, "url": source_url, "context": context},
     }
 
 

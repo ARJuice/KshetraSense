@@ -36,6 +36,8 @@ export interface CropFitFactor {
 
 export interface CropFitAssessment {
   crop: string;
+  name: string;
+  scientificName: string;
   factors: CropFitFactor[];
   limitations: string[];
 }

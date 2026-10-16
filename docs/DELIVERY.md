@@ -1,6 +1,6 @@
 # Delivery plan and acceptance
 
-**Status:** Release acceptance checklist. The authoritative implementation sequence and phase status are in [plans/README.md](plans/README.md); Phases 1–4 are implemented, Phase 5 contract/defense materials are prepared, and the leaf classifier release gate remains open. SoilGrids uses the public ISRIC WCS with honest no-data/outage states; live Earth Engine use still requires user setup. No visual-only or fixture-output product phase is planned.
+**Status:** Release acceptance checklist. Phases 1–5 are implemented; frontend and leaf-focused checks pass. The current full backend run has 94 passes and one CropSight environment/provider-response mismatch (expected 500, received 200), recorded in [Phase 5 verification](plans/phase-5-leaf-contract-and-verification.md). Leaf Diagnosis has a trained model, API, and UI; external field-photo validation and calibrated rejection remain open. SoilGrids uses the public ISRIC WCS with honest no-data/outage states; live Earth Engine use still requires user setup. No visual-only or fixture-output product phase is planned.
 
 ## Delivery principles
 
@@ -18,7 +18,7 @@
 | 2. Soil Zoning UI Redesign — complete | Boundary/sample input, real `/v2` integration, returned clipped-cell layers/diagnostics, and selected-cell/zone Crop Fit via the existing rules endpoint. | Frontend/service tests pass; no canned result; edits mark prior runs stale; 2D/3D use the same response geometry; 3D obeys cell and triangle limits. |
 | 3. Historical Telemetry Replay & Soil-Signal Forecast — complete | Pinned Parma research data, provenance-aware playback API, experimental `%RH`-signal GRU, candidate-only anomaly screen, and separate calibrated-VWC FAO-56 advisory. | 62 Python tests pass; model/data metadata and source hashes are recorded. The GRU fails to beat persistence at all horizons and is explicitly evaluation-only; no live/zone/actuation claim. |
 | 4. Field Monitoring UI Transformation — complete | Add the historical replay view alongside empty-by-default Soil Investigation and independent CropSight aggregate analysis; preserve module boundaries. | Frontend/API tests pass; replay provenance, raw units, data quality, and weak model performance are visible; no fake SoilGrids values or CropSight zones; provider/setup failures are honest; no output silently changes zoning or Crop Fit. |
-| 5. Leaf Contract, Verification & Defense — contract prepared | Freeze the image-only 17-class MobileNetV3-Small API boundary, cross-module test matrix, demonstration narrative, and defense guide. | **Documentation complete; classifier release gate remains open.** The future route/model must pass dataset audit, preprocessing/class-map agreement, measured evaluation, calibration/review policy, resource-limit and image-privacy tests before inference is enabled. No leaf model, route, or weights are currently included. |
+| 5. Leaf Contract, Verification & Defense — implemented | Freeze the image-only 17-class MobileNetV3-Small API boundary, cross-module test matrix, demonstration narrative, and defense guide; implement and evaluate the model, endpoint, and UI. | Leaf-focused backend tests (15) and frontend tests (51) pass. Current full backend run: 94 passed, 1 CropSight environment/provider-response mismatch (expected 500, received 200). Held-out filtered PlantVillage test (4,653 images) reaches 92.97% accuracy and 93.52% macro-F1. All responses require manual review; field-photo performance and PlantDoc external evaluation remain open. |
 
 The sequence permits independent work on the crop model, soil processing, or CropSight environment, but user-visible completion gates remain in order. A visual element may be polished during its functional phase; it must never be used to disguise an unimplemented computation.
 
@@ -52,7 +52,7 @@ Phase 3 backend acceptance is verified by its data, playback, water-balance, and
 | AC-08 | Soil, zoning, and membership modes have distinct titles/legends; zone meaning does not rely on color alone. | Accessibility/visual review. |
 | AC-09 | Crop Fit shows selected values/units, cited context/source, method limitations, and missing-input states. | Crop Fit API and zoning UI tests. |
 | AC-10 | Crop Fit has no crop-level verdict/ranking and its factor rows do not depend on cluster labels. | API test and copy scan. |
-| AC-11 | Leaf result contains the 17 ranked classes, model/preprocessing/map versions, measured latency, and review/unsupported state. | Model contract test. |
+| AC-11 | Leaf result contains all 17 ranked classes, model/preprocessing/map versions, measured per-request latency, and an always-on manual-review indication. | Leaf API contract tests and held-out model report. |
 | AC-12 | Leaf inference receives no zone, soil, SHI, or selected-crop feature. | Request-schema test. |
 | AC-13 | All core workflows remain available without WebGL; mobile defaults to a usable 2D path. | Browser run with WebGL disabled and responsive tests. |
 | AC-14 | Keyboard-only path reaches field actions; no required information depends on hover; reduced motion stops decorative travel/loops. | Accessibility and manual check. |
@@ -71,7 +71,7 @@ Phase 3 backend acceptance is verified by its data, playback, water-balance, and
 4. In Field Monitoring, create/import dated soil samples and compare only compatible repeated measurements. Query SoilGrids as separate nominal-250 m context; explain that no-data or provider outage gives no estimate and never fills a local sample or field cell.
 5. Replay the Parma research series and explain its `%RH` units, source/treatment labels, model-versus-persistence holdout result, anomaly-candidate semantics, and lack of live/actuation behavior.
 6. After the user configures Earth Engine and ensures the CropSight sub-application/dependencies are available, enter its independent circular AOI/date window and review only returned aggregate NDVI statistics/time series. Explain that the current response has no map-ready raster or zone outputs; do not claim a patch-level prescription or scouting coordinate.
-7. Show the Leaf Diagnosis contract and Evidence & Methods; run a leaf classifier only after its separately built model and inference service pass Phase 5 acceptance.
+7. Upload a supported leaf image in Leaf Diagnosis, inspect all returned scores and model versions, and explain the manual-review requirement and controlled-dataset limits.
 8. Show the provenance chain, measured evaluation reports, and unavailable/deferred features.
 
 If a required provider is unavailable during demonstration, show the explicit unavailable state and setup requirement. Do not substitute a canned screen as if the provider ran.
@@ -80,8 +80,8 @@ If a required provider is unavailable during demonstration, show the explicit un
 
 | Assumption/risk | Required handling |
 | --- | --- |
-| PlantVillage labels and physical-leaf split match the intended 17 classes. | Audit files, labels, counts, and split metadata; save a versioned manifest. |
-| PlantDoc has exact supported label matches. | Audit labels and report only actual coverage. |
+| PlantVillage labels and physical-leaf split match the intended 17 classes. | Audited and versioned the exact class map; grouped physical `leaf_id` and exact-image hashes; excluded ten records from five source train/test overlap groups; saved the split manifest. |
+| PlantDoc has exact supported label matches. | Not evaluated in this build; report PlantDoc as open external-domain work and do not claim cross-dataset performance. |
 | CropSight runtime dependencies/configuration are complete. | Test the pinned source in an isolated environment, provide required packages/configuration outside the preserved source when possible, and record setup. |
 | Earth Engine access/quota is available for the college demonstration. | Validate the configured noncommercial project and show distinct authentication/quota/image-coverage errors. |
 | CropSight algorithm names match map outputs. | Verify source-to-display behavior; suppress or mark any known mismatch unavailable without claiming it is valid. |

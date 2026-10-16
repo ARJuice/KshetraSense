@@ -12,6 +12,8 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from services.telemetry.app.router import router as telemetry_router
+from services.leaf.router import router as leaf_router
+from services.leaf.upload_limits import LeafUploadLimitMiddleware
 
 from app.crop_fit import evaluate_crop_fit
 from app.crop_profiles import PROFILE_VERSION
@@ -47,8 +49,9 @@ def _cors_origins() -> list[str]:
 app = FastAPI(
     title="KshetraSense Analysis & Monitoring Service",
     version=ALGORITHM_VERSION,
-    description="Local soil zoning and crop-fit, SoilGrids context, independent CropSight integration, and historical telemetry replay.",
+    description="Local soil zoning and crop-fit, image-only leaf diagnosis, SoilGrids context, independent CropSight integration, and historical telemetry replay.",
 )
+app.add_middleware(LeafUploadLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
@@ -57,6 +60,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(telemetry_router)
+app.include_router(leaf_router)
 
 # Mount CropSight as an independent sub-application if available
 cropsight_mounted = False

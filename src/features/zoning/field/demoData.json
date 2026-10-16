@@ -132,7 +132,7 @@
         ]
       }
     },
-    "csv": "id,latitude,longitude,depth_cm,ph,ec,nitrogen,phosphorus,potassium,collection_date,lab_method,uncertainty_ph,uncertainty_ec,uncertainty_nitrogen,uncertainty_phosphorus,uncertainty_potassium\nbalanced-01,12.97015,77.59015,0-15,6.0,0.45,42,18,105,2026-06-15,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nbalanced-02,12.97015,77.59105,0-15,6.2,0.65,50,23,120,2026-06-15,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nbalanced-03,12.97060,77.59060,0-15,6.4,0.80,58,29,140,2026-06-15,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nbalanced-04,12.97105,77.59015,0-15,6.6,0.90,65,35,155,2026-06-15,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nbalanced-05,12.97105,77.59105,0-15,6.3,0.70,54,27,132,2026-06-15,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\n"
+    "csv": "id,latitude,longitude,depth_cm,ph,ec,nitrogen,phosphorus,potassium,collection_date,lab_method,uncertainty_ph,uncertainty_ec,uncertainty_nitrogen,uncertainty_phosphorus,uncertainty_potassium\nbalanced-01,12.97015,77.59015,0-15,5.9,0.45,42,18,105,2026-06-15,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nbalanced-02,12.97015,77.59105,0-15,6.1,0.65,50,23,120,2026-06-15,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nbalanced-03,12.97060,77.59060,0-15,6.3,0.80,58,29,140,2026-06-15,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nbalanced-04,12.97105,77.59015,0-15,6.5,0.90,65,35,155,2026-06-15,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nbalanced-05,12.97105,77.59105,0-15,6.2,0.70,54,27,132,2026-06-15,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\n"
   },
   {
     "id": "contrasting-ph-patches",
@@ -222,7 +222,7 @@
         ]
       }
     },
-    "csv": "id,latitude,longitude,depth_cm,ph,ec,nitrogen,phosphorus,potassium,collection_date,lab_method,uncertainty_ph,uncertainty_ec,uncertainty_nitrogen,uncertainty_phosphorus,uncertainty_potassium\nhigh-mix-01,12.99115,77.61815,0-15,5.9,1.50,90,70,220,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nhigh-mix-02,12.99115,77.61905,0-15,6.1,2.10,110,95,280,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nhigh-mix-03,12.99160,77.61860,0-15,6.4,1.90,125,105,310,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nhigh-mix-04,12.99205,77.61815,0-15,6.6,2.80,140,88,340,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nhigh-mix-05,12.99205,77.61905,0-15,6.2,3.30,130,115,295,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\n"
+    "csv": "id,latitude,longitude,depth_cm,ph,ec,nitrogen,phosphorus,potassium,collection_date,lab_method,uncertainty_ph,uncertainty_ec,uncertainty_nitrogen,uncertainty_phosphorus,uncertainty_potassium\nhigh-mix-01,12.99115,77.61815,0-15,5.8,1.50,90,70,220,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nhigh-mix-02,12.99115,77.61905,0-15,6.0,2.10,110,95,280,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nhigh-mix-03,12.99160,77.61860,0-15,6.3,1.90,125,105,310,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nhigh-mix-04,12.99205,77.61815,0-15,6.5,2.80,140,88,340,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nhigh-mix-05,12.99205,77.61905,0-15,6.1,3.30,130,115,295,2026-02-17,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\n"
   },
   {
     "id": "low-nitrogen",
@@ -402,7 +402,7 @@
         ]
       }
     },
-    "csv": "id,latitude,longitude,depth_cm,ph,ec,nitrogen,phosphorus,potassium,collection_date,lab_method,uncertainty_ph,uncertainty_ec,uncertainty_nitrogen,uncertainty_phosphorus,uncertainty_potassium\nmixed-01,12.99715,77.62615,0-15,6.7,1.10,30,55,60,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nmixed-02,12.99715,77.62705,0-15,6.4,1.50,80,16,180,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nmixed-03,12.99760,77.62660,0-15,5.8,0.60,50,29,110,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nmixed-04,12.99805,77.62615,0-15,7.0,2.10,70,42,140,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nmixed-05,12.99805,77.62705,0-15,6.2,1.00,35,70,230,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\n"
+    "csv": "id,latitude,longitude,depth_cm,ph,ec,nitrogen,phosphorus,potassium,collection_date,lab_method,uncertainty_ph,uncertainty_ec,uncertainty_nitrogen,uncertainty_phosphorus,uncertainty_potassium\nmixed-01,12.99715,77.62615,0-15,6.6,1.10,30,55,60,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nmixed-02,12.99715,77.62705,0-15,6.3,1.50,80,16,180,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nmixed-03,12.99760,77.62660,0-15,5.7,0.60,50,29,110,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nmixed-04,12.99805,77.62615,0-15,6.9,2.10,70,42,140,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\nmixed-05,12.99805,77.62705,0-15,6.1,1.00,35,70,230,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8\n"
   },
   {
     "id": "salinity-gradient",

@@ -1,7 +1,8 @@
-# Soil reference intervals for current KshetraSense crops
+# Historical soil reference intervals for the prior KshetraSense crop catalog
 
 **Evidence checked:** 2026-10-14
-**Purpose:** Document source-backed, context-specific reference values for Apple, Tomato, and Potato. This is a research note, not a universal soil standard or crop recommendation.
+**Status:** Historical catalog; superseded for current Crop Fit crop selection by [crop-fit-crop-selection.md](crop-fit-crop-selection.md) and [Decision 0012](../decisions/0012-karnataka-crop-reference-catalog.md).
+**Purpose:** Preserve source-backed, context-specific reference values for the former Apple, Tomato, and Potato catalog. This is not the current crop list, a universal soil standard, or a crop recommendation. Its method-comparability and measurement-limit findings remain relevant.
 
 ## Finding
 

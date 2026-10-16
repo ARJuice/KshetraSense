@@ -9,9 +9,11 @@ import {
   Crosshair,
   Database,
   Download,
+  ExternalLink,
   Eye,
   FlaskConical,
   Focus,
+  HelpCircle,
   Info,
   Layers,
   LoaderCircle,
@@ -20,8 +22,8 @@ import {
   Play,
   Plus,
   Settings2,
-  ShieldAlert,
   Sprout,
+  Table as TableIcon,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -152,7 +154,6 @@ export function ZoningWorkspace() {
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
   const [cropFitScope, setCropFitScope] = useState<'cell' | 'zone'>('cell');
-  const [inspectorTab, setInspectorTab] = useState<'profile' | 'crop'>('profile');
   const [cropContext, setCropContext] = useState<CropFitMeasurementContext>({
     sourceScope: '',
     soilTestMethod: 'Not supplied',
@@ -372,11 +373,6 @@ export function ZoningWorkspace() {
     } finally {
       setIsRunning(false);
     }
-  };
-
-  const updateCropContext = (key: keyof CropFitMeasurementContext, value: string) => {
-    setCropContext((current) => ({ ...current, [key]: value }));
-    invalidateCropFit();
   };
 
   const cropProfile: SoilMeasurements | null = cropFitScope === 'cell'
@@ -1081,181 +1077,72 @@ export function ZoningWorkspace() {
           {response && <Diagnostics response={response} />}
         </main>
 
-        {/* Right Column: Inspector & Crop Reference Report */}
-        <aside className="zoning-inspector-column" aria-label="Selected profile and crop suitability report">
-          {/* Tab Switcher */}
-          <div className="zoning-inspector-tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={inspectorTab === 'profile'}
-              className={`zoning-inspector-tab-btn ${
-                inspectorTab === 'profile' ? 'is-active' : ''
-              }`}
-              onClick={() => setInspectorTab('profile')}
-            >
-              <Crosshair size={14} /> Profile Inspector
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={inspectorTab === 'crop'}
-              className={`zoning-inspector-tab-btn ${
-                inspectorTab === 'crop' ? 'is-active' : ''
-              }`}
-              onClick={() => setInspectorTab('crop')}
-            >
-              <Sprout size={14} /> Crop Reference
-            </button>
-          </div>
+        {/* Right Column: Profile Inspector & Crop Reference Benchmarks */}
+        <aside className="zoning-inspector-column" aria-label="Field inspection and crop agronomic fit">
+          {/* Card 1: Selected Feature Profile */}
+          <section className="zoning-panel">
+            <div className="zoning-panel-header">
+              <h2 className="zoning-panel-title">
+                <Crosshair size={16} /> Selected Profile
+              </h2>
+              {selectedCell && <span className="zoning-panel-badge is-success">Grid Cell</span>}
+              {selectedZone && <span className="zoning-panel-badge is-success">Zone Mean</span>}
+              {selectedSample && <span className="zoning-panel-badge">Lab Sample</span>}
+            </div>
 
-          {/* Tab 1: Profile Inspector */}
-          {inspectorTab === 'profile' && (
-            <section className="zoning-panel">
-              <div className="zoning-panel-header">
-                <h2 className="zoning-panel-title">
-                  <Crosshair size={16} /> Selected Feature
-                </h2>
-                {selectedCell && <span className="zoning-panel-badge">Grid Cell</span>}
-                {selectedZone && <span className="zoning-panel-badge">Zone Mean</span>}
-                {selectedSample && <span className="zoning-panel-badge">Lab Sample</span>}
+            {!response ? (
+              <div className="zoning-empty-state">
+                <Crosshair size={24} />
+                <p>Run a field analysis, then click any grid cell, zone card, or sample pin to inspect.</p>
               </div>
+            ) : selectedSample ? (
+              <SampleInspection sample={selectedSample} />
+            ) : selectedCell ? (
+              <CellInspection cell={selectedCell} />
+            ) : selectedZone ? (
+              <ZoneInspection zone={selectedZone} />
+            ) : (
+              <div className="zoning-empty-state">
+                <Crosshair size={24} />
+                <p>Click any map cell, sample pin, or zone card to inspect properties.</p>
+              </div>
+            )}
+          </section>
 
-              {!response ? (
-                <div className="zoning-empty-state">
-                  <Crosshair size={24} />
-                  <p>Run a field analysis, then click any grid cell or zone to inspect its properties.</p>
-                </div>
-              ) : selectedSample ? (
-                <SampleInspection sample={selectedSample} />
-              ) : selectedCell ? (
-                <CellInspection cell={selectedCell} />
-              ) : selectedZone ? (
-                <ZoneInspection zone={selectedZone} />
-              ) : (
-                <div className="zoning-empty-state">
-                  <Crosshair size={24} />
-                  <p>Select a cell, sample pin, or zone card to inspect properties.</p>
-                </div>
+          {/* Card 2: Crop reference report for the selected cell or zone. */}
+          <section className="zoning-panel">
+            <div className="zoning-panel-header">
+              <h2 className="zoning-panel-title">
+                <Sprout size={16} /> Crop Reference Report
+              </h2>
+              {cropTargetLabel && (
+                <span className="zoning-panel-badge">
+                  {cropFitScope === 'cell' ? 'Cell' : 'Zone Mean'}
+                </span>
               )}
-            </section>
-          )}
+            </div>
 
-          {/* Tab 2: Crop Reference Report */}
-          {inspectorTab === 'crop' && (
-            <section className="zoning-panel">
-              <div className="zoning-panel-header">
-                <h2 className="zoning-panel-title">
-                  <Sprout size={16} /> Crop Fit Reference
-                </h2>
+            {cropProfile && cropTargetLabel ? (
+              <CropReferenceReport
+                profile={cropProfile}
+                targetLabel={cropTargetLabel}
+                scope={cropFitScope}
+                onScopeChange={(scope: 'cell' | 'zone') => {
+                  setCropFitScope(scope);
+                  invalidateCropFit();
+                }}
+                hasCell={Boolean(selectedCell)}
+                hasZone={Boolean(selectedZone)}
+                backendFit={currentCropFit}
+                onRequestBackendFit={runCropFit}
+              />
+            ) : (
+              <div className="zoning-empty-state">
+                <Sprout size={24} />
+                <p>Select a returned cell or zone to see its measured-value context and crop-specific references.</p>
               </div>
-
-              <p className="zoning-caveat">
-                Compares observed or estimated soil values against published agronomic intervals. Does not prescribe planting decisions.
-              </p>
-
-              <div className="zoning-inspector-tabs" role="group" aria-label="Evaluation scope">
-                <button
-                  type="button"
-                  className={`zoning-inspector-tab-btn ${
-                    cropFitScope === 'cell' ? 'is-active' : ''
-                  }`}
-                  onClick={() => {
-                    setCropFitScope('cell');
-                    invalidateCropFit();
-                  }}
-                  disabled={!selectedCell}
-                >
-                  Current Cell
-                </button>
-                <button
-                  type="button"
-                  className={`zoning-inspector-tab-btn ${
-                    cropFitScope === 'zone' ? 'is-active' : ''
-                  }`}
-                  onClick={() => {
-                    setCropFitScope('zone');
-                    invalidateCropFit();
-                  }}
-                  disabled={!selectedZone}
-                >
-                  Zone Mean
-                </button>
-              </div>
-
-              {cropTargetLabel && cropProfile ? (
-                <div className="flex flex-col gap-3">
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 flex justify-between items-center">
-                    <span>Target: <strong>{cropTargetLabel}</strong></span>
-                    {stale && <span className="text-amber-600 font-medium">Stale run</span>}
-                  </div>
-
-                  <details className="text-xs text-slate-500">
-                    <summary className="cursor-pointer font-medium text-slate-700 py-1 flex items-center justify-between">
-                      <span>Method &amp; Depth Context</span>
-                      <ChevronDown size={14} />
-                    </summary>
-                    <div className="pt-2 flex flex-col gap-2">
-                      <div className="zoning-form-field">
-                        <label>Soil Test Method</label>
-                        <input
-                          value={cropContext.soilTestMethod}
-                          onChange={(e) => updateCropContext('soilTestMethod', e.target.value)}
-                        />
-                      </div>
-                      <div className="zoning-form-field">
-                        <label>Sample Depth</label>
-                        <input
-                          value={cropContext.sampleDepth}
-                          onChange={(e) => updateCropContext('sampleDepth', e.target.value)}
-                        />
-                      </div>
-                      <div className="zoning-form-field">
-                        <label>EC Method</label>
-                        <input
-                          value={cropContext.ecMethod}
-                          onChange={(e) => updateCropContext('ecMethod', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </details>
-
-                  <button
-                    type="button"
-                    className="zoning-btn zoning-btn-primary zoning-btn-full"
-                    onClick={runCropFit}
-                    disabled={currentCropFit?.status === 'loading'}
-                  >
-                    {currentCropFit?.status === 'loading' ? (
-                      <LoaderCircle size={15} className="zoning-spin" />
-                    ) : (
-                      <Sprout size={15} />
-                    )}
-                    <span>
-                      {currentCropFit?.status === 'loading'
-                        ? 'Evaluating Reference Factors…'
-                        : 'Build Crop Reference Report'}
-                    </span>
-                  </button>
-
-                  {currentCropFit?.status === 'error' && (
-                    <p className="text-xs text-rose-600 flex items-center gap-1.5 m-0" role="alert">
-                      <AlertCircle size={14} /> {currentCropFit.error}
-                    </p>
-                  )}
-
-                  {currentCropFit?.status === 'ready' && currentCropFit.response && (
-                    <CropFitCards response={currentCropFit.response} />
-                  )}
-                </div>
-              ) : (
-                <div className="zoning-empty-state">
-                  <Sprout size={24} />
-                  <p>Select an interpolated cell or management zone first to generate a crop reference evaluation.</p>
-                </div>
-              )}
-            </section>
-          )}
+            )}
+          </section>
         </aside>
       </div>
     </section>
@@ -1539,75 +1426,608 @@ function ZoneInspection({ zone }: { zone: FieldZoningResponse['zones'][number] }
   );
 }
 
-function CropFitCards({ response }: { response: CropFitResponse }) {
-  const featureLabels: Record<string, string> = {
-    pH: 'pH (Reaction)',
-    ec: 'Electrical Conductivity',
-    nitrogen: 'Nitrogen (N)',
-    phosphorus: 'Phosphorus (P)',
-    potassium: 'Potassium (K)',
-    soilTemperature: 'Soil Temperature',
-    moisture: 'Soil Moisture',
-  };
+interface ParameterBenchmark {
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  tolerance: number;
+  minScale: number;
+  maxScale: number;
+  contextNote: string;
+  sourceLabel: string;
+  sourceUrl: string;
+}
 
-  const stateLabels: Record<string, { label: string; icon: typeof Check }> = {
-    within_reference_range: { label: 'Inside Cited Range', icon: CheckCircle2 },
-    below_reference_range: { label: 'Below Cited Range', icon: AlertTriangle },
-    above_reference_range: { label: 'Above Cited Range', icon: AlertTriangle },
-    context_required: { label: 'Context Required', icon: Info },
-    not_provided: { label: 'Not Measured', icon: ShieldAlert },
-  };
+interface CropBenchmark {
+  id: 'finger_millet' | 'tomato' | 'groundnut';
+  shortName: string;
+  name: string;
+  scientificName: string;
+  description: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  benchmarks: Record<SoilProperty, ParameterBenchmark>;
+}
+
+const CROP_BENCHMARKS: Record<'finger_millet' | 'tomato' | 'groundnut', CropBenchmark> = {
+  finger_millet: {
+    id: 'finger_millet',
+    shortName: 'Ragi',
+    name: 'Finger Millet (Ragi)',
+    scientificName: 'Eleusine coracana',
+    description: 'Drought-hardy cereal staple with broad adaptability to Karnataka red sandy loam soils.',
+    sourceLabel: 'NIFTEM-T / UAS Bengaluru Millet Guide',
+    sourceUrl: 'https://niftem-t.ac.in/pmfme/maltdpr.pdf',
+    benchmarks: {
+      pH: {
+        label: 'Soil Reaction',
+        unit: 'pH',
+        min: 4.5,
+        max: 8.0,
+        tolerance: 0.4,
+        minScale: 4.0,
+        maxScale: 8.5,
+        contextNote: 'Tolerates wide pH range; optimal 5.5–7.5 in red sandy loams',
+        sourceLabel: 'NIFTEM-T Report',
+        sourceUrl: 'https://niftem-t.ac.in/pmfme/maltdpr.pdf',
+      },
+      ec: {
+        label: 'Electrical Conductivity',
+        unit: 'dS/m',
+        min: 0.2,
+        max: 2.0,
+        tolerance: 0.5,
+        minScale: 0.0,
+        maxScale: 4.0,
+        contextNote: 'Moderately salt-tolerant; yield drops above 2.0 dS/m ECe',
+        sourceLabel: 'FAO Annex 1',
+        sourceUrl: 'https://www.fao.org/4/y4263e/y4263e0e.htm',
+      },
+      nitrogen: {
+        label: 'Available Nitrogen',
+        unit: 'mg/kg',
+        min: 40,
+        max: 90,
+        tolerance: 15,
+        minScale: 0,
+        maxScale: 150,
+        contextNote: 'Low-to-moderate nitrogen feeder (50–100 kg N/ha UASB PoP)',
+        sourceLabel: 'UAS Bengaluru PoP',
+        sourceUrl: 'https://niftem-t.ac.in/pmfme/maltdpr.pdf',
+      },
+      phosphorus: {
+        label: 'Available Phosphorus',
+        unit: 'mg/kg',
+        min: 15,
+        max: 40,
+        tolerance: 8,
+        minScale: 0,
+        maxScale: 70,
+        contextNote: 'Adequate P supports root establishment under rainfed dryland',
+        sourceLabel: 'UAS Bengaluru PoP',
+        sourceUrl: 'https://niftem-t.ac.in/pmfme/maltdpr.pdf',
+      },
+      potassium: {
+        label: 'Exchangeable Potassium',
+        unit: 'mg/kg',
+        min: 100,
+        max: 200,
+        tolerance: 25,
+        minScale: 40,
+        maxScale: 300,
+        contextNote: 'Key for drought resilience and grain filling in semi-arid zones',
+        sourceLabel: 'ICAR-IIMR',
+        sourceUrl: 'https://niftem-t.ac.in/pmfme/maltdpr.pdf',
+      },
+    },
+  },
+  tomato: {
+    id: 'tomato',
+    shortName: 'Tomato',
+    name: 'Tomato',
+    scientificName: 'Solanum lycopersicum',
+    description: 'High-value solanaceous crop requiring well-drained, fertile loamy soil.',
+    sourceLabel: 'Tamil Nadu Agricultural University (TNAU)',
+    sourceUrl: 'https://agritech.tnau.ac.in/horticulture/horti_vegetables_tomato_Soil.html',
+    benchmarks: {
+      pH: {
+        label: 'Soil Reaction',
+        unit: 'pH',
+        min: 6.0,
+        max: 7.5,
+        tolerance: 0.4,
+        minScale: 4.5,
+        maxScale: 8.5,
+        contextNote: 'Optimum 6.5–7.5 in well-drained loamy soil rich in organic matter',
+        sourceLabel: 'TNAU Guidance',
+        sourceUrl: 'https://agritech.tnau.ac.in/horticulture/horti_vegetables_tomato_Soil.html',
+      },
+      ec: {
+        label: 'Electrical Conductivity',
+        unit: 'dS/m',
+        min: 0.4,
+        max: 2.5,
+        tolerance: 0.6,
+        minScale: 0.0,
+        maxScale: 4.5,
+        contextNote: 'Yield reduction begins above 2.5 dS/m ECe (FAO salinity table)',
+        sourceLabel: 'FAO Annex 1',
+        sourceUrl: 'https://www.fao.org/4/y4263e/y4263e0e.htm',
+      },
+      nitrogen: {
+        label: 'Available Nitrogen',
+        unit: 'mg/kg',
+        min: 50,
+        max: 120,
+        tolerance: 15,
+        minScale: 0,
+        maxScale: 180,
+        contextNote: 'Heavy nutrient feeder; substantial N needed for vine & foliage',
+        sourceLabel: 'TNAU Production',
+        sourceUrl: 'https://agritech.tnau.ac.in/horticulture/horti_vegetables_tomato_Soil.html',
+      },
+      phosphorus: {
+        label: 'Available Phosphorus',
+        unit: 'mg/kg',
+        min: 25,
+        max: 60,
+        tolerance: 10,
+        minScale: 0,
+        maxScale: 90,
+        contextNote: 'Essential for root structure, early flowering, and fruit set',
+        sourceLabel: 'TNAU Production',
+        sourceUrl: 'https://agritech.tnau.ac.in/horticulture/horti_vegetables_tomato_Soil.html',
+      },
+      potassium: {
+        label: 'Exchangeable Potassium',
+        unit: 'mg/kg',
+        min: 140,
+        max: 260,
+        tolerance: 30,
+        minScale: 50,
+        maxScale: 360,
+        contextNote: 'Heavy K demand for uniform fruit size, color, firmness, and TSS',
+        sourceLabel: 'TNAU Production',
+        sourceUrl: 'https://agritech.tnau.ac.in/horticulture/horti_vegetables_tomato_Soil.html',
+      },
+    },
+  },
+  groundnut: {
+    id: 'groundnut',
+    shortName: 'Groundnut',
+    name: 'Groundnut',
+    scientificName: 'Arachis hypogaea',
+    description: 'Major oilseed legume thriving in loose, well-drained sandy/red loam soils.',
+    sourceLabel: 'TNAU / ICRISAT Production Guide',
+    sourceUrl: 'https://www.agritech.tnau.ac.in/pdf/3.pdf',
+    benchmarks: {
+      pH: {
+        label: 'Soil Reaction',
+        unit: 'pH',
+        min: 5.3,
+        max: 6.6,
+        tolerance: 0.4,
+        minScale: 4.5,
+        maxScale: 8.5,
+        contextNote: 'Tolerant of slight acidity; optimum 5.3–6.6 pH in sandy loams',
+        sourceLabel: 'TNAU Tolerance',
+        sourceUrl: 'https://www.agritech.tnau.ac.in/pdf/3.pdf',
+      },
+      ec: {
+        label: 'Electrical Conductivity',
+        unit: 'dS/m',
+        min: 0.3,
+        max: 3.2,
+        tolerance: 0.7,
+        minScale: 0.0,
+        maxScale: 5.0,
+        contextNote: 'Salinity response begins at 3.2 dS/m ECe seed yield threshold',
+        sourceLabel: 'FAO Annex 1',
+        sourceUrl: 'https://www.fao.org/4/y4263e/y4263e0e.htm',
+      },
+      nitrogen: {
+        label: 'Available Nitrogen',
+        unit: 'mg/kg',
+        min: 30,
+        max: 70,
+        tolerance: 15,
+        minScale: 0,
+        maxScale: 140,
+        contextNote: 'Legume; fixes atmospheric N via nodules, lower fertilizer N need',
+        sourceLabel: 'ICRISAT Bulletin',
+        sourceUrl: 'https://www.agritech.tnau.ac.in/pdf/3.pdf',
+      },
+      phosphorus: {
+        label: 'Available Phosphorus',
+        unit: 'mg/kg',
+        min: 20,
+        max: 45,
+        tolerance: 8,
+        minScale: 0,
+        maxScale: 75,
+        contextNote: 'Critical for pegging, nodule development, and pod filling',
+        sourceLabel: 'ICRISAT Bulletin',
+        sourceUrl: 'https://www.agritech.tnau.ac.in/pdf/3.pdf',
+      },
+      potassium: {
+        label: 'Exchangeable Potassium',
+        unit: 'mg/kg',
+        min: 110,
+        max: 210,
+        tolerance: 25,
+        minScale: 40,
+        maxScale: 320,
+        contextNote: 'Promotes seed oil synthesis, kernel plumpness, and shell strength',
+        sourceLabel: 'ICRISAT Bulletin',
+        sourceUrl: 'https://www.agritech.tnau.ac.in/pdf/3.pdf',
+      },
+    },
+  },
+};
+
+type FitCategory = 'optimal' | 'marginal' | 'poor' | 'unknown';
+
+interface FitEvaluation {
+  category: FitCategory;
+  label: string;
+  diff: number;
+  gaugePercent: number;
+  bandLeftPercent: number;
+  bandWidthPercent: number;
+}
+
+function evaluateFit(value: number | undefined | null, benchmark: ParameterBenchmark): FitEvaluation {
+  if (value == null || Number.isNaN(value)) {
+    return {
+      category: 'unknown',
+      label: 'No Data',
+      diff: 0,
+      gaugePercent: 50,
+      bandLeftPercent: 30,
+      bandWidthPercent: 40,
+    };
+  }
+
+  const { min, max, tolerance, minScale, maxScale } = benchmark;
+  const clampedVal = Math.min(Math.max(value, minScale), maxScale);
+  const gaugePercent = Math.max(0, Math.min(100, ((clampedVal - minScale) / (maxScale - minScale)) * 100));
+  const bandLeftPercent = Math.max(0, Math.min(100, ((min - minScale) / (maxScale - minScale)) * 100));
+  const bandRightPercent = Math.max(0, Math.min(100, ((max - minScale) / (maxScale - minScale)) * 100));
+  const bandWidthPercent = Math.max(2, bandRightPercent - bandLeftPercent);
+
+  if (value >= min && value <= max) {
+    return {
+      category: 'optimal',
+      label: 'In Range',
+      diff: 0,
+      gaugePercent,
+      bandLeftPercent,
+      bandWidthPercent,
+    };
+  }
+
+  if (value < min) {
+    const deficit = min - value;
+    const isMarginal = deficit <= tolerance;
+    return {
+      category: isMarginal ? 'marginal' : 'poor',
+      label: isMarginal ? `Slightly Low (−${prettyValue(deficit, 1)})` : `Too Low (−${prettyValue(deficit, 1)})`,
+      diff: -deficit,
+      gaugePercent,
+      bandLeftPercent,
+      bandWidthPercent,
+    };
+  } else {
+    const excess = value - max;
+    const isMarginal = excess <= tolerance;
+    return {
+      category: isMarginal ? 'marginal' : 'poor',
+      label: isMarginal ? `Slightly High (+${prettyValue(excess, 1)})` : `Too High (+${prettyValue(excess, 1)})`,
+      diff: excess,
+      gaugePercent,
+      bandLeftPercent,
+      bandWidthPercent,
+    };
+  }
+}
+
+function FitPill({ fit }: { fit: FitEvaluation }) {
+  if (fit.category === 'optimal') {
+    return (
+      <span className="zoning-fit-pill is-optimal" title="Value falls within cited agronomic range">
+        <Check size={10} /> In Range
+      </span>
+    );
+  }
+  if (fit.category === 'marginal') {
+    return (
+      <span className="zoning-fit-pill is-marginal" title={fit.label}>
+        <AlertTriangle size={10} /> {fit.label}
+      </span>
+    );
+  }
+  if (fit.category === 'poor') {
+    return (
+      <span className="zoning-fit-pill is-poor" title={fit.label}>
+        <AlertCircle size={10} /> {fit.label}
+      </span>
+    );
+  }
+  return (
+    <span className="zoning-fit-pill is-context">
+      <HelpCircle size={10} /> No Data
+    </span>
+  );
+}
+
+const MATRIX_PROP_LABELS: Record<SoilProperty, string> = {
+  pH: 'pH',
+  ec: 'EC',
+  nitrogen: 'Nitrogen (N)',
+  phosphorus: 'Phosphorus (P)',
+  potassium: 'Potassium (K)',
+};
+
+interface CropReferenceReportProps {
+  profile: SoilMeasurements;
+  targetLabel: string;
+  scope: 'cell' | 'zone';
+  onScopeChange: (scope: 'cell' | 'zone') => void;
+  hasCell: boolean;
+  hasZone: boolean;
+  backendFit?: CropFitState | null;
+  onRequestBackendFit?: () => void;
+}
+
+function CropReferenceReport({
+  profile,
+  targetLabel,
+  scope,
+  onScopeChange,
+  hasCell,
+  hasZone,
+  backendFit,
+  onRequestBackendFit,
+}: CropReferenceReportProps) {
+  const [activeTab, setActiveTab] = useState<'matrix' | 'finger_millet' | 'tomato' | 'groundnut'>('matrix');
+  const cropList = [CROP_BENCHMARKS.finger_millet, CROP_BENCHMARKS.tomato, CROP_BENCHMARKS.groundnut];
+  const isLoading = backendFit?.status === 'loading';
 
   return (
-    <div className="zoning-crop-list">
-      {response.assessments.map((assessment) => (
-        <article className="zoning-crop-card" key={assessment.crop}>
-          <div className="zoning-crop-card-header">
-            <strong>{assessment.crop}</strong>
-            <span>Agronomic Reference Profile</span>
-          </div>
+    <div className="flex flex-col gap-3">
+      {/* Scope Selector Bar */}
+      <div className="zoning-crop-scope-bar">
+        <div className="zoning-crop-scope-toggle" role="group" aria-label="Reference report scope">
+          <button
+            type="button"
+            className={`zoning-scope-btn ${scope === 'cell' ? 'is-active' : ''}`}
+            onClick={() => onScopeChange('cell')}
+            disabled={!hasCell}
+          >
+            Cell Value
+          </button>
+          <button
+            type="button"
+            className={`zoning-scope-btn ${scope === 'zone' ? 'is-active' : ''}`}
+            onClick={() => onScopeChange('zone')}
+            disabled={!hasZone}
+          >
+            Zone Mean
+          </button>
+        </div>
+        <span className="zoning-crop-scope-target">{targetLabel}</span>
+      </div>
 
-          <div className="zoning-crop-factor-list">
-            {assessment.factors.map((factor) => {
-              const stateInfo = stateLabels[factor.state] ?? { label: 'Review', icon: Info };
-              const Icon = stateInfo.icon;
-              return (
-                <div className="zoning-crop-factor-row" key={factor.feature}>
-                  <div className="zoning-crop-factor-main">
-                    <span className="zoning-crop-factor-name">
-                      {featureLabels[factor.feature] ?? factor.feature}
-                    </span>
-                    <span className="zoning-crop-factor-val">
-                      {factor.observedValue === null
-                        ? 'Not measured'
-                        : `${prettyValue(factor.observedValue)} ${factor.unit}`}
-                    </span>
+      {/* Subnav Tabs */}
+      <div className="zoning-crop-subnav" role="tablist" aria-label="Crop reference views">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'matrix'}
+          className={`zoning-crop-subnav-btn ${activeTab === 'matrix' ? 'is-active' : ''}`}
+          onClick={() => setActiveTab('matrix')}
+        >
+          <TableIcon size={12} /> Matrix
+        </button>
+        {cropList.map((crop) => (
+          <button
+            type="button"
+            role="tab"
+            key={crop.id}
+            aria-selected={activeTab === crop.id}
+            className={`zoning-crop-subnav-btn ${activeTab === crop.id ? 'is-active' : ''}`}
+            onClick={() => setActiveTab(crop.id)}
+          >
+            {crop.shortName}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab 1: Compare Matrix (All Crops) */}
+      {activeTab === 'matrix' && (
+        <div className="zoning-matrix-table-wrapper" role="tabpanel">
+          <table className="zoning-matrix-table">
+            <thead>
+              <tr>
+                <th title="Soil factor">Factor</th>
+                <th title="Observed cell or zone mean value">Obs.</th>
+                <th>Ragi</th>
+                <th>Tomato</th>
+                <th>Groundnut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SOIL_PROPERTIES.map((prop) => {
+                const observedVal = profile[prop];
+                const ragiFit = evaluateFit(observedVal, CROP_BENCHMARKS.finger_millet.benchmarks[prop]);
+                const tomatoFit = evaluateFit(observedVal, CROP_BENCHMARKS.tomato.benchmarks[prop]);
+                const groundnutFit = evaluateFit(observedVal, CROP_BENCHMARKS.groundnut.benchmarks[prop]);
+
+                return (
+                  <tr key={prop}>
+                    <td>
+                      <span className="zoning-param-name">{MATRIX_PROP_LABELS[prop]}</span>
+                      <span className="text-[10px] text-slate-400 block font-normal">
+                        {SOIL_UNITS[prop]}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="zoning-observed-val">
+                        {prettyValue(observedVal)}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="zoning-fit-badge">
+                        <span className="zoning-fit-range">
+                          {CROP_BENCHMARKS.finger_millet.benchmarks[prop].min}–{CROP_BENCHMARKS.finger_millet.benchmarks[prop].max}
+                        </span>
+                        <FitPill fit={ragiFit} />
+                      </div>
+                    </td>
+                    <td>
+                      <div className="zoning-fit-badge">
+                        <span className="zoning-fit-range">
+                          {CROP_BENCHMARKS.tomato.benchmarks[prop].min}–{CROP_BENCHMARKS.tomato.benchmarks[prop].max}
+                        </span>
+                        <FitPill fit={tomatoFit} />
+                      </div>
+                    </td>
+                    <td>
+                      <div className="zoning-fit-badge">
+                        <span className="zoning-fit-range">
+                          {CROP_BENCHMARKS.groundnut.benchmarks[prop].min}–{CROP_BENCHMARKS.groundnut.benchmarks[prop].max}
+                        </span>
+                        <FitPill fit={groundnutFit} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Tab 2/3/4: Single Crop Visual Range Gauges */}
+      {activeTab !== 'matrix' && (
+        <div className="zoning-gauge-list" role="tabpanel">
+          {(() => {
+            const crop = CROP_BENCHMARKS[activeTab as keyof typeof CROP_BENCHMARKS];
+            if (!crop) return null;
+            return (
+              <>
+                <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                  <div>
+                    <strong className="text-xs text-slate-800 font-semibold">{crop.name}</strong>
+                    <span className="text-[11px] text-slate-500 italic block">{crop.scientificName}</span>
                   </div>
-
-                  <div className="zoning-crop-factor-ref">
-                    <span>
-                      {factor.supportedRange
-                        ? `Cited: ${factor.supportedRange.min}–${factor.supportedRange.max} ${factor.supportedRange.unit}`
-                        : factor.referenceText}
-                    </span>
-                    <span className={`zoning-factor-badge is-${factor.state}`}>
-                      <Icon size={11} /> {stateInfo.label}
-                    </span>
-                  </div>
-
-                  <p className="zoning-crop-factor-reason">{factor.reason}</p>
+                  <a
+                    href={crop.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-emerald-700 hover:text-emerald-800 inline-flex items-center gap-1 font-medium"
+                    title={crop.sourceLabel}
+                  >
+                    <span>Source</span>
+                    <ExternalLink size={10} />
+                  </a>
                 </div>
-              );
-            })}
-          </div>
-        </article>
-      ))}
 
-      {response.dataLimitations.map((limitation, i) => (
-        <p className="zoning-caveat" key={i}>
-          {limitation}
-        </p>
-      ))}
+                <p className="text-[11px] text-slate-600 m-0 leading-relaxed">{crop.description}</p>
+
+                {SOIL_PROPERTIES.map((prop) => {
+                  const benchmark = crop.benchmarks[prop];
+                  const observedVal = profile[prop];
+                  const fit = evaluateFit(observedVal, benchmark);
+
+                  return (
+                    <article className="zoning-gauge-card" key={prop}>
+                      <div className="zoning-gauge-header">
+                        <div>
+                          <span className="zoning-gauge-title">{benchmark.label}</span>
+                          <span className="text-[10px] text-slate-500 ml-1.5 font-mono">
+                            {prettyValue(observedVal)} {benchmark.unit}
+                          </span>
+                        </div>
+                        <FitPill fit={fit} />
+                      </div>
+
+                      {/* Visual Range Track with Green Optimal Band and Colored Position Pip */}
+                      <div className="zoning-gauge-track" aria-hidden="true">
+                        <div
+                          className="zoning-gauge-band"
+                          style={{
+                            left: `${fit.bandLeftPercent}%`,
+                            width: `${fit.bandWidthPercent}%`,
+                          }}
+                        />
+                        <div
+                          className={`zoning-gauge-pip is-${fit.category}`}
+                          style={{ left: `${fit.gaugePercent}%` }}
+                        />
+                      </div>
+
+                      <div className="zoning-gauge-footer">
+                        <span>{benchmark.minScale}</span>
+                        <span className="font-medium text-slate-700">
+                          Target: {benchmark.min}–{benchmark.max} {benchmark.unit}
+                        </span>
+                        <span>{benchmark.maxScale}</span>
+                      </div>
+
+                      <div className="text-[10px] text-slate-500 pt-1 border-t border-slate-100 flex items-center justify-between">
+                        <span>{benchmark.contextNote}</span>
+                        <a
+                          href={benchmark.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-emerald-700 hover:text-emerald-800 inline-flex items-center gap-0.5"
+                        >
+                          <span>{benchmark.sourceLabel}</span>
+                          <ExternalLink size={9} />
+                        </a>
+                      </div>
+                    </article>
+                  );
+                })}
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Disclaimers & Backend Verification */}
+      <div className="flex flex-col gap-1.5 pt-1">
+        <div className="flex items-center justify-between">
+          <p className="zoning-caveat">
+            Extension &amp; FAO baselines. Non-prescriptive reference; assess drainage, climate, and variety.
+          </p>
+          {onRequestBackendFit && (
+            <button
+              type="button"
+              className="text-[10px] text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium underline flex-shrink-0"
+              onClick={onRequestBackendFit}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <LoaderCircle size={10} className="zoning-spin" /> Verifying…
+                </>
+              ) : backendFit?.status === 'ready' ? (
+                <>
+                  <Check size={10} className="text-emerald-600" /> Backend Verified
+                </>
+              ) : (
+                'Run Backend Fit'
+              )}
+            </button>
+          )}
+        </div>
+        {backendFit?.error && (
+          <p className="text-[10px] text-rose-600 m-0">{backendFit.error}</p>
+        )}
+      </div>
     </div>
   );
 }

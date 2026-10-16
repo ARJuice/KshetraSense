@@ -1,6 +1,6 @@
 id,latitude,longitude,depth_cm,ph,ec,nitrogen,phosphorus,potassium,collection_date,lab_method,uncertainty_ph,uncertainty_ec,uncertainty_nitrogen,uncertainty_phosphorus,uncertainty_potassium
-mixed-01,12.99715,77.62615,0-15,6.7,1.10,30,55,60,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
-mixed-02,12.99715,77.62705,0-15,6.4,1.50,80,16,180,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
-mixed-03,12.99760,77.62660,0-15,5.8,0.60,50,29,110,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
-mixed-04,12.99805,77.62615,0-15,7.0,2.10,70,42,140,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
-mixed-05,12.99805,77.62705,0-15,6.2,1.00,35,70,230,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+mixed-01,12.99715,77.62615,0-15,6.6,1.10,30,55,60,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+mixed-02,12.99715,77.62705,0-15,6.3,1.50,80,16,180,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+mixed-03,12.99760,77.62660,0-15,5.7,0.60,50,29,110,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+mixed-04,12.99805,77.62615,0-15,6.9,2.10,70,42,140,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8
+mixed-05,12.99805,77.62705,0-15,6.1,1.00,35,70,230,2026-08-22,SYNTHETIC-DEMO; method unspecified,0.10,0.05,5,3,8

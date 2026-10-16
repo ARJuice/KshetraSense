@@ -3,12 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-PROFILE_VERSION = "2026.10-crop-reference-report-v2"
+PROFILE_VERSION = "2026.10-crop-reference-report-v3"
 
 
 @dataclass(frozen=True)
 class CropProfile:
     crop: str
+    name: str
+    scientific_name: str
     ph_min: float
     ph_max: float
     source_label: str
@@ -17,6 +19,7 @@ class CropProfile:
     ec_reference: str
     ec_source_label: str
     ec_source_url: str
+    ec_context: str
 
 
 # pH intervals are crop-specific published context, not universal planting criteria.
@@ -24,37 +27,46 @@ class CropProfile:
 # unspecified single-depth EC result. Other factors need local lab calibration.
 PROFILES: tuple[CropProfile, ...] = (
     CropProfile(
-        crop="apple",
-        ph_min=6.0,
-        ph_max=7.0,
-        source_label="University of Minnesota Extension: Growing apples",
-        source_url="https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-apples",
-        context="Home-orchard soil pH guidance; drainage and standing-water limitations remain unassessed.",
-        ec_reference="FAO classifies apple as salt-sensitive but reports no numeric ECe yield threshold for apple in this table.",
-        ec_source_label="FAO Annex 1: Crop salt tolerance data",
-        ec_source_url="https://www.fao.org/4/Y4263E/y4263e0e.htm",
+        crop="finger_millet",
+        name="Finger Millet (Ragi)",
+        scientific_name="Eleusine coracana",
+        ph_min=4.5,
+        ph_max=8.0,
+        source_label="NIFTEM-T: Millet processing and value addition technical report",
+        source_url="https://niftem-t.ac.in/pmfme/maltdpr.pdf",
+        context="Broad, method-unspecified pH context reported for finger millet; not a locally calibrated planting threshold.",
+        ec_reference="The FAO crop table does not report a finger-millet-specific root-zone ECe yield threshold.",
+        ec_source_label="FAO: Water quality for agriculture, Annex 1",
+        ec_source_url="https://www.fao.org/4/y4263e/y4263e0e.htm",
+        ec_context="No finger-millet-specific ECe threshold is listed; values for other millet species are not substituted.",
     ),
     CropProfile(
         crop="tomato",
-        ph_min=5.8,
-        ph_max=6.6,
-        source_label="Penn State Extension: Tomato production",
-        source_url="https://extension.psu.edu/tomato-production",
-        context="Commercial tomato production guidance; crop system, climate, water, and nutrient management remain unassessed.",
-        ec_reference="Yield reduction begins at 2.5 dS/m ECe in the cited FAO table; the reported slope above that threshold is 9.9% per dS/m. This is a root-zone salinity response reference, not a target interval.",
-        ec_source_label="FAO Annex 1: Crop salt tolerance data",
-        ec_source_url="https://www.fao.org/4/Y4263E/y4263e0e.htm",
+        name="Tomato",
+        scientific_name="Solanum lycopersicum",
+        ph_min=6.5,
+        ph_max=7.5,
+        source_label="Tamil Nadu Agricultural University: Tomato soil guidance",
+        source_url="https://agritech.tnau.ac.in/horticulture/horti_vegetables_tomato_Soil.html",
+        context="TNAU guidance for well-drained loamy soil rich in organic matter; not calibrated to this sample method or to Karnataka fields.",
+        ec_reference="FAO reports a tomato fruit-yield ECe threshold of 2.5 dS/m and a 9.9% per dS/m yield-response slope above it. This is not a generic EC target.",
+        ec_source_label="FAO: Water quality for agriculture, Annex 1",
+        ec_source_url="https://www.fao.org/4/y4263e/y4263e0e.htm",
+        ec_context="FAO salinity response uses mean root-zone ECe from a saturation-paste extract; this field EC method and root-zone context are unverified.",
     ),
     CropProfile(
-        crop="potato",
-        ph_min=5.5,
-        ph_max=6.5,
-        source_label="Penn State Extension: Potato production",
-        source_url="https://extension.psu.edu/potato-production",
-        context="Potato production guidance; variety, disease, soil texture, water, and nutrient management remain unassessed.",
-        ec_reference="Yield reduction begins at 1.7 dS/m ECe in the cited FAO table; the reported slope above that threshold is 12% per dS/m. This is a root-zone salinity response reference, not a target interval.",
-        ec_source_label="FAO Annex 1: Crop salt tolerance data",
-        ec_source_url="https://www.fao.org/4/Y4263E/y4263e0e.htm",
+        crop="groundnut",
+        name="Groundnut",
+        scientific_name="Arachis hypogaea",
+        ph_min=5.3,
+        ph_max=6.6,
+        source_label="Tamil Nadu Agricultural University: Relative crop tolerance to soil acidity",
+        source_url="https://www.agritech.tnau.ac.in/pdf/3.pdf",
+        context="TNAU's crop-group table lists an optimum pH range; test method and local cultivar calibration are unspecified.",
+        ec_reference="FAO reports a groundnut seed-yield ECe threshold of 3.2 dS/m and a 29% per dS/m yield-response slope above it. This is not a generic EC target.",
+        ec_source_label="FAO: Water quality for agriculture, Annex 1",
+        ec_source_url="https://www.fao.org/4/y4263e/y4263e0e.htm",
+        ec_context="FAO salinity response uses mean root-zone ECe from a saturation-paste extract; this field EC method and root-zone context are unverified.",
     ),
 )
 

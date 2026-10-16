@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.crop_profiles import PROFILE_VERSION
 from app.main import app
 
 client = TestClient(app)
@@ -87,13 +88,19 @@ def test_crop_fit_endpoint_returns_factor_values_without_a_crop_level_verdict():
 
     assert response.status_code == 200, response.text
     result = response.json()
-    assert result["profileVersion"]
+    assert result["profileVersion"] == PROFILE_VERSION
     assert len(result["assessments"]) == 3
     assert all("assessmentState" not in assessment for assessment in result["assessments"])
     for assessment in result["assessments"]:
         factors = {factor["feature"]: factor for factor in assessment["factors"]}
         for feature, value in measurements.items():
             assert factors[feature]["observedValue"] == value
-    apple_factors = {factor["feature"]: factor for factor in result["assessments"][0]["factors"]}
-    assert apple_factors["pH"]["state"] == "below_reference_range"
-    assert apple_factors["ec"]["state"] == "context_required"
+    ragi, tomato, groundnut = result["assessments"]
+    assert [item["crop"] for item in result["assessments"]] == ["finger_millet", "tomato", "groundnut"]
+    ragi_factors = {factor["feature"]: factor for factor in ragi["factors"]}
+    tomato_factors = {factor["feature"]: factor for factor in tomato["factors"]}
+    groundnut_factors = {factor["feature"]: factor for factor in groundnut["factors"]}
+    assert ragi_factors["pH"]["state"] == "within_reference_range"
+    assert tomato_factors["pH"]["state"] == "below_reference_range"
+    assert groundnut_factors["pH"]["state"] == "within_reference_range"
+    assert all(factors["ec"]["state"] == "context_required" for factors in (ragi_factors, tomato_factors, groundnut_factors))

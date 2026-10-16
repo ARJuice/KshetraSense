@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Activity, BarChart3, ChevronLeft, Database, Layers, LayoutGrid, Menu, Sprout } from 'lucide-react';
+import { Activity, BarChart3, ChevronLeft, Database, Layers, LayoutGrid, Leaf, Menu, Sprout } from 'lucide-react';
 import { ZoningWorkspace } from '../features/zoning/ZoningWorkspace';
 import { FieldMonitoringView } from '../features/monitoring/FieldMonitoringView';
+import { LeafDiagnosisView } from '../features/leaf/LeafDiagnosisView';
 
-type AppModule = 'zoning' | 'monitoring' | 'methods';
+type AppModule = 'zoning' | 'leaf' | 'monitoring' | 'methods';
 
 const modules: Array<{ id: AppModule; label: string; detail: string; icon: typeof LayoutGrid }> = [
   { id: 'zoning', label: 'Soil Zoning', detail: 'Variable management units', icon: Layers },
+  { id: 'leaf', label: 'Leaf Diagnosis', detail: 'Image-only classifier', icon: Leaf },
   { id: 'monitoring', label: 'Field Monitoring', detail: 'Observations & satellite', icon: Activity },
   { id: 'methods', label: 'Methodology & Limits', detail: 'Traceability & constraints', icon: BarChart3 },
 ];
@@ -83,6 +85,7 @@ export default function App() {
         </div>
 
         {activeModule === 'zoning' && <ZoningWorkspace />}
+        {activeModule === 'leaf' && <LeafDiagnosisView />}
         {activeModule === 'monitoring' && <FieldMonitoringView />}
         {activeModule === 'methods' && <MethodsView />}
       </main>

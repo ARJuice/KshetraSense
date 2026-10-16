@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import demoData from './demoData.json';
 import { isPointInsideFieldBoundary, parseFieldBoundary } from './fieldGeometry';
 import { buildFieldZoningRequest } from './fieldSamples';
 import { parseSoilSampleCsv } from './soilSampleCsv';
@@ -23,9 +24,11 @@ describe('soil-zoning demonstration inputs', () => {
       const boundary = parseFieldBoundary(feature);
       const csv = readFileSync(new URL(`../../../../data/demo/soil-zoning/${stem}.csv`, import.meta.url), 'utf8');
       const parsed = parseSoilSampleCsv(csv);
+      const embeddedDemo = demoData.find(({ id }) => id === stem);
 
       expect(feature.properties.dataStatus).toContain('SYNTHETIC DEMO ONLY');
       expect(feature.properties.pairedSamplesCsv).toBe(`${stem}.csv`);
+      expect(embeddedDemo?.csv.replace(/\r\n/g, '\n')).toBe(csv.replace(/\r\n/g, '\n'));
       expect(parsed.errors).toEqual([]);
       expect(parsed.samples).toHaveLength(5);
       expect(new Set(parsed.samples.map(({ collectionDate }) => collectionDate))).toEqual(new Set([feature.properties.collectionDate]));

@@ -1,9 +1,9 @@
 # Phase 4: Field Monitoring UI Transformation
 
-**Status:** Implemented and automated checks passed on 2026-10-14. The SoilGrids WCS adapter is implemented and live-smoke-tested; manual visual/accessibility review and live Earth Engine execution remain pending.
+**Status:** Implemented and automated checks passed on 2026-10-14. SoilGrids WCS and CropSight Earth Engine were both live-smoke-tested locally on 2026-10-14; manual visual/accessibility review remains pending. Other machines still need their own Earth Engine project access and local authentication.
 **Scope:** `src/features/monitoring/` — Soil Investigation, historical telemetry replay, and the independent CropSight vegetation workflow.
-**Depends on:** Phase 3 telemetry API, ISRIC SoilGrids public WCS, and CropSight aggregate-analysis API. Only live CropSight analysis depends on user-configured Earth Engine credentials/project/quota.
-**Manual setup:** Google Earth Engine authentication/project configuration is deferred until the user performs it; the rest of the Field Monitoring UI must work without it.
+**Depends on:** Phase 3 telemetry API, ISRIC SoilGrids public WCS, and CropSight aggregate-analysis API. Live CropSight analysis requires an Earth Engine project, local credentials, quota, and imagery coverage. The project ID is selected through `EARTHENGINE_PROJECT` (default: `kshetrasense-earth-engine`); credentials remain outside the repository.
+**Manual setup:** The current developer environment has Earth Engine access configured and verified. Any other machine must independently authenticate and use an authorized Earth Engine project; the rest of Field Monitoring works without it.
 
 ---
 
@@ -85,13 +85,13 @@ src/features/monitoring/
 4. Forecast values, horizons, input completeness, holdout metrics, and persistence comparison match the API. The failed baseline comparison is explicit. **Implemented.**
 5. Anomalies are review candidates only. No live gateway, valve, flow, VWC threshold, or actuation UI is shown. **Implemented.**
 6. SoilGrids returns only real mapped WCS cells with documented units/quantiles and provenance; masked cells/provider failures show no estimate. Legacy preset records are archived or visibly disclaimed; CropSight shows no stale or fabricated result. **Implemented and tested; live WCS smoke test passed.**
-7. CropSight only displays returned aggregate NDVI statistics, time series, optional rainfall, and unvalidated heuristic notes. Its current API provides no raster or spatial zones, so none are shown. **Implemented and tested with response fixtures.**
+7. CropSight only displays returned aggregate NDVI statistics, time series, optional rainfall, and unvalidated heuristic notes. Its current API provides no raster or spatial zones, so none are shown. **Implemented and tested with response fixtures. Live Earth Engine smoke test passed locally:** the published Parma tomato research-trial sensor locations were averaged to an approximate center (44.808726, 10.273005); a 50 m circular AOI for 2023-06-29 through 2023-09-14 returned 38 Sentinel-2 scenes, mean NDVI 0.347, standard deviation 0.158, range 0.103–0.604, a decreasing time-series trend, and rainfall context. These are historical research-site results, not a current farm assessment. The circle is an approximate demo AOI, not a cadastral boundary. Source: [published Parma tomato-trial dataset](https://pmc.ncbi.nlm.nih.gov/articles/PMC12002878/).
 8. Automated verification (2026-10-14): `npm test` passed 46 tests in 13 files; `npm run typecheck` and `npm run build` passed; the full Python suite passed 75 tests. The Vite build reports the existing 824.24 kB `FieldScene3D` chunk above the 500 kB advisory threshold.
 9. Manual browser/accessibility inspection is still pending. The UI automation safety check stopped before opening a confidently identified page URL, so a screenshot-based visual pass is not claimed.
 
 ### Remaining manual/provider gates
 
-- The user will configure Earth Engine project/authentication and ensure the CropSight sub-application is mounted with its required dependencies later. Until then, live imagery analysis has not been verified.
-- Recheck live ISRIC WCS availability at demonstration time; the public service is external and may be down. Do not substitute a local estimate. No SoilGrids credential/setup action is required. The user still configures Earth Engine and ensures CropSight dependencies are available before live satellite analysis.
+- The local Earth Engine project/authentication and CropSight live API path are verified; other machines require their own authorized project, credentials, dependencies, quota, and imagery coverage. Do not copy local credentials into the repository.
+- Recheck live ISRIC WCS and Earth Engine availability at demonstration time; both are external services and may be down or rate-limited. Do not substitute local estimates or fabricated satellite results. The full-season CropSight request took about 200 seconds in this smoke test, so long date windows may be slow.
 - A separately scoped UI may expose the calibrated-VWC FAO-56 endpoint later; never connect it to the replay's `%RH` signal.
 - Manually verify browser accessibility/layout and profile the oversized 3D bundle in a later review.
