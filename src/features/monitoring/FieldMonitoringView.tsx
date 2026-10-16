@@ -150,17 +150,19 @@ export const FieldMonitoringView: React.FC<FieldMonitoringViewProps> = ({ onSamp
           </div>
         )}
 
-        {/* View Switch */}
-        {activeTab === 'soil' ? (
-          <SoilInvestigationView
-            samples={samples}
-            onUpdateSamples={handleUpdateSamples}
-          />
-        ) : activeTab === 'telemetry' ? (
-          <TelemetryReplayView />
-        ) : (
-          <VegetationMonitoringView />
-        )}
+        {/* View Switch with smooth in-module transition */}
+        <div key={activeTab} className="module-nav-transition">
+          {activeTab === 'soil' ? (
+            <SoilInvestigationView
+              samples={samples}
+              onUpdateSamples={handleUpdateSamples}
+            />
+          ) : activeTab === 'telemetry' ? (
+            <TelemetryReplayView />
+          ) : (
+            <VegetationMonitoringView />
+          )}
+        </div>
       </div>
     </div>
   );

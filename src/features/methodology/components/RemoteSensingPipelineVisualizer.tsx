@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { MathView } from '../../../components/ui/MathView';
 
 interface CanopyPreset {
   name: string;
@@ -84,7 +85,7 @@ export const RemoteSensingPipelineVisualizer: React.FC = () => {
             </h3>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Multispectral physics, QA60 cloud bitmask filtering, and the 250m regional covariate decoupling firewall.
+            Multispectral physics, QA60 cloud bitmask filtering, and regional 250m soil covariates.
           </p>
         </div>
 
@@ -112,14 +113,14 @@ export const RemoteSensingPipelineVisualizer: React.FC = () => {
               activeTab === 'soilgrids' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            3. 250m Covariate Firewall
+            3. 250m Regional Covariates
           </button>
         </div>
       </div>
 
       {/* TAB 1: MULTISPECTRAL REFLECTANCE PHYSICS & NDVI */}
       {activeTab === 'reflectance' && (
-        <div className="space-y-6">
+        <div key="reflectance" className="module-nav-transition space-y-6">
           {/* Preset Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[11px] font-semibold text-slate-500">Canopy Presets:</span>
@@ -127,7 +128,7 @@ export const RemoteSensingPipelineVisualizer: React.FC = () => {
               <button
                 key={p.name}
                 onClick={() => applyPreset(p)}
-                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 active:scale-95 transition-all duration-150 hover:bg-slate-100 hover:border-slate-300"
               >
                 {p.name}
               </button>
@@ -237,13 +238,13 @@ export const RemoteSensingPipelineVisualizer: React.FC = () => {
 
                 {/* Formula breakdown */}
                 <div className="rounded-lg bg-slate-900 p-3 text-slate-100 font-mono text-xs space-y-1">
-                  <p className="text-emerald-400 font-semibold">
-                    {'NDVI = (B8 - B4) / (B8 + B4)'}
-                  </p>
-                  <p className="text-slate-300 text-[11px]">
+                  <div className="py-1">
+                    <MathView math="\text{NDVI} = \frac{\rho_{\text{B08}} - \rho_{\text{B04}}}{\rho_{\text{B08}} + \rho_{\text{B04}}}" block className="text-emerald-300" />
+                  </div>
+                  <p className="text-slate-300 text-[11px] text-center">
                     {`= (${nir.toFixed(2)} - ${red.toFixed(2)}) / (${nir.toFixed(2)} + ${red.toFixed(2)})`}
                   </p>
-                  <p className="text-emerald-300 font-bold text-[11px]">
+                  <p className="text-emerald-300 font-bold text-[11px] text-center">
                     {`= ${(nir - red).toFixed(3)} / ${denom.toFixed(3)} = ${ndvi.toFixed(3)}`}
                   </p>
                 </div>
@@ -273,7 +274,7 @@ export const RemoteSensingPipelineVisualizer: React.FC = () => {
 
       {/* TAB 2: QA60 CLOUD MASKING */}
       {activeTab === 'qa60' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+        <div key="qa60" className="module-nav-transition grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
           <div className="rounded-xl border border-slate-200 bg-slate-900 p-5 text-white space-y-4">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -336,7 +337,7 @@ export const RemoteSensingPipelineVisualizer: React.FC = () => {
 
       {/* TAB 3: 250M COVARIATE FIREWALL */}
       {activeTab === 'soilgrids' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+        <div key="soilgrids" className="module-nav-transition grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
           {/* Spatial Resolution Comparison */}
           <div className="rounded-xl border border-slate-200 bg-slate-900 p-5 text-white space-y-4">
             <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
@@ -367,9 +368,9 @@ export const RemoteSensingPipelineVisualizer: React.FC = () => {
               </div>
             </div>
 
-            <div className="rounded border border-rose-900/40 bg-rose-950/20 p-3 text-xs text-rose-200 space-y-1">
-              <strong className="text-rose-400 font-bold block">Strict Decoupling Firewall (Decision 0010):</strong>
-              SoilGrids 2.0 data are displayed strictly as regional background context. They are NEVER downscaled or blended into high-resolution farm zoning rasters.
+            <div className="rounded border border-amber-900/40 bg-amber-950/20 p-3 text-xs text-amber-200 space-y-1">
+              <strong className="text-amber-400 font-bold block">Resolution Boundary Principle:</strong>
+              SoilGrids 2.0 layers provide regional soil reference context. They are retained at their native 250m resolution rather than artificially downscaled into localized 10m farm rasters.
             </div>
           </div>
 

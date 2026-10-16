@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin } from 'lucide-react';
+import { MathView } from '../../../components/ui/MathView';
 
 interface SamplePoint {
   id: string;
@@ -108,7 +109,7 @@ export const SpatialZoningVisualizer: React.FC = () => {
 
       {/* MODE 1: IDW INTERPOLATION SIMULATOR */}
       {activeTab === 'idw' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div key="idw" className="module-nav-transition grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Interactive Field Canvas (7 cols) */}
           <div className="lg:col-span-7 space-y-3">
             <div className="flex items-center justify-between">
@@ -322,8 +323,8 @@ export const SpatialZoningVisualizer: React.FC = () => {
                 </table>
               </div>
 
-              <div className="rounded border border-blue-200 bg-blue-50/60 p-2 text-[10px] leading-relaxed text-blue-900">
-                <strong>Spatial Physics Note:</strong> As the query cell approaches any sample core, distance $d \to 0$ and its weight $w \to \infty$, honoring the exact lab measurement as an exact interpolator.
+              <div className="rounded border border-blue-200 bg-blue-50/60 p-2.5 text-[11px] leading-relaxed text-blue-900">
+                <strong>Spatial Physics Note:</strong> As the query cell approaches any sample core, distance <MathView math="d \to 0" /> and its weight <MathView math="w \to \infty" />, honoring the exact lab measurement as an exact interpolator.
               </div>
             </div>
           </div>
@@ -332,7 +333,7 @@ export const SpatialZoningVisualizer: React.FC = () => {
 
       {/* MODE 2: AUTO-K SILHOUETTE SWEEP */}
       {activeTab === 'autok' && (
-        <div className="space-y-4">
+        <div key="autok" className="module-nav-transition space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
             {/* Auto-K Bar Chart */}
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 space-y-4">
@@ -387,18 +388,18 @@ export const SpatialZoningVisualizer: React.FC = () => {
                   Why KshetraSense Evaluates K Automatically
                 </h4>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  In legacy agricultural software, the number of zones $K$ is arbitrarily hardcoded (usually $K=3$). If a field is pedologically uniform, forcing 3 zones fabricates false boundaries. If it has 4 distinct soil types, it under-segments.
+                  In conventional approaches, the number of zones <MathView math="K" /> is arbitrarily hardcoded (usually <MathView math="K=3" />). If a field is pedologically uniform, forcing 3 zones fabricates false boundaries. If it has 4 distinct soil types, it under-segments.
                 </p>
                 <div className="rounded bg-slate-900 p-3 text-slate-100 font-mono text-xs space-y-1">
-                  <p className="text-emerald-400 font-semibold">
-                    {'s(i) = (b(i) - a(i)) / max(a(i), b(i))'}
-                  </p>
-                  <p className="text-[10px] text-slate-400">
-                    a(i) = intra-cluster mean distance · b(i) = nearest-cluster distance
+                  <div className="text-emerald-400 py-1">
+                    <MathView math="s(i) = \frac{b(i) - a(i)}{\max(a(i), b(i))}" block className="text-emerald-300" />
+                  </div>
+                  <p className="text-[10px] text-slate-400 text-center">
+                    <MathView math="a(i)" />: intra-cluster mean distance · <MathView math="b(i)" />: nearest-cluster distance
                   </p>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  KshetraSense executes K-Means++ and FCM across all candidate counts $K \in [2, 6]$, computing the exact silhouette coefficient. The argmax $K^*$ is selected as the mathematically optimal partitioning.
+                  KshetraSense executes K-Means++ and FCM across all candidate counts <MathView math="K \in [2, 6]" />, computing the exact silhouette coefficient. The argmax <MathView math="K^*" /> is selected as the mathematically optimal partitioning.
                 </p>
               </div>
             </div>
@@ -408,7 +409,7 @@ export const SpatialZoningVisualizer: React.FC = () => {
 
       {/* MODE 3: SPATIAL CONTIGUITY & SMOOTHING */}
       {activeTab === 'contiguity' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+        <div key="contiguity" className="module-nav-transition grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
           {/* Visual Comparison: Raw vs Smoothed */}
           <div className="rounded-xl border border-slate-200 bg-slate-900 p-5 text-white space-y-4">
             <div className="flex items-center justify-between">

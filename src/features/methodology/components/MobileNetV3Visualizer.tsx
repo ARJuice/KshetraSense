@@ -4,6 +4,7 @@ import {
   Eye,
   ShieldAlert,
 } from 'lucide-react';
+import { MathView } from '../../../components/ui/MathView';
 
 interface FoliarClassSample {
   id: string;
@@ -141,7 +142,7 @@ export const MobileNetV3Visualizer: React.FC = () => {
 
       {/* TAB 1: CNN ARCHITECTURE & INVERTED RESIDUAL BLOCKS */}
       {activeTab === 'architecture' && (
-        <div className="space-y-6">
+        <div key="architecture" className="module-nav-transition space-y-6">
           {/* Top-level Pipeline Topology Diagram */}
           <div className="rounded-xl border border-slate-200 bg-slate-900 p-5 text-white shadow-inner">
             <div className="flex items-center justify-between mb-4">
@@ -244,7 +245,7 @@ export const MobileNetV3Visualizer: React.FC = () => {
                   <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-1">
                     <span className="font-mono text-[10px] font-bold text-slate-500">PHASE 1</span>
                     <strong className="block text-slate-900">1×1 Pointwise Expansion</strong>
-                    <p className="text-[11px] text-slate-600">Expands input channels by expansion factor $t$ (e.g. $t=3$ to $6$) to high-dimensional manifold.</p>
+                    <p className="text-[11px] text-slate-600">Expands input channels by expansion factor <MathView math="t" /> (e.g. <MathView math="t \in [3, 6]" />) to high-dimensional manifold.</p>
                   </div>
 
                   <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-1">
@@ -267,11 +268,11 @@ export const MobileNetV3Visualizer: React.FC = () => {
                 </div>
 
                 {/* Hard-Swish formula callout */}
-                <div className="rounded-lg bg-slate-900 p-3 text-white font-mono text-xs space-y-1">
+                <div className="rounded-lg bg-slate-900 p-3.5 text-white font-mono text-xs space-y-1.5">
                   <span className="text-emerald-400 font-bold block">Hard-Swish Activation Function:</span>
-                  <p className="text-slate-200">
-                    {'h_swish(x) = x · (ReLU6(x + 3) / 6)'}
-                  </p>
+                  <div className="py-1">
+                    <MathView math="h_{\text{swish}}(x) = x \cdot \frac{\text{ReLU6}(x + 3)}{6}" block className="text-emerald-300 text-left" />
+                  </div>
                   <p className="text-[10px] text-slate-400">
                     Approximates the Swish function without costly floating-point exponential operations, ideal for agricultural mobile edge devices.
                   </p>
@@ -287,16 +288,19 @@ export const MobileNetV3Visualizer: React.FC = () => {
                 <p className="text-xs text-slate-600 leading-relaxed">
                   SE modules dynamically recalibrate channel-wise feature responses by explicitly modeling interdependencies between channels:
                 </p>
-                <div className="rounded-lg bg-slate-900 p-3 text-white font-mono text-xs space-y-1">
-                  <p className="text-emerald-400 font-bold">
-                    {'z = AdaptiveAvgPool2d(x)  # Squeeze'}
-                  </p>
-                  <p className="text-slate-200">
-                    {'s = HardSigmoid(Linear_2(ReLU(Linear_1(z))))  # Excitation'}
-                  </p>
-                  <p className="text-emerald-300">
-                    {'output = x · s  # Channel-wise feature scaling'}
-                  </p>
+                <div className="rounded-lg bg-slate-900 p-3.5 text-white font-mono text-xs space-y-2">
+                  <div className="border-b border-slate-800 pb-1.5">
+                    <span className="text-slate-400 text-[10px] block">1. Squeeze Operation:</span>
+                    <MathView math="\mathbf{z} = \text{AdaptiveAvgPool2d}(\mathbf{x})" block className="text-emerald-300 text-left" />
+                  </div>
+                  <div className="border-b border-slate-800 pb-1.5">
+                    <span className="text-slate-400 text-[10px] block">2. Excitation Gating:</span>
+                    <MathView math="\mathbf{s} = \text{HardSigmoid}(\mathbf{W}_2 \cdot \text{ReLU}(\mathbf{W}_1 \mathbf{z}))" block className="text-emerald-300 text-left" />
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block">3. Recalibration:</span>
+                    <MathView math="\mathbf{y} = \mathbf{x} \cdot \mathbf{s}" block className="text-emerald-300 text-left" />
+                  </div>
                 </div>
               </div>
             )}
@@ -346,17 +350,17 @@ export const MobileNetV3Visualizer: React.FC = () => {
 
       {/* TAB 2: INFERENCE SIMULATOR */}
       {activeTab === 'simulator' && (
-        <div className="space-y-6">
+        <div key="simulator" className="module-nav-transition space-y-6">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[11px] font-semibold text-slate-500">Sample Foliar Conditions:</span>
             {AUDITED_CLASSES.map((sample) => (
               <button
                 key={sample.id}
                 onClick={() => setSelectedSample(sample)}
-                className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold active:scale-95 transition-all duration-150 ${
                   selectedSample.id === sample.id
                     ? 'border-emerald-500 bg-emerald-50 text-emerald-800 shadow-sm'
-                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
                 }`}
               >
                 {sample.name}
@@ -424,7 +428,7 @@ export const MobileNetV3Visualizer: React.FC = () => {
                     </div>
                     <div className="h-2 w-full rounded-full bg-emerald-200 overflow-hidden">
                       <div
-                        className="h-full bg-emerald-600 rounded-full"
+                        className="h-full bg-emerald-600 rounded-full transition-all duration-300 ease-out"
                         style={{ width: `${selectedSample.simulatedTopScore * 100}%` }}
                       />
                     </div>
@@ -442,7 +446,7 @@ export const MobileNetV3Visualizer: React.FC = () => {
                     </div>
                     <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
                       <div
-                        className="h-full bg-slate-500 rounded-full"
+                        className="h-full bg-slate-500 rounded-full transition-all duration-300 ease-out"
                         style={{ width: `${selectedSample.runnerUpScore * 100}%` }}
                       />
                     </div>
@@ -460,7 +464,7 @@ export const MobileNetV3Visualizer: React.FC = () => {
                     </div>
                     <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
                       <div
-                        className="h-full bg-slate-400 rounded-full"
+                        className="h-full bg-slate-400 rounded-full transition-all duration-300 ease-out"
                         style={{ width: `${selectedSample.thirdScore * 100}%` }}
                       />
                     </div>
@@ -481,7 +485,7 @@ export const MobileNetV3Visualizer: React.FC = () => {
 
       {/* TAB 3: MANDATORY SAFETY GATE */}
       {activeTab === 'safety' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+        <div key="safety" className="module-nav-transition grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
           <div className="rounded-xl border border-slate-200 bg-slate-900 p-5 text-white space-y-4">
             <div className="flex items-center gap-2">
               <ShieldAlert size={18} className="text-amber-400" />

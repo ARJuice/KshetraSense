@@ -6,6 +6,7 @@ import {
   HelpCircle,
   Sliders,
 } from 'lucide-react';
+import { MathView } from '../../../components/ui/MathView';
 
 interface CropProfile {
   cropName: string;
@@ -135,23 +136,23 @@ export const CropFitBoundaryMatrix: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[11px] font-semibold text-slate-500">Presets:</span>
             <button
               onClick={() => applyZonePreset('zone1')}
-              className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+              className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 active:scale-95 transition-all duration-150 hover:bg-slate-100 hover:border-slate-300"
             >
               Zone 1: Acidic Laterite
             </button>
             <button
               onClick={() => applyZonePreset('zone2')}
-              className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+              className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 active:scale-95 transition-all duration-150 hover:bg-slate-100 hover:border-slate-300"
             >
               Zone 2: Fertile Loam
             </button>
             <button
               onClick={() => applyZonePreset('zone3')}
-              className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+              className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 active:scale-95 transition-all duration-150 hover:bg-slate-100 hover:border-slate-300"
             >
               Zone 3: Saline-Alkaline
             </button>
@@ -253,7 +254,7 @@ export const CropFitBoundaryMatrix: React.FC = () => {
             <div
               key={crop.cropName}
               onClick={() => setSelectedCropIndex(idx)}
-              className={`cursor-pointer rounded-xl border p-4 text-left transition-all ${
+              className={`cursor-pointer rounded-xl border p-4 text-left active:scale-[0.99] transition-all duration-150 ${
                 isSelected
                   ? 'border-emerald-500 bg-emerald-50/40 shadow-sm ring-1 ring-emerald-500'
                   : 'border-slate-200 bg-white hover:border-slate-300'
@@ -312,7 +313,7 @@ export const CropFitBoundaryMatrix: React.FC = () => {
       </div>
 
       {/* Selected Crop Deep Literature Details */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+      <div key={activeCrop.cropName} className="module-nav-transition rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
           <div>
             <h4 className="text-sm font-bold text-slate-900">{activeCrop.cropName}</h4>
@@ -397,8 +398,8 @@ export const CropFitBoundaryMatrix: React.FC = () => {
             <p className="leading-relaxed text-slate-300">
               Treating crop suitability as a probability distribution summing to 100% is a fatal mathematical fallacy: it treats <em>independent multi-label agronomic viability states</em> as if they were <em>mutually exclusive single-choice events</em>.
             </p>
-            <div className="rounded bg-slate-800 p-3 font-mono text-[11px] text-emerald-300 border border-slate-700">
-              P(Suitable_Ragi) + P(Suitable_Tomato) + P(Suitable_Groundnut) ≠ 1.0
+            <div className="rounded-xl bg-slate-800/90 p-3.5 border border-slate-700/80 my-2">
+              <MathView math="P(\text{Suitable}_{\text{Ragi}}) + P(\text{Suitable}_{\text{Tomato}}) + P(\text{Suitable}_{\text{Groundnut}}) \neq 1.0" block className="text-emerald-300 font-semibold" />
             </div>
           </div>
 

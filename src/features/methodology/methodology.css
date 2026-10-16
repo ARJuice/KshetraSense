@@ -1,4 +1,4 @@
-/* KshetraSense Methodology & Limits - Minimalist Scientific ERP Design */
+/* KshetraSense Methodology & Architecture - Modern Scientific ERP Design */
 
 .methodology-container {
   color: #0f172a;
@@ -13,7 +13,7 @@
   border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
-  transition: all 140ms ease;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
   border: 1px solid transparent;
   white-space: nowrap;
 }
@@ -22,7 +22,7 @@
   background-color: #ffffff;
   color: #059669;
   border-color: #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .methodology-tab-btn--inactive {
@@ -33,6 +33,37 @@
 .methodology-tab-btn--inactive:hover {
   color: #0f172a;
   background-color: #f1f5f9;
+}
+
+/* Smooth Tab & Stage Transitions */
+@keyframes tabFadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.methodology-tab-pane {
+  animation: tabFadeSlide 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes stageGlide {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.stage-transition-panel {
+  animation: stageGlide 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Pipeline Flow Animations */
@@ -60,6 +91,25 @@
 
 .pipeline-pulse-node {
   animation: pulseGaze 2.4s ease-in-out infinite;
+}
+
+/* KaTeX and Mathematical Equation Styling */
+.math-block {
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.math-block .katex-display {
+  margin: 0.5em 0;
+}
+
+.math-block .katex {
+  font-size: 1.15em;
+  color: inherit;
+}
+
+.math-inline .katex {
+  font-size: 1.02em;
 }
 
 /* Code & Formula Displays */
@@ -104,6 +154,61 @@
   animation: rippleWave 2s ease-out infinite;
 }
 
+/* Staggered Entrance for Highlights Stat Chips */
+@keyframes chipFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-chip-stagger {
+  animation: chipFadeUp 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.stat-chip-stagger:nth-child(1) { animation-delay: 30ms; }
+.stat-chip-stagger:nth-child(2) { animation-delay: 60ms; }
+.stat-chip-stagger:nth-child(3) { animation-delay: 90ms; }
+.stat-chip-stagger:nth-child(4) { animation-delay: 120ms; }
+.stat-chip-stagger:nth-child(5) { animation-delay: 150ms; }
+.stat-chip-stagger:nth-child(6) { animation-delay: 180ms; }
+
+/* Interactive Hover Cards */
+.interactive-hover-card {
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms ease, background-color 180ms ease;
+}
+
+.interactive-hover-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  border-color: #cbd5e1;
+}
+
+/* Topology Interactive Track Styling */
+.topology-track-card {
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.topology-track-card:hover {
+  transform: translateY(-1px);
+  border-color: #475569;
+  background-color: rgba(15, 23, 42, 0.95);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.topology-flow-arrow {
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), color 200ms ease;
+}
+
+.topology-track-card:hover .topology-flow-arrow {
+  transform: translateX(4px);
+  color: #34d399;
+}
+
 /* Reduced Motion Override */
 @media (prefers-reduced-motion: reduce) {
   .pipeline-flow-path {
@@ -114,5 +219,18 @@
   }
   .idw-ripple {
     animation: none !important;
+  }
+  .methodology-tab-pane {
+    animation: none !important;
+  }
+  .stage-transition-panel {
+    animation: none !important;
+  }
+  .stat-chip-stagger {
+    animation: none !important;
+  }
+  .interactive-hover-card:hover,
+  .topology-track-card:hover {
+    transform: none !important;
   }
 }

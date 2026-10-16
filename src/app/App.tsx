@@ -85,10 +85,12 @@ export default function App() {
           </div>
         </div>
 
-        {activeModule === 'zoning' && <ZoningWorkspace />}
-        {activeModule === 'leaf' && <LeafDiagnosisView />}
-        {activeModule === 'monitoring' && <FieldMonitoringView />}
-        {activeModule === 'methods' && <MethodologyLimitsView />}
+        <div key={activeModule} className="module-nav-transition flex-1">
+          {activeModule === 'zoning' && <ZoningWorkspace />}
+          {activeModule === 'leaf' && <LeafDiagnosisView />}
+          {activeModule === 'monitoring' && <FieldMonitoringView />}
+          {activeModule === 'methods' && <MethodologyLimitsView />}
+        </div>
       </main>
     </div>
   );

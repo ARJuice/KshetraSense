@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BookOpen, Check, Copy, Info } from 'lucide-react';
+import { MathView } from '../../../components/ui/MathView';
 
 export interface FormulaVariable {
   symbol: string;
@@ -34,24 +35,24 @@ export const InteractiveFormulaCard: React.FC<InteractiveFormulaCardProps> = ({
   };
 
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-emerald-300 ${className}`}>
+    <div className={`rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm transition-all duration-200 hover:border-emerald-300 hover:shadow-md ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-50 text-emerald-700 font-semibold shadow-xs">
             <BookOpen size={13} />
           </div>
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">{name}</h4>
         </div>
         <div className="flex items-center gap-1.5">
           {sourceRef && (
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+            <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 border border-slate-200/60">
               {sourceRef}
             </span>
           )}
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-95"
             title="Copy LaTeX formula"
           >
             {copied ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
@@ -60,11 +61,9 @@ export const InteractiveFormulaCard: React.FC<InteractiveFormulaCardProps> = ({
         </div>
       </div>
 
-      {/* Formula Display Area */}
-      <div className="my-3 flex items-center justify-center rounded-lg bg-slate-900 py-4 px-3 text-slate-100 shadow-inner">
-        <code className="formula-block text-center text-sm md:text-base font-semibold text-emerald-300">
-          {latex}
-        </code>
+      {/* Formula Display Area with KaTeX */}
+      <div className="my-3 flex items-center justify-center rounded-xl bg-slate-900 py-4 px-4 text-emerald-300 shadow-inner overflow-x-auto min-h-[64px]">
+        <MathView math={latex} block className="text-emerald-300 text-sm md:text-base font-semibold" />
       </div>
 
       {/* Description */}
@@ -76,7 +75,7 @@ export const InteractiveFormulaCard: React.FC<InteractiveFormulaCardProps> = ({
           <div className="flex items-center justify-between">
             <button
               onClick={() => setShowVariables((prev) => !prev)}
-              className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 hover:text-emerald-700"
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 hover:text-emerald-700 transition-colors"
             >
               <Info size={12} className="text-slate-400" />
               <span>{showVariables ? 'Hide Parameters' : 'Show Parameters & Units'} ({variables.length})</span>
@@ -84,21 +83,23 @@ export const InteractiveFormulaCard: React.FC<InteractiveFormulaCardProps> = ({
           </div>
 
           {showVariables && (
-            <div className="mt-2 overflow-x-auto">
+            <div className="mt-2.5 overflow-x-auto rounded-lg border border-slate-100 transition-all">
               <table className="w-full text-left text-[11px]">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-500 font-medium">
-                    <th className="py-1 px-2 font-mono">Symbol</th>
-                    <th className="py-1 px-2">Physical Agronomic Definition</th>
-                    <th className="py-1 px-2 font-mono">Unit</th>
+                  <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-500 font-semibold">
+                    <th className="py-1.5 px-3">Symbol</th>
+                    <th className="py-1.5 px-3">Parameter Definition</th>
+                    <th className="py-1.5 px-3 font-mono">Unit</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tbody className="divide-y divide-slate-100 text-slate-700 bg-white">
                   {variables.map((v, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/50">
-                      <td className="py-1 px-2 font-mono font-bold text-emerald-800">{v.symbol}</td>
-                      <td className="py-1 px-2">{v.meaning}</td>
-                      <td className="py-1 px-2 font-mono text-slate-500">{v.unit || 'dimensionless'}</td>
+                    <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-1.5 px-3 font-medium text-emerald-800">
+                        <MathView math={v.symbol} />
+                      </td>
+                      <td className="py-1.5 px-3 text-slate-600">{v.meaning}</td>
+                      <td className="py-1.5 px-3 font-mono text-slate-400">{v.unit || '—'}</td>
                     </tr>
                   ))}
                 </tbody>

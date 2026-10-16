@@ -106,12 +106,17 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   color: #94a3b8;
   background: transparent;
   text-align: left;
-  transition: all 130ms ease;
+  transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .nav-item:hover {
   color: #f8fafc;
   background: rgba(255, 255, 255, 0.06);
+  transform: translateX(2px);
+}
+
+.nav-item:active {
+  transform: scale(0.98);
 }
 
 .nav-item--active {
@@ -468,3 +473,29 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 @media (max-width: 760px) { .soil-canvas { min-height: 480px; padding: 11px 10px 9px; }.soil-canvas__badge { gap: 5px; padding: 5px 6px; font-size: 7px; }.soil-canvas__badge small { display: none; }.soil-canvas__tools button { min-height: 25px; padding-inline: 6px; font-size: 8px; }.soil-canvas__mapbar { align-items: flex-start; flex-direction: column; gap: 4px; padding-bottom: 7px; }.soil-canvas__view-tools { align-self: flex-end; margin-top: -29px; }.soil-canvas__workarea { min-height: 300px; padding-inline: 10px; }.soil-canvas__grid { grid-template-columns: repeat(var(--soil-grid-columns),clamp(17px,4.2vw,23px)); gap: 3px; }.soil-canvas__grid-frame { padding-inline: 10px; }.soil-canvas__brush-panel { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }.soil-canvas__brush-title { grid-column: 1/-1; }.soil-canvas__status { font-size: 7px; }.soil-canvas__shortcuts { display: none !important; } }
 @media (max-width: 390px) { .soil-canvas__badge { letter-spacing: .025em; }.soil-canvas__workarea { min-height: 270px; }.soil-canvas__brush-panel { padding: 7px; }.soil-canvas__brush-panel label { font-size: 7px; }.soil-canvas__grid { gap: 2px; } }
 @media (prefers-reduced-motion: reduce) { .soil-canvas--revealing .soil-canvas__cell,.soil-canvas--revealing .soil-canvas__cell.is-selected,.soil-canvas__cell.is-brush-preview,.soil-canvas__cell.is-recently-painted { animation: none !important; }.soil-canvas__cell,.soil-canvas__perspective { transition: none !important; }.soil-canvas__perspective { transform: perspective(1000px) rotateX(0deg) scale(var(--soil-grid-zoom)) !important; } }
+
+/* Smooth Navigation Transitions for In-Module and Top-Level Views */
+@keyframes moduleNavFadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.module-nav-transition {
+  animation: moduleNavFadeSlide 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module-nav-transition {
+    animation: none !important;
+  }
+  .nav-item:hover,
+  .nav-item:active {
+    transform: none !important;
+  }
+}

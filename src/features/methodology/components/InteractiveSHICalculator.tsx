@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Sliders } from 'lucide-react';
+import { MathView } from '../../../components/ui/MathView';
 
 export const InteractiveSHICalculator: React.FC = () => {
   // Input parameters state
@@ -97,25 +98,25 @@ export const InteractiveSHICalculator: React.FC = () => {
           <span className="text-[11px] font-semibold text-slate-500">Presets:</span>
           <button
             onClick={() => applyPreset('optimal')}
-            className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+            className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 hover:border-slate-300 active:scale-95 transition-all duration-150"
           >
             Near-Neutral Loam
           </button>
           <button
             onClick={() => applyPreset('acidic')}
-            className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+            className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 hover:border-slate-300 active:scale-95 transition-all duration-150"
           >
             Acidic Laterite
           </button>
           <button
             onClick={() => applyPreset('saline')}
-            className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+            className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 hover:border-slate-300 active:scale-95 transition-all duration-150"
           >
             Saline-Alkaline
           </button>
           <button
             onClick={() => applyPreset('depleted')}
-            className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+            className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 hover:border-slate-300 active:scale-95 transition-all duration-150"
           >
             Nutrient-Depleted
           </button>
@@ -273,19 +274,19 @@ export const InteractiveSHICalculator: React.FC = () => {
           {/* Individual Factor Breakdown Table */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-2.5">
             <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
-              Factor Sub-Score Breakdown (S ∈ [0, 1])
+              Factor Sub-Score Breakdown (<MathView math="S \in [0, 1]" />)
             </h4>
 
             <div className="space-y-2 text-xs">
               {/* pH Subscore */}
               <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-100">
                 <div>
-                  <span className="font-bold text-slate-800">S_pH</span>
-                  <span className="text-[10px] text-slate-600 ml-1.5">(Weight: 25%)</span>
+                  <span className="font-bold text-slate-800"><MathView math="S_{\text{pH}}" /></span>
+                  <span className="text-[10px] text-slate-500 ml-1.5">(Weight: 25%)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-600" style={{ width: `${scorePh * 100}%` }} />
+                    <div className="h-full bg-emerald-600 rounded-full transition-all duration-300 ease-out" style={{ width: `${scorePh * 100}%` }} />
                   </div>
                   <span className="font-mono font-bold text-slate-900 w-10 text-right">
                     {scorePh.toFixed(2)}
@@ -296,12 +297,12 @@ export const InteractiveSHICalculator: React.FC = () => {
               {/* EC Subscore */}
               <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-100">
                 <div>
-                  <span className="font-bold text-slate-800">S_EC</span>
-                  <span className="text-[10px] text-slate-600 ml-1.5">(Weight: 20%)</span>
+                  <span className="font-bold text-slate-800"><MathView math="S_{\text{EC}}" /></span>
+                  <span className="text-[10px] text-slate-500 ml-1.5">(Weight: 20%)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-600" style={{ width: `${scoreEc * 100}%` }} />
+                    <div className="h-full bg-emerald-600 rounded-full transition-all duration-300 ease-out" style={{ width: `${scoreEc * 100}%` }} />
                   </div>
                   <span className="font-mono font-bold text-slate-900 w-10 text-right">
                     {scoreEc.toFixed(2)}
@@ -312,12 +313,12 @@ export const InteractiveSHICalculator: React.FC = () => {
               {/* Nitrogen Subscore */}
               <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-100">
                 <div>
-                  <span className="font-bold text-slate-800">S_N</span>
-                  <span className="text-[10px] text-slate-600 ml-1.5">(Weight: 20%)</span>
+                  <span className="font-bold text-slate-800"><MathView math="S_{\text{N}}" /></span>
+                  <span className="text-[10px] text-slate-500 ml-1.5">(Weight: 20%)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-600" style={{ width: `${scoreN * 100}%` }} />
+                    <div className="h-full bg-emerald-600 rounded-full transition-all duration-300 ease-out" style={{ width: `${scoreN * 100}%` }} />
                   </div>
                   <span className="font-mono font-bold text-slate-900 w-10 text-right">
                     {scoreN.toFixed(2)}
@@ -328,12 +329,12 @@ export const InteractiveSHICalculator: React.FC = () => {
               {/* Phosphorus Subscore */}
               <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-100">
                 <div>
-                  <span className="font-bold text-slate-800">S_P</span>
-                  <span className="text-[10px] text-slate-600 ml-1.5">(Weight: 15%)</span>
+                  <span className="font-bold text-slate-800"><MathView math="S_{\text{P}}" /></span>
+                  <span className="text-[10px] text-slate-500 ml-1.5">(Weight: 15%)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-600" style={{ width: `${scoreP * 100}%` }} />
+                    <div className="h-full bg-emerald-600 rounded-full transition-all duration-300 ease-out" style={{ width: `${scoreP * 100}%` }} />
                   </div>
                   <span className="font-mono font-bold text-slate-900 w-10 text-right">
                     {scoreP.toFixed(2)}
@@ -344,12 +345,12 @@ export const InteractiveSHICalculator: React.FC = () => {
               {/* Potassium Subscore */}
               <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-100">
                 <div>
-                  <span className="font-bold text-slate-800">S_K</span>
-                  <span className="text-[10px] text-slate-600 ml-1.5">(Weight: 20%)</span>
+                  <span className="font-bold text-slate-800"><MathView math="S_{\text{K}}" /></span>
+                  <span className="text-[10px] text-slate-500 ml-1.5">(Weight: 20%)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-600" style={{ width: `${scoreK * 100}%` }} />
+                    <div className="h-full bg-emerald-600 rounded-full transition-all duration-300 ease-out" style={{ width: `${scoreK * 100}%` }} />
                   </div>
                   <span className="font-mono font-bold text-slate-900 w-10 text-right">
                     {scoreK.toFixed(2)}
@@ -365,9 +366,9 @@ export const InteractiveSHICalculator: React.FC = () => {
       <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3.5 flex items-start gap-2.5">
         <AlertTriangle size={15} className="text-amber-700 shrink-0 mt-0.5" />
         <div className="text-xs text-amber-950 space-y-1">
-          <p className="font-bold">Architectural Decoupling Rationale:</p>
+          <p className="font-bold">Screening Index Architecture:</p>
           <p className="leading-relaxed">
-            The composite SHI is strictly an exploratory screening tool. It is <strong>NEVER used as a clustering feature</strong> in spatial zoning. Clustering uses the multivariate z-scored raw profile <code className="font-mono bg-amber-100 px-1 py-0.5 rounded text-amber-900">[z_pH, z_EC, z_N, z_P, z_K]</code> directly. This prevents collapsing multi-dimensional soil chemistry into a scalar index that would obscure orthogonal agronomic requirements.
+            The composite SHI is strictly an exploratory screening tool. It is kept independent of clustering, which operates on the multivariate profile <MathView math="[z_{\text{pH}}, z_{\text{EC}}, z_{\text{N}}, z_{\text{P}}, z_{\text{K}}]" /> to preserve orthogonal multi-dimensional soil chemistry.
           </p>
         </div>
       </div>

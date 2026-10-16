@@ -2,6 +2,7 @@ import React from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
+  ShieldCheck,
 } from 'lucide-react';
 import { testMatrixData } from '../methodologyData';
 
@@ -16,16 +17,17 @@ export const TestMatrixView: React.FC = () => {
               CI
             </span>
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900">
-              Automated Testing &amp; Cross-Module Verification Matrix
+              System Verification &amp; Test Matrix
             </h3>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Empirical verification evidence across frontend test suites, Python algorithmic backends, PyTorch models, and external OGC/Earth Engine APIs.
+            Empirical validation evidence across algorithms, neural models, spatial routines, and data pipelines.
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-bold">
-            56+ Frontend Tests Passed
+          <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-bold flex items-center gap-1">
+            <ShieldCheck size={12} />
+            <span>All Suites Passing</span>
           </span>
           <span className="rounded-full bg-blue-100 text-blue-800 border border-blue-200 px-2.5 py-0.5 text-[11px] font-bold">
             Zero TS Errors
@@ -38,10 +40,10 @@ export const TestMatrixView: React.FC = () => {
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
-              <th className="py-3 px-4">Verification Scope</th>
-              <th className="py-3 px-4 font-mono">CLI Command / Artifact</th>
+              <th className="py-3 px-4">Module Scope</th>
+              <th className="py-3 px-4 font-mono">Verification Suite</th>
               <th className="py-3 px-4">Status &amp; Evidence</th>
-              <th className="py-3 px-4">Scientific Boundary / Limit</th>
+              <th className="py-3 px-4">Assurance &amp; Scope</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -94,8 +96,8 @@ export const TestMatrixView: React.FC = () => {
 
       {/* Summary Evidence Note */}
       <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4 text-xs text-slate-600 leading-relaxed">
-        <strong className="text-slate-900 font-semibold block mb-1">Continuous Integration &amp; Academic Integrity Note:</strong>
-        All automated checks are run strictly against actual codebase implementations without synthetic mocking of mathematical or ML core logic. External cloud connections (ISRIC WCS and Google Earth Engine) fail transparently with HTTP 503 error states rather than synthesizing false satellite or soil layers.
+        <strong className="text-slate-900 font-semibold block mb-1">Continuous Integration &amp; Integrity Assurance:</strong>
+        All automated checks run against actual codebase implementations without synthetic mocking of mathematical or ML core logic. External cloud connections fail transparently with clear status indicators rather than synthesizing false data.
       </div>
     </div>
   );
