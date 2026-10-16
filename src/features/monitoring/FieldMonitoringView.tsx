@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, FlaskConical, Satellite } from 'lucide-react';
+import { Activity, AlertCircle, FlaskConical, Satellite } from 'lucide-react';
 import { SoilInvestigationView } from './SoilInvestigationView';
 import { TelemetryReplayView } from './TelemetryReplayView';
 import { VegetationMonitoringView } from './VegetationMonitoringView';
@@ -30,78 +30,123 @@ export const FieldMonitoringView: React.FC<FieldMonitoringViewProps> = ({ onSamp
     onSamplesChange?.(samples);
   }, []);
 
+  const navTabs = [
+    {
+      id: 'soil' as const,
+      title: 'Soil Investigation',
+      description: 'Lab samples & 250m SoilGrids context',
+      icon: FlaskConical,
+      badge: `${samples.length} ${samples.length === 1 ? 'record' : 'records'}`,
+    },
+    {
+      id: 'telemetry' as const,
+      title: 'Telemetry Replay',
+      description: 'In-situ sensor WSN & time-series',
+      icon: Activity,
+      badge: 'WSN Model',
+    },
+    {
+      id: 'vegetation' as const,
+      title: 'Vegetation Monitoring',
+      description: 'Multispectral Sentinel-2 & CropSight',
+      icon: Satellite,
+      badge: 'Copernicus S2',
+    },
+  ];
+
   return (
-    <main className="flex-1 overflow-y-auto bg-parchment-100/60 p-5 lg:p-7">
+    <div className="flex-1 overflow-y-auto bg-slate-50/60 p-5 lg:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Module Master Header */}
-        <header className="flex flex-col justify-between gap-4 border-b border-line-border pb-4 sm:flex-row sm:items-end">
+        <header className="flex flex-col justify-between gap-4 border-b border-slate-200/80 pb-5">
           <div>
             <div className="mb-1 flex items-center gap-2">
-              <span className="font-serif text-2xl font-bold text-ink">Field Monitoring</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">
+                Precision Agriculture
+              </span>
+              <span className="text-slate-300">/</span>
+              <span className="text-[11px] font-semibold text-slate-500">
+                Field Monitoring &amp; Telemetry
+              </span>
             </div>
-            <p className="max-w-3xl text-xs leading-6 text-ink-muted">
-              Record validated measured soil observations, query coarse 250m regional SoilGrids context, and run Sentinel-2 / Google Earth Engine vegetation monitoring via the independent CropSight sub-application.
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Field Monitoring &amp; Observations
+            </h1>
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500">
+              Record validated measured soil observations, query coarse 250m regional SoilGrids context, replay in-situ sensor telemetry, and run Sentinel-2 multispectral vegetation monitoring via the independent CropSight sub-application.
             </p>
           </div>
 
-          {/* Primary View Switcher */}
-          <div className="flex flex-wrap rounded-lg border border-line-border bg-parchment-50 p-1 shadow-instrument" role="tablist" aria-label="Field Monitoring Modules">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'soil'}
-              onClick={() => setActiveTab('soil')}
-              className={`inline-flex items-center gap-2 rounded-md px-3.5 py-2 text-xs font-semibold transition ${
-                activeTab === 'soil'
-                  ? 'bg-sage-700 text-parchment-50 shadow-sm'
-                  : 'text-ink-muted hover:bg-parchment-100 hover:text-ink'
-              }`}
-            >
-              <FlaskConical size={14} />
-              <span>Soil Investigation</span>
-              <span className="rounded bg-black/15 px-1.5 py-0.2 font-mono text-[10px]">
-                {samples.length}
-              </span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'telemetry'}
-              onClick={() => setActiveTab('telemetry')}
-              className={`inline-flex items-center gap-2 rounded-md px-3.5 py-2 text-xs font-semibold transition ${
-                activeTab === 'telemetry'
-                  ? 'bg-sage-700 text-parchment-50 shadow-sm'
-                  : 'text-ink-muted hover:bg-parchment-100 hover:text-ink'
-              }`}
-            >
-              <Activity size={14} />
-              <span>Historical Telemetry Replay</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'vegetation'}
-              onClick={() => setActiveTab('vegetation')}
-              className={`inline-flex items-center gap-2 rounded-md px-3.5 py-2 text-xs font-semibold transition ${
-                activeTab === 'vegetation'
-                  ? 'bg-sage-700 text-parchment-50 shadow-sm'
-                  : 'text-ink-muted hover:bg-parchment-100 hover:text-ink'
-              }`}
-            >
-              <Satellite size={14} />
-              <span>Vegetation Monitoring (CropSight)</span>
-            </button>
-          </div>
+          {/* Primary View Segmented Dock */}
+          <nav
+            role="tablist"
+            aria-label="Field Monitoring Modules"
+            className="grid grid-cols-1 gap-2.5 rounded-2xl border border-slate-200/90 bg-slate-100/70 p-1.5 sm:grid-cols-3"
+          >
+            {navTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`group relative flex items-center gap-3.5 rounded-xl px-4 py-3 text-left transition-all duration-150 ${
+                    isActive
+                      ? 'border border-slate-200/90 bg-white text-slate-900 shadow-sm ring-1 ring-slate-900/5'
+                      : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
+                  }`}
+                >
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-500/20'
+                        : 'bg-slate-200/60 text-slate-500 group-hover:bg-slate-200 group-hover:text-slate-700'
+                    }`}
+                  >
+                    <Icon size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-xs font-bold tracking-tight">
+                        {tab.title}
+                      </span>
+                    </div>
+                    <p className="truncate text-[11px] text-slate-400 group-hover:text-slate-500">
+                      {tab.description}
+                    </p>
+                  </div>
+                  <span
+                    className={`ml-auto shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold transition-colors ${
+                      isActive
+                        ? 'border border-emerald-200/60 bg-emerald-50 text-emerald-700'
+                        : 'bg-slate-200/50 text-slate-500'
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
         </header>
 
         {storageLoad.archivedPresetCount > 0 && (
-          <div className="rounded-lg border border-amberGold/30 bg-amberGold-subtle p-3 text-xs text-amberGold-dark">
-            Archived {storageLoad.archivedPresetCount} legacy synthetic soil preset record(s) from active measurements. Manual and CSV records were preserved.
+          <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-900">
+            <AlertCircle size={16} className="shrink-0 text-amber-600" />
+            <span>
+              Archived {storageLoad.archivedPresetCount} legacy synthetic soil preset record(s) from active measurements. Manual and CSV records were preserved.
+            </span>
           </div>
         )}
         {storageLoad.migrationWarning && (
-          <div className="rounded-lg border border-amberGold/30 bg-amberGold-subtle p-3 text-xs text-amberGold-dark">
-            Browser storage could not archive legacy synthetic presets. They remain clearly marked as non-measurements; active measurement summaries exclude them.
+          <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-900">
+            <AlertCircle size={16} className="shrink-0 text-amber-600" />
+            <span>
+              Browser storage could not archive legacy synthetic presets. They remain clearly marked as non-measurements; active measurement summaries exclude them.
+            </span>
           </div>
         )}
 
@@ -117,6 +162,6 @@ export const FieldMonitoringView: React.FC<FieldMonitoringViewProps> = ({ onSamp
           <VegetationMonitoringView />
         )}
       </div>
-    </main>
+    </div>
   );
 };

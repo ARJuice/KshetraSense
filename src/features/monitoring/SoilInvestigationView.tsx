@@ -11,6 +11,7 @@ import {
   LineChart,
   MapPin,
   RefreshCw,
+  ShieldAlert,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -47,17 +48,17 @@ const EMPTY_SOIL_FORM: CsvSampleRow = {
 };
 
 const inputClassName =
-  'w-full rounded-md border border-line-border bg-parchment-50 px-2.5 py-1.5 text-xs text-ink outline-none transition focus:border-sage-600 focus:ring-2 focus:ring-sage-200';
+  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder-slate-400 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20';
 
 const FieldLabel: React.FC<{ label: string; help?: string; children: React.ReactNode }> = ({
   label,
   help,
   children,
 }) => (
-  <label className="block">
-    <span className="mb-1 block text-[11px] font-medium text-ink-muted">{label}</span>
+  <label className="block space-y-1">
+    <span className="block text-[11px] font-semibold text-slate-700">{label}</span>
     {children}
-    {help && <span className="mt-0.5 block text-[10px] leading-3 text-ink-subtle">{help}</span>}
+    {help && <span className="block text-[10px] leading-tight text-slate-400">{help}</span>}
   </label>
 );
 
@@ -66,13 +67,13 @@ const StatusPill: React.FC<{ children: React.ReactNode; tone: 'amber' | 'sage' |
   tone,
 }) => {
   const tones = {
-    amber: 'border-amberGold/30 bg-amberGold-subtle text-amberGold-dark',
-    sage: 'border-sage-300 bg-sage-100 text-sage-800',
-    slate: 'border-line-border bg-parchment-100 text-ink-muted',
-    clay: 'border-clay/30 bg-clay-subtle text-clay-dark',
+    amber: 'border-amber-200 bg-amber-50 text-amber-800',
+    sage: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    slate: 'border-slate-200 bg-slate-100 text-slate-700',
+    clay: 'border-rose-200 bg-rose-50 text-rose-800',
   };
   return (
-    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wide ${tones[tone]}`}>
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -227,36 +228,45 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Sub-navigation switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-border pb-3">
-        <div className="flex rounded-lg border border-line-border bg-parchment-50 p-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-4">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-100/80 p-1">
           <button
             type="button"
             onClick={() => setSubTab('entry')}
-            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-              subTab === 'entry' ? 'bg-sage-700 text-parchment-50 shadow-sm' : 'text-ink-muted hover:text-ink'
+            className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
+              subTab === 'entry'
+                ? 'border border-slate-200/80 bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:bg-white/50 hover:text-slate-900'
             }`}
           >
-            1. Sample Register & CSV
+            <FlaskConical size={14} className={subTab === 'entry' ? 'text-emerald-600' : 'text-slate-400'} />
+            <span>1. Sample Register &amp; CSV</span>
           </button>
           <button
             type="button"
             onClick={() => setSubTab('trends')}
-            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-              subTab === 'trends' ? 'bg-sage-700 text-parchment-50 shadow-sm' : 'text-ink-muted hover:text-ink'
+            className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
+              subTab === 'trends'
+                ? 'border border-slate-200/80 bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:bg-white/50 hover:text-slate-900'
             }`}
           >
-            2. Observation Trends & Comparability (FM-02)
+            <LineChart size={14} className={subTab === 'trends' ? 'text-emerald-600' : 'text-slate-400'} />
+            <span>2. Observation Trends &amp; Comparability</span>
           </button>
           <button
             type="button"
             onClick={() => setSubTab('soilgrids')}
-            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-              subTab === 'soilgrids' ? 'bg-sage-700 text-parchment-50 shadow-sm' : 'text-ink-muted hover:text-ink'
+            className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
+              subTab === 'soilgrids'
+                ? 'border border-slate-200/80 bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:bg-white/50 hover:text-slate-900'
             }`}
           >
-            3. Regional SoilGrids Context (FM-03)
+            <Database size={14} className={subTab === 'soilgrids' ? 'text-emerald-600' : 'text-slate-400'} />
+            <span>3. Regional SoilGrids Context</span>
           </button>
         </div>
 
@@ -265,9 +275,9 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
             <button
               type="button"
               onClick={clearAllSamples}
-              className="inline-flex items-center gap-1 rounded border border-clay/30 bg-clay-subtle px-2 py-1 text-[11px] font-medium text-clay-dark hover:bg-clay/20"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
             >
-              <Trash2 size={12} /> Clear
+              <Trash2 size={13} /> Clear All Records
             </button>
           )}
         </div>
@@ -275,17 +285,17 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
 
       {/* SUB-TAB 1: ENTRY & COVERAGE */}
       {subTab === 'entry' && (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
-          <div className="space-y-5">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
+          <div className="space-y-6">
             {/* Manual Form Card */}
-            <section className="rounded-xl border border-line-border bg-parchment-50 p-5 shadow-instrument">
-              <div className="mb-4 flex items-start justify-between gap-3">
+            <section className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
+              <div className="mb-5 flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <FlaskConical size={17} className="text-sage-700" />
-                    <h2 className="font-serif text-lg font-bold text-ink">Record Soil Measurement</h2>
+                    <FlaskConical size={18} className="text-emerald-600" />
+                    <h2 className="text-base font-bold tracking-tight text-slate-900">Record Soil Measurement</h2>
                   </div>
-                  <p className="text-xs text-ink-muted">
+                  <p className="mt-1 text-xs text-slate-500">
                     Values require collection timestamp, coordinates, analytical method, depth, and source. Preserved in local storage.
                   </p>
                 </div>
@@ -293,11 +303,11 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
               </div>
 
               {formErrors.length > 0 && (
-                <div className="mb-4 rounded-lg border border-clay/30 bg-clay-subtle p-3 text-xs text-clay-dark">
-                  <div className="mb-1 flex items-center gap-1 font-semibold">
-                    <AlertTriangle size={14} /> Review record issues
+                <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50/80 p-3.5 text-xs text-rose-900">
+                  <div className="mb-1 flex items-center gap-1.5 font-semibold">
+                    <AlertTriangle size={14} className="text-rose-600" /> Review record issues
                   </div>
-                  <ul className="list-disc space-y-0.5 pl-4">
+                  <ul className="list-disc space-y-0.5 pl-4 text-rose-800">
                     {formErrors.map((err) => (
                       <li key={err}>{err}</li>
                     ))}
@@ -305,13 +315,13 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                 </div>
               )}
 
-              <form onSubmit={handleFormSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <FieldLabel label="Sample ID *" help="Unique code"><input required value={soilForm.sample_id} onChange={(e) => setSoilForm({ ...soilForm, sample_id: e.target.value })} className={inputClassName} placeholder="e.g. SE-014" /></FieldLabel>
-                <FieldLabel label="Collection Date *" help="ISO date"><input required type="date" value={soilForm.collected_at} onChange={(e) => setSoilForm({ ...soilForm, collected_at: e.target.value })} className={inputClassName} /></FieldLabel>
-                <FieldLabel label="Lab / Source *" help="Origin lab or survey"><input required value={soilForm.source} onChange={(e) => setSoilForm({ ...soilForm, source: e.target.value })} className={inputClassName} placeholder="PAU Soil Lab" /></FieldLabel>
-                <FieldLabel label="Latitude *" help="-90 to 90"><input required inputMode="decimal" value={soilForm.latitude} onChange={(e) => setSoilForm({ ...soilForm, latitude: e.target.value })} className={inputClassName} placeholder="30.9015" /></FieldLabel>
-                <FieldLabel label="Longitude *" help="-180 to 180"><input required inputMode="decimal" value={soilForm.longitude} onChange={(e) => setSoilForm({ ...soilForm, longitude: e.target.value })} className={inputClassName} placeholder="75.8524" /></FieldLabel>
-                <FieldLabel label="pH *" help="0–14 scale"><input required inputMode="decimal" value={soilForm.ph} onChange={(e) => setSoilForm({ ...soilForm, ph: e.target.value })} className={inputClassName} placeholder="7.4" /></FieldLabel>
+              <form onSubmit={handleFormSubmit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                <FieldLabel label="Sample ID *" help="Unique identifier code"><input required value={soilForm.sample_id} onChange={(e) => setSoilForm({ ...soilForm, sample_id: e.target.value })} className={inputClassName} placeholder="e.g. SE-014" /></FieldLabel>
+                <FieldLabel label="Collection Date *" help="ISO date format"><input required type="date" value={soilForm.collected_at} onChange={(e) => setSoilForm({ ...soilForm, collected_at: e.target.value })} className={inputClassName} /></FieldLabel>
+                <FieldLabel label="Lab / Source *" help="Origin laboratory or survey"><input required value={soilForm.source} onChange={(e) => setSoilForm({ ...soilForm, source: e.target.value })} className={inputClassName} placeholder="PAU Soil Lab" /></FieldLabel>
+                <FieldLabel label="Latitude *" help="-90 to 90 degrees"><input required inputMode="decimal" value={soilForm.latitude} onChange={(e) => setSoilForm({ ...soilForm, latitude: e.target.value })} className={inputClassName} placeholder="30.9015" /></FieldLabel>
+                <FieldLabel label="Longitude *" help="-180 to 180 degrees"><input required inputMode="decimal" value={soilForm.longitude} onChange={(e) => setSoilForm({ ...soilForm, longitude: e.target.value })} className={inputClassName} placeholder="75.8524" /></FieldLabel>
+                <FieldLabel label="pH *" help="0–14 standard scale"><input required inputMode="decimal" value={soilForm.ph} onChange={(e) => setSoilForm({ ...soilForm, ph: e.target.value })} className={inputClassName} placeholder="7.4" /></FieldLabel>
                 <FieldLabel label="EC *" help="dS/m"><input required inputMode="decimal" value={soilForm.ec_ds_m} onChange={(e) => setSoilForm({ ...soilForm, ec_ds_m: e.target.value })} className={inputClassName} placeholder="0.65" /></FieldLabel>
                 <FieldLabel label="Nitrogen *" help="mg/kg"><input required inputMode="decimal" value={soilForm.nitrogen_mg_kg} onChange={(e) => setSoilForm({ ...soilForm, nitrogen_mg_kg: e.target.value })} className={inputClassName} placeholder="54" /></FieldLabel>
                 <FieldLabel label="Phosphorus *" help="mg/kg"><input required inputMode="decimal" value={soilForm.phosphorus_mg_kg} onChange={(e) => setSoilForm({ ...soilForm, phosphorus_mg_kg: e.target.value })} className={inputClassName} placeholder="26" /></FieldLabel>
@@ -326,8 +336,11 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                     <input value={soilForm.notes} onChange={(e) => setSoilForm({ ...soilForm, notes: e.target.value })} className={inputClassName} placeholder="Composite topsoil, sandy loam." />
                   </FieldLabel>
                 </div>
-                <div className="sm:col-span-2 lg:col-span-3 flex justify-end">
-                  <button type="submit" className="button button--primary">
+                <div className="sm:col-span-2 lg:col-span-3 flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:bg-emerald-800"
+                  >
                     Record Measurement
                   </button>
                 </div>
@@ -335,43 +348,43 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
             </section>
 
             {/* CSV Import Card */}
-            <section className="rounded-xl border border-line-border bg-parchment-50 p-5 shadow-instrument">
-              <div className="mb-3 flex items-start justify-between gap-3">
+            <section className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
+              <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <FileSpreadsheet size={17} className="text-sage-700" />
-                    <h2 className="font-serif text-lg font-bold text-ink">CSV Import Register</h2>
+                    <FileSpreadsheet size={18} className="text-emerald-600" />
+                    <h2 className="text-base font-bold tracking-tight text-slate-900">CSV Import Register</h2>
                   </div>
-                  <p className="text-xs text-ink-muted">
+                  <p className="mt-1 text-xs text-slate-500">
                     Validate soil observation rows in browser memory before merging. Requires explicit units and headers.
                   </p>
                 </div>
                 <StatusPill tone="slate">2 MB limit</StatusPill>
               </div>
 
-              <label className="flex cursor-pointer items-center justify-between rounded-lg border border-dashed border-line-border bg-parchment-100/60 p-3 transition hover:border-sage-500 hover:bg-sage-50">
-                <span className="flex items-center gap-2 text-xs font-medium text-ink">
-                  <Upload size={16} className="text-sage-700" /> Select CSV file for local validation
+              <label className="flex cursor-pointer items-center justify-between rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/70 p-4 transition hover:border-emerald-400 hover:bg-emerald-50/30">
+                <span className="flex items-center gap-2.5 text-xs font-semibold text-slate-700">
+                  <Upload size={16} className="text-emerald-600" /> Select CSV file for local validation
                 </span>
-                <span className="text-[11px] text-ink-subtle">No cloud upload</span>
+                <span className="text-[11px] text-slate-400">Processed locally in browser</span>
                 <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => handleCsvFile(e.target.files?.[0])} />
               </label>
 
-              <p className="mt-2 text-[10px] text-ink-subtle">
+              <p className="mt-2.5 text-[11px] text-slate-400">
                 Headers: {SOIL_CSV_HEADERS.slice(0, 10).join(', ')}, depth_cm, method, moisture_pct, notes.
               </p>
 
               {importPreview && (
-                <div className="mt-4 rounded-lg border border-line-border bg-parchment-100 p-3 text-xs">
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-ink">{importPreview.fileName}</span>
-                    <span className="font-mono text-sage-800">
+                    <span className="font-semibold text-slate-900">{importPreview.fileName}</span>
+                    <span className="font-mono font-semibold text-emerald-700">
                       {importPreview.accepted.length} valid / {importPreview.totalRows} rows
                     </span>
                   </div>
 
                   {importPreview.issues.length > 0 && (
-                    <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto border-t border-line-subtle pt-2 text-clay-dark">
+                    <ul className="mt-3 max-h-28 space-y-1 overflow-y-auto border-t border-slate-200 pt-2.5 text-rose-700">
                       {importPreview.issues.slice(0, 6).map((issue, idx) => (
                         <li key={idx}>Row {issue.row || '—'}: {issue.message}</li>
                       ))}
@@ -379,15 +392,19 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                     </ul>
                   )}
 
-                  <div className="mt-3 flex justify-end gap-2">
-                    <button type="button" onClick={() => setImportPreview(null)} className="rounded px-2.5 py-1 text-xs text-ink-muted hover:bg-parchment-200">
+                  <div className="mt-3.5 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setImportPreview(null)}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                    >
                       Discard
                     </button>
                     <button
                       type="button"
                       disabled={importPreview.accepted.length === 0}
                       onClick={applyCsvImport}
-                      className="button button--primary !text-xs disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
                     >
                       <Import size={13} /> Add {importPreview.accepted.length} Valid Records
                     </button>
@@ -396,25 +413,25 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
               )}
 
               {importMessage && (
-                <p className="mt-3 flex items-center gap-1 text-xs font-medium text-sage-800">
-                  <CheckCircle2 size={14} /> {importMessage}
+                <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                  <CheckCircle2 size={15} /> {importMessage}
                 </p>
               )}
             </section>
           </div>
 
           {/* Right Column: Coverage & Inspection */}
-          <aside className="space-y-5">
-            <section className="rounded-xl border border-line-border bg-parchment-50 p-5 shadow-instrument">
-              <div className="mb-3 flex items-start justify-between">
+          <aside className="space-y-6">
+            <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
+              <div className="mb-3.5 flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <MapPin size={16} className="text-sage-700" />
-                    <h2 className="font-serif text-base font-bold text-ink">Sample Coverage</h2>
+                    <MapPin size={17} className="text-emerald-600" />
+                    <h2 className="text-base font-bold tracking-tight text-slate-900">Sample Coverage</h2>
                   </div>
-                  <p className="text-[11px] text-ink-muted">Relative coordinate scatter within bounding box.</p>
+                  <p className="text-[11px] text-slate-500">Relative coordinate scatter within bounding box.</p>
                 </div>
-                <span className="font-mono text-xs font-bold text-sage-800">{measuredSamples.length} measured/imported</span>
+                <span className="font-mono text-xs font-bold text-emerald-700">{measuredSamples.length} measured/imported</span>
               </div>
 
               <SampleCoverageMap
@@ -431,24 +448,24 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
               />
 
               {summary && (
-                <div className="mt-3 grid grid-cols-3 divide-x divide-line-subtle rounded-lg border border-line-subtle bg-parchment-100/80 text-center text-[10px]">
-                  <div className="p-2">
-                    <span className="block font-mono text-sm font-semibold text-ink">
+                <div className="mt-3.5 grid grid-cols-3 divide-x divide-slate-200 rounded-xl border border-slate-200 bg-slate-50/80 text-center text-[10px]">
+                  <div className="p-2.5">
+                    <span className="block font-mono text-sm font-bold text-slate-900">
                       {summary.meanPh?.toFixed(2) ?? '—'}
                     </span>
-                    <span className="text-ink-subtle">mean pH</span>
+                    <span className="text-slate-500">mean pH</span>
                   </div>
-                  <div className="p-2">
-                    <span className="block font-mono text-sm font-semibold text-ink">
+                  <div className="p-2.5">
+                    <span className="block font-mono text-sm font-bold text-slate-900">
                       {summary.meanEc?.toFixed(2) ?? '—'}
                     </span>
-                    <span className="text-ink-subtle">mean EC (dS/m)</span>
+                    <span className="text-slate-500">mean EC (dS/m)</span>
                   </div>
-                  <div className="p-2">
-                    <span className="block font-mono text-sm font-semibold text-ink">
+                  <div className="p-2.5">
+                    <span className="block font-mono text-sm font-bold text-slate-900">
                       {summary.meanN ? Math.round(summary.meanN) : '—'}
                     </span>
-                    <span className="text-ink-subtle">mean N (mg/kg)</span>
+                    <span className="text-slate-500">mean N (mg/kg)</span>
                   </div>
                 </div>
               )}
@@ -456,50 +473,52 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
 
             {/* Selected Sample Detail Inspector */}
             {selectedSample ? (
-              <section className="rounded-xl border border-line-border bg-parchment-50 p-4 shadow-instrument">
-                <div className="flex items-start justify-between gap-2 border-b border-line-subtle pb-2">
+              <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
                   <div>
-                    <h3 className="font-mono text-xs font-bold text-ink">{selectedSample.sampleId}</h3>
-                    <p className="text-[10px] text-ink-subtle">{selectedSample.collectedAt} · {selectedSample.source}</p>
+                    <h3 className="font-mono text-xs font-bold text-slate-900">{selectedSample.sampleId}</h3>
+                    <p className="text-[11px] text-slate-400">{selectedSample.collectedAt} · {selectedSample.source}</p>
                   </div>
                   <StatusPill tone={selectedSample.provenance === 'seed-preset' ? 'amber' : selectedSample.provenance === 'csv-import' ? 'slate' : 'sage'}>
                     {selectedSample.provenance === 'seed-preset' ? 'Synthetic legacy — excluded' : selectedSample.provenance}
                   </StatusPill>
                 </div>
 
-                <dl className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
-                  <div><dt className="text-ink-subtle">Depth Stratum</dt><dd className="font-mono font-medium text-ink">{selectedSample.depthInterval || `${selectedSample.depthCm} cm` || 'Unrecorded'}</dd></div>
-                  <div><dt className="text-ink-subtle">Method</dt><dd className="font-mono font-medium text-ink">{selectedSample.method || 'Standard extraction'}</dd></div>
-                  <div><dt className="text-ink-subtle">pH</dt><dd className="font-mono font-medium text-ink">{selectedSample.ph.toFixed(2)}</dd></div>
-                  <div><dt className="text-ink-subtle">EC</dt><dd className="font-mono font-medium text-ink">{selectedSample.ecDsM.toFixed(2)} dS/m</dd></div>
-                  <div><dt className="text-ink-subtle">N · P · K</dt><dd className="font-mono font-medium text-ink">{Math.round(selectedSample.nitrogenMgKg)} · {Math.round(selectedSample.phosphorusMgKg)} · {Math.round(selectedSample.potassiumMgKg)} mg/kg</dd></div>
+                <dl className="mt-3 grid grid-cols-2 gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 text-[11px]">
+                  <div><dt className="text-slate-400">Depth Stratum</dt><dd className="font-mono font-semibold text-slate-800">{selectedSample.depthInterval || `${selectedSample.depthCm} cm` || 'Unrecorded'}</dd></div>
+                  <div><dt className="text-slate-400">Method</dt><dd className="font-mono font-semibold text-slate-800">{selectedSample.method || 'Standard extraction'}</dd></div>
+                  <div><dt className="text-slate-400">pH</dt><dd className="font-mono font-semibold text-slate-800">{selectedSample.ph.toFixed(2)}</dd></div>
+                  <div><dt className="text-slate-400">EC</dt><dd className="font-mono font-semibold text-slate-800">{selectedSample.ecDsM.toFixed(2)} dS/m</dd></div>
+                  <div className="col-span-2"><dt className="text-slate-400">N · P · K</dt><dd className="font-mono font-semibold text-slate-800">{Math.round(selectedSample.nitrogenMgKg)} · {Math.round(selectedSample.phosphorusMgKg)} · {Math.round(selectedSample.potassiumMgKg)} mg/kg</dd></div>
                   {selectedSample.moisturePercentage !== undefined && (
-                    <div><dt className="text-ink-subtle">Moisture</dt><dd className="font-mono font-medium text-ink">{selectedSample.moisturePercentage}% ({selectedSample.moistureUnit})</dd></div>
+                    <div className="col-span-2"><dt className="text-slate-400">Moisture</dt><dd className="font-mono font-semibold text-slate-800">{selectedSample.moisturePercentage}% ({selectedSample.moistureUnit})</dd></div>
                   )}
                 </dl>
 
                 {selectedSample.notes && (
-                  <p className="mt-2 rounded bg-parchment-100 p-1.5 text-[10px] leading-4 text-ink-muted">
+                  <p className="mt-3 rounded-lg bg-slate-50 p-2.5 text-[11px] leading-relaxed text-slate-600">
                     {selectedSample.notes}
                   </p>
                 )}
 
-                <div className="mt-3 flex justify-between gap-2 border-t border-line-subtle pt-2">
-                  {selectedSample.provenance !== 'seed-preset' && <button
-                    type="button"
-                    onClick={() => {
-                      setSgLat(String(selectedSample.latitude));
-                      setSgLon(String(selectedSample.longitude));
-                      setSubTab('soilgrids');
-                    }}
-                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-sage-800 hover:underline"
-                  >
-                    View SoilGrids for this site <ChevronRight size={12} />
-                  </button>}
+                <div className="mt-3.5 flex justify-between gap-2 border-t border-slate-100 pt-3">
+                  {selectedSample.provenance !== 'seed-preset' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSgLat(String(selectedSample.latitude));
+                        setSgLon(String(selectedSample.longitude));
+                        setSubTab('soilgrids');
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 transition hover:text-emerald-700"
+                    >
+                      View SoilGrids for this site <ChevronRight size={13} />
+                    </button>
+                  )}
                 </div>
               </section>
             ) : (
-              <div className="rounded-xl border border-dashed border-line-border p-4 text-center text-xs text-ink-subtle">
+              <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
                 Click a pin on the coverage map to inspect individual sample metadata.
               </div>
             )}
@@ -509,24 +528,24 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
 
       {/* SUB-TAB 2: OBSERVATION TRENDS & COMPARABILITY (FM-02) */}
       {subTab === 'trends' && (
-        <section className="space-y-5 rounded-xl border border-line-border bg-parchment-50 p-5 shadow-instrument">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-subtle pb-3">
+        <section className="space-y-6 rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
               <div className="flex items-center gap-2">
-                <LineChart size={18} className="text-sage-700" />
-                <h2 className="font-serif text-lg font-bold text-ink">Observation Trends & Comparability Engine (FM-02)</h2>
+                <LineChart size={18} className="text-emerald-600" />
+                <h2 className="text-base font-bold tracking-tight text-slate-900">Observation Trends &amp; Comparability Engine (FM-02)</h2>
               </div>
-              <p className="text-xs text-ink-muted">
+              <p className="mt-1 text-xs text-slate-500">
                 FM-02 Rule: Repeated soil readings are graphed only when their parameters, units, methods, depths, and time context are comparable; otherwise they remain separate observations.
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-ink-muted">Parameter:</span>
+              <span className="text-xs font-semibold text-slate-600">Parameter:</span>
               <select
                 value={trendParam}
                 onChange={(e) => setTrendParam(e.target.value as MeasurableParameter)}
-                className="rounded border border-line-border bg-parchment-100 px-2.5 py-1 text-xs font-medium text-ink outline-none"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 shadow-xs focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
                 {Object.values(PARAMETER_METAS).map((meta) => (
                   <option key={meta.key} value={meta.key}>
@@ -538,18 +557,18 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
           </div>
 
           {comparableGroups.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-line-border p-8 text-center text-xs text-ink-subtle">
+            <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-400">
               No measurements recorded for {PARAMETER_METAS[trendParam].label}. Add or import soil samples to evaluate temporal trends.
             </div>
           ) : (
             <div className="space-y-5">
               {comparableGroups.map((group) => (
-                <div key={group.groupKey} className="rounded-xl border border-line-border bg-parchment-100/50 p-4">
-                  <div className="mb-3 flex flex-wrap items-start justify-between gap-2 border-b border-line-subtle pb-2">
+                <div key={group.groupKey} className="rounded-xl border border-slate-200 bg-slate-50/60 p-5">
+                  <div className="mb-3.5 flex flex-wrap items-start justify-between gap-2 border-b border-slate-200/70 pb-3">
                     <div>
-                      <h3 className="font-serif text-sm font-bold text-ink">{group.siteLabel}</h3>
-                      <p className="text-[11px] text-ink-muted">
-                        Depth: <strong>{group.depth}</strong> · Method: <strong>{group.method}</strong> · Unit: <strong>{group.unit}</strong>
+                      <h3 className="text-sm font-bold text-slate-900">{group.siteLabel}</h3>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        Depth: <strong className="text-slate-700">{group.depth}</strong> · Method: <strong className="text-slate-700">{group.method}</strong> · Unit: <strong className="text-slate-700">{group.unit}</strong>
                       </p>
                     </div>
                     <StatusPill tone={group.isComparable ? 'sage' : 'amber'}>
@@ -559,9 +578,9 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
 
                   {/* Comparability boundary notice if depths/methods differed */}
                   {group.incomparabilityReason && (
-                    <div className="mb-3 flex items-start gap-2 rounded-lg border border-amberGold/30 bg-amberGold-subtle p-2.5 text-xs text-amberGold-dark">
-                      <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-                      <p className="leading-5">{group.incomparabilityReason}</p>
+                    <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
+                      <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
+                      <p className="leading-relaxed">{group.incomparabilityReason}</p>
                     </div>
                   )}
 
@@ -571,9 +590,9 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                       <div className="h-44 w-full">
                         <svg className="h-full w-full overflow-visible" viewBox="0 0 500 140">
                           {/* Guides */}
-                          <line x1="40" y1="20" x2="480" y2="20" stroke="#d5ded3" strokeDasharray="3 3" />
-                          <line x1="40" y1="70" x2="480" y2="70" stroke="#d5ded3" strokeDasharray="3 3" />
-                          <line x1="40" y1="120" x2="480" y2="120" stroke="#d5ded3" />
+                          <line x1="40" y1="20" x2="480" y2="20" stroke="#e2e8f0" strokeDasharray="3 3" />
+                          <line x1="40" y1="70" x2="480" y2="70" stroke="#e2e8f0" strokeDasharray="3 3" />
+                          <line x1="40" y1="120" x2="480" y2="120" stroke="#e2e8f0" />
 
                           {(() => {
                             const vals = group.readings.map((r) => r.value);
@@ -591,14 +610,14 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
 
                             return (
                               <g>
-                                <path d={pathD} fill="none" stroke="#32745b" strokeWidth="2.5" strokeLinecap="round" />
+                                <path d={pathD} fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" />
                                 {points.map((p, idx) => (
                                   <g key={idx}>
-                                    <circle cx={p.x} cy={p.y} r="5" fill="#f5f7f3" stroke="#32745b" strokeWidth="2.5" />
-                                    <text x={p.x} y={p.y - 9} textAnchor="middle" className="font-mono text-[9px] font-bold fill-sage-900">
+                                    <circle cx={p.x} cy={p.y} r="5" fill="#ffffff" stroke="#059669" strokeWidth="2.5" />
+                                    <text x={p.x} y={p.y - 9} textAnchor="middle" className="font-mono text-[9px] font-bold fill-slate-900">
                                       {p.r.value}
                                     </text>
-                                    <text x={p.x} y="134" textAnchor="middle" className="font-mono text-[8px] fill-ink-subtle">
+                                    <text x={p.x} y="134" textAnchor="middle" className="font-mono text-[8px] fill-slate-400">
                                       {p.r.collectedAt.slice(5)}
                                     </text>
                                   </g>
@@ -608,12 +627,12 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
                           })()}
                         </svg>
                       </div>
-                      <p className="text-[10px] text-ink-subtle text-right">
+                      <p className="text-[10px] text-slate-400 text-right">
                         Chronological sequence: {group.readings[0].collectedAt} → {group.readings[group.readings.length - 1].collectedAt}
                       </p>
                     </div>
                   ) : (
-                    <div className="rounded border border-dashed border-line-border p-3 text-center text-xs text-ink-subtle">
+                    <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
                       Single observation point ({group.readings[0].value} {group.unit} on {group.readings[0].collectedAt}). Requires &ge;2 comparable temporal readings to plot a trend line.
                     </div>
                   )}
@@ -626,26 +645,26 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
 
       {/* SUB-TAB 3: REGIONAL SOILGRIDS CONTEXT (FM-03, FM-04) */}
       {subTab === 'soilgrids' && (
-        <section className="space-y-5 rounded-xl border border-line-border bg-parchment-50 p-5 shadow-instrument">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line-subtle pb-3">
+        <section className="space-y-6 rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
               <div className="flex items-center gap-2">
-                <Database size={18} className="text-sage-700" />
-                <h2 className="font-serif text-lg font-bold text-ink">Regional SoilGrids Context (FM-03, FM-04)</h2>
+                <Database size={18} className="text-emerald-600" />
+                <h2 className="text-base font-bold tracking-tight text-slate-900">Regional SoilGrids Context (FM-03, FM-04)</h2>
               </div>
-              <p className="text-xs text-ink-muted">
+              <p className="mt-1 text-xs text-slate-500">
                 Live ISRIC WCS context at a nominal 250 m resolution—not a field measurement or an input to zoning or Crop Fit.
               </p>
             </div>
             <StatusPill tone="sage">ISRIC SoilGrids 2.0 · WCS</StatusPill>
           </div>
 
-          <div role="note" className="rounded-lg border border-line-border bg-parchment-100/70 p-3 text-xs leading-5 text-ink-muted">
+          <div role="note" className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-xs leading-relaxed text-slate-600">
             Each query retrieves the lower, median, and upper model quantiles for the SoilGrids cell at this coordinate. Water, urban, or otherwise masked cells return no estimate; provider outages remain visible as errors.
           </div>
 
           {/* Query Inputs Card */}
-          <div className="grid grid-cols-1 gap-3 rounded-lg border border-line-border bg-parchment-100/60 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3.5 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <FieldLabel label="Latitude" help="Decimal degrees">
               <input required type="number" min="-90" max="90" step="any" value={sgLat} onChange={(e) => { setSgLat(e.target.value); setSgData(null); }} className={inputClassName} placeholder="Enter coordinates or select a sample" />
             </FieldLabel>
@@ -675,15 +694,15 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
               </select>
             </FieldLabel>
 
-            <div className="sm:col-span-2 lg:col-span-4 flex items-center justify-between gap-3 border-t border-line-subtle pt-3">
-              <div className="text-[11px] text-ink-subtle">
+            <div className="sm:col-span-2 lg:col-span-4 flex items-center justify-between gap-3 border-t border-slate-200/70 pt-3">
+              <div className="text-[11px] text-slate-400">
                 Nominal product resolution: 250 m. Retrieval requires a network connection to ISRIC's public WCS service.
               </div>
               <button
                 type="button"
                 onClick={runSoilGridsQuery}
                 disabled={sgLoading || !sgCoordinatesValid}
-                className="button button--primary"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50"
               >
                 {sgLoading ? <RefreshCw size={13} className="spin" /> : 'Retrieve Regional Estimate'}
               </button>
@@ -691,56 +710,56 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
           </div>
 
           {sgError && (
-            <div className="rounded-lg border border-clay/30 bg-clay-subtle p-3 text-xs text-clay-dark">
+            <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3.5 text-xs text-rose-900">
               {sgError}
             </div>
           )}
 
           {/* Results Display (FM-03) */}
           {sgData && (
-            <div className="space-y-4 rounded-xl border border-line-border bg-parchment-50 p-5 shadow-sm">
+            <div className="space-y-4 rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
               {/* Prominent Header & Disclosures */}
-              <div className="rounded-lg border border-amberGold/30 bg-amberGold-subtle p-3.5">
+              <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-4">
                 <div className="flex items-center gap-2">
-                  <AlertCircle size={16} className="text-amberGold-dark" />
-                  <span className="font-serif text-sm font-bold text-amberGold-dark">
+                  <AlertCircle size={16} className="text-amber-700" />
+                  <span className="text-sm font-bold text-amber-900">
                     {sgData.modeledContextLabel}
                   </span>
                 </div>
-                <p className="mt-1 text-xs leading-5 text-amberGold-dark">
+                <p className="mt-1 text-xs leading-relaxed text-amber-800">
                   {sgData.uncertaintyDisclosure}
                 </p>
               </div>
 
               {/* Estimate & Quantile Gauge */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="rounded-lg border border-line-border bg-parchment-100 p-4 text-center">
-                  <span className="block text-[10px] uppercase font-bold text-ink-subtle">Lower Bound (Q0.05)</span>
-                  <span className="font-mono text-xl font-bold text-ink">{sgData.quantiles.q05}</span>
-                  <span className="block text-[10px] text-ink-subtle">{sgData.unit}</span>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
+                  <span className="block text-[10px] uppercase font-bold text-slate-400">Lower Bound (Q0.05)</span>
+                  <span className="font-mono text-xl font-bold text-slate-900">{sgData.quantiles.q05}</span>
+                  <span className="block text-[10px] text-slate-500">{sgData.unit}</span>
                 </div>
-                <div className="rounded-lg border-2 border-sage-600 bg-sage-50/60 p-4 text-center shadow-sm">
-                  <span className="block text-[10px] uppercase font-bold text-sage-800">Median Estimate (Q0.50)</span>
-                  <span className="font-mono text-2xl font-bold text-sage-900">{sgData.mappedValue}</span>
-                  <span className="block text-[10px] font-semibold text-sage-800">{sgData.unit}</span>
+                <div className="rounded-xl border-2 border-emerald-500 bg-emerald-50/50 p-4 text-center shadow-xs">
+                  <span className="block text-[10px] uppercase font-bold text-emerald-800">Median Estimate (Q0.50)</span>
+                  <span className="font-mono text-2xl font-bold text-emerald-950">{sgData.mappedValue}</span>
+                  <span className="block text-[10px] font-semibold text-emerald-700">{sgData.unit}</span>
                 </div>
-                <div className="rounded-lg border border-line-border bg-parchment-100 p-4 text-center">
-                  <span className="block text-[10px] uppercase font-bold text-ink-subtle">Upper Bound (Q0.95)</span>
-                  <span className="font-mono text-xl font-bold text-ink">{sgData.quantiles.q95}</span>
-                  <span className="block text-[10px] text-ink-subtle">{sgData.unit}</span>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
+                  <span className="block text-[10px] uppercase font-bold text-slate-400">Upper Bound (Q0.95)</span>
+                  <span className="font-mono text-xl font-bold text-slate-900">{sgData.quantiles.q95}</span>
+                  <span className="block text-[10px] text-slate-500">{sgData.unit}</span>
                 </div>
               </div>
 
               {/* Quantile Visualization Bar */}
-              <div className="space-y-1.5 rounded-lg border border-line-subtle bg-parchment-100/70 p-3">
-                <div className="flex justify-between text-[10px] font-mono text-ink-muted">
-                  <span>Q0.05–Q0.95 model-quantile span: [{sgData.quantiles.q05} – {sgData.quantiles.q95} {sgData.unit}]</span>
+              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <div className="flex justify-between text-[11px] font-mono text-slate-600">
+                  <span>Q0.05–Q0.95 span: [{sgData.quantiles.q05} – {sgData.quantiles.q95} {sgData.unit}]</span>
                   <span>Spread: {(sgData.quantiles.q95 - sgData.quantiles.q05).toFixed(2)}</span>
                 </div>
-                <div className="relative h-3 w-full rounded-full bg-parchment-200">
-                  <div className="absolute inset-y-0 left-0 rounded-full bg-sage-300" style={{ width: '100%' }} />
+                <div className="relative h-3 w-full rounded-full bg-slate-200">
+                  <div className="absolute inset-y-0 left-0 rounded-full bg-emerald-300" style={{ width: '100%' }} />
                   <div
-                    className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-parchment-50 bg-sage-800 shadow"
+                    className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-white bg-emerald-600 shadow-md"
                     style={{ left: `${sgData.quantiles.q95 === sgData.quantiles.q05 ? 50 : ((sgData.mappedValue - sgData.quantiles.q05) / (sgData.quantiles.q95 - sgData.quantiles.q05)) * 100}%` }}
                     title={`Median: ${sgData.mappedValue}`}
                   />
@@ -748,13 +767,14 @@ export const SoilInvestigationView: React.FC<SoilInvestigationViewProps> = ({
               </div>
 
               {/* Provenance and Separation Disclaimer (FM-04) */}
-              <div className="border-t border-line-subtle pt-3 text-[11px] leading-5 text-ink-muted">
+              <div className="border-t border-slate-100 pt-3 text-[11px] leading-relaxed text-slate-500">
                 <p><strong>Source Attribution:</strong> {sgData.source}</p>
                 <p><strong>Query Coordinates:</strong> {sgData.latitude.toFixed(4)}°N, {sgData.longitude.toFixed(4)}°E · Depth: {sgData.depth}</p>
                 <p><strong>Retrieval Timestamp:</strong> {sgData.retrievalDate}</p>
-                <p className="mt-2 font-medium text-sage-800">
-                  🛡️ {sgData.disclaimer}
-                </p>
+                <div className="mt-2.5 flex items-center gap-1.5 font-medium text-emerald-800">
+                  <ShieldAlert size={14} className="shrink-0 text-emerald-600" />
+                  <span>{sgData.disclaimer}</span>
+                </div>
               </div>
             </div>
           )}

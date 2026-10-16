@@ -1,0 +1,118 @@
+/* KshetraSense Methodology & Limits - Minimalist Scientific ERP Design */
+
+.methodology-container {
+  color: #0f172a;
+}
+
+/* Tab Navigation */
+.methodology-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 140ms ease;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.methodology-tab-btn--active {
+  background-color: #ffffff;
+  color: #059669;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.methodology-tab-btn--inactive {
+  color: #64748b;
+  background-color: transparent;
+}
+
+.methodology-tab-btn--inactive:hover {
+  color: #0f172a;
+  background-color: #f1f5f9;
+}
+
+/* Pipeline Flow Animations */
+@keyframes flowDash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.pipeline-flow-path {
+  stroke-dasharray: 6 6;
+  animation: flowDash 1.2s linear infinite;
+}
+
+@keyframes pulseGaze {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.02);
+  }
+}
+
+.pipeline-pulse-node {
+  animation: pulseGaze 2.4s ease-in-out infinite;
+}
+
+/* Code & Formula Displays */
+.formula-block {
+  font-family: "Cambria Math", "KaTeX_Main", "Times New Roman", serif;
+  letter-spacing: 0.02em;
+}
+
+.math-sub {
+  font-size: 0.8em;
+  vertical-align: sub;
+}
+
+.math-sup {
+  font-size: 0.8em;
+  vertical-align: super;
+}
+
+/* Interactive Slider Custom Styling */
+.range-slider-accent {
+  accent-color: #059669;
+}
+
+/* Interactive Accordion Transitions */
+.accordion-content {
+  transition: max-height 250ms ease-in-out, opacity 200ms ease;
+}
+
+/* Subtle Interactive Wave Animation for IDW Canvas */
+@keyframes rippleWave {
+  0% {
+    r: 2;
+    opacity: 0.8;
+  }
+  100% {
+    r: 16;
+    opacity: 0;
+  }
+}
+
+.idw-ripple {
+  animation: rippleWave 2s ease-out infinite;
+}
+
+/* Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  .pipeline-flow-path {
+    animation: none !important;
+  }
+  .pipeline-pulse-node {
+    animation: none !important;
+  }
+  .idw-ripple {
+    animation: none !important;
+  }
+}
