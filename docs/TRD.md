@@ -165,9 +165,7 @@ Estimate triangulation from the vertex counts of the returned cell and field pol
 
 Procedural geometry/SVG covers grid cells, field edges, zones, patterns, membership overlays, sensor markers, crop cues, centroids, and root layers. No model, texture, font, icon pack, or external asset service is required to operate the product. Sensor markers are illustrative primitives labeled “Illustrative; no live sensor stream.”
 
-The current zoning scene uses procedural geometry only; prepared Kenney Nature Kit GLBs are not loaded into it. The twelve small models in the [asset manifest](../assets/3d/asset-manifest.json) remain optional assets for a later documented visual need. They must not represent cells, crop outcomes, soil state, or sensors; imported decoration must remain outside selectable field data, optional behind a working fallback, and inside the scene budgets. Any model addition needs exact source/creator/license provenance, original/optimized SHA-256 and size/geometry metadata, and zero-error glTF validation. [Poly Haven](https://polyhaven.com/license) remains a potential CC0 source; its collection-wide license alone does not approve a specific model.
-
-Use `.glb` as the runtime interchange format for a justified imported model. The [Khronos glTF 2.0 specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) defines GLB as binary glTF, a container for JSON and binary asset data.
+The current zoning scene uses procedural geometry exclusively. Functional field cells, boundaries, and elevation relief are generated at runtime from GeoJSON/UTM coordinates and IDW estimates. Zero external 3D models are bundled or required. Any future optional asset must stay within the scene budgets, have verified open licensing provenance, and provide an automatic procedural fallback.
 
 ## Privacy, reliability, and reproducibility
 
