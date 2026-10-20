@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from io import BytesIO
 import math
+import os
 from typing import Any
 
 import httpx
@@ -16,7 +17,7 @@ SOILGRIDS_STATUS = "configured-via-isric-wcs"
 SUPPORTED_PROPERTIES = ("phh2o", "nitrogen", "soc", "cec", "bdod", "clay", "sand", "silt")
 SUPPORTED_DEPTHS = ("0-5cm", "5-15cm", "15-30cm", "30-60cm", "60-100cm", "100-200cm")
 
-_WCS_URL = "https://maps.isric.org/mapserv"
+_WCS_URL = os.getenv("SOILGRIDS_WCS_URL", "https://maps.isric.org/mapserv")
 _WGS84_CRS = "http://www.opengis.net/def/crs/EPSG/0/4326"
 _QUERY_HALF_WIDTH = 0.005
 _MAX_GEOTIFF_BYTES = 1024 * 1024

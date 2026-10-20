@@ -10,6 +10,15 @@ from sklearn.cluster import KMeans, DBSCAN, MeanShift
 from sklearn.mixture import GaussianMixture
 import json
 import os
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+    for env_path in [Path(__file__).resolve().parents[2] / ".env", Path(__file__).resolve().parent / ".env", Path(".env")]:
+        if env_path.exists():
+            load_dotenv(env_path)
+except ImportError:
+    pass
 
 app = FastAPI(title="NDVI Field Segmentation API")
 EARTHENGINE_PROJECT = os.getenv("EARTHENGINE_PROJECT", "kshetrasense-earth-engine")

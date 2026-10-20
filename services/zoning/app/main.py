@@ -11,6 +11,14 @@ project_root = Path(__file__).resolve().parents[3]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+try:
+    from dotenv import load_dotenv
+    for env_candidate in [project_root / ".env", project_root / ".env.local", Path(".env")]:
+        if env_candidate.exists():
+            load_dotenv(env_candidate)
+except ImportError:
+    pass
+
 from services.telemetry.app.router import router as telemetry_router
 from services.leaf.router import router as leaf_router
 from services.leaf.upload_limits import LeafUploadLimitMiddleware
