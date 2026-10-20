@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
+  Crosshair,
   Database,
   ExternalLink,
   Pause,
@@ -9,6 +10,7 @@ import {
   RefreshCw,
   RotateCcw,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 import {
   controlTelemetryPlayback,
@@ -24,9 +26,7 @@ import {
   type TelemetryMetadata,
   type TelemetrySnapshot,
 } from '../../services/telemetryApi';
-import { buildHumiditySegments } from './telemetryViewModel';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { buildHumiditySegments, calculateHistoryWindow, DAY_MS } from './telemetryViewModel';
 const SPEEDS = [1, 10, 60, 360] as const;
 const LINE_STYLES = [
   { color: '#059669', dash: undefined },
@@ -42,15 +42,24 @@ function formatUtc(value: string | number): string {
   return Number.isNaN(date.getTime()) ? '—' : `${date.toLocaleString(undefined, { timeZone: 'UTC' })} UTC`;
 }
 
+function formatTimeOnly(value: string | number): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleTimeString(undefined, {
+    timeZone: 'UTC',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+}
+
 function formatValue(value: number | null | undefined, digits = 1, unit = ''): string {
   return typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(digits)}${unit ? ` ${unit}` : ''}` : 'Not recorded';
 }
 
 function nextHistoryWindow(centerMs: number, startMs: number, endMs: number) {
-  let start = Math.max(startMs, centerMs - DAY_MS / 2);
-  let end = Math.min(endMs, start + DAY_MS);
-  start = Math.max(startMs, end - DAY_MS);
-  return { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
+  return calculateHistoryWindow(centerMs, startMs, endMs, DAY_MS);
 }
 
 const Reading: React.FC<{ label: string; value: number | null | undefined; unit: string; digits?: number }> = ({ label, value, unit, digits = 1 }) => (
@@ -69,12 +78,16 @@ export const TelemetryReplayView: React.FC = () => {
   const [initialHistoryAttempted, setInitialHistoryAttempted] = useState(false);
   const [historyLine, setHistoryLine] = useState<'all' | number>('all');
   const [previewMs, setPreviewMs] = useState<number | null>(null);
+  const [autoFollow, setAutoFollow] = useState(true);
+  const [liveScanMode, setLiveScanMode] = useState(true);
+  const [hoveredMs, setHoveredMs] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [transport, setTransport] = useState<'paused' | 'websocket' | 'polling'>('paused');
   const lastSeekRef = useRef<number | null>(null);
+  const lastAutoLoadCenterRef = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -97,10 +110,10 @@ export const TelemetryReplayView: React.FC = () => {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const loadHistory = useCallback(async (centerMs: number) => {
+  const loadHistory = useCallback(async (centerMs: number, background = false) => {
     if (!metadata || !playback) return;
     const range = nextHistoryWindow(centerMs, Date.parse(playback.startUtc), Date.parse(playback.endUtc));
-    setHistoryLoading(true);
+    if (!background) setHistoryLoading(true);
     setHistoryError(null);
     try {
       const values = await Promise.all(metadata.lines.map((line) =>
@@ -111,7 +124,7 @@ export const TelemetryReplayView: React.FC = () => {
     } catch (cause) {
       setHistoryError(cause instanceof Error ? cause.message : 'Could not load bounded history for this window.');
     } finally {
-      setHistoryLoading(false);
+      if (!background) setHistoryLoading(false);
     }
   }, [metadata, playback]);
 
@@ -121,6 +134,22 @@ export const TelemetryReplayView: React.FC = () => {
       void loadHistory(Date.parse(playback.startUtc));
     }
   }, [metadata, playback, initialHistoryAttempted, historyLoading, loadHistory]);
+
+  useEffect(() => {
+    if (!autoFollow || !playback?.isPlaying || historyLoading || !historyWindow) return;
+    const current = playback.timestampMs;
+    const wStart = Date.parse(historyWindow.start);
+    const wEnd = Date.parse(historyWindow.end);
+    const bufferMs = 15 * 60 * 1000;
+
+    const shouldShift = current >= wEnd - bufferMs || current < wStart;
+    if (shouldShift) {
+      if (lastAutoLoadCenterRef.current === null || Math.abs(current - lastAutoLoadCenterRef.current) > 30 * 60 * 1000) {
+        lastAutoLoadCenterRef.current = current;
+        void loadHistory(current, true);
+      }
+    }
+  }, [autoFollow, playback?.isPlaying, playback?.timestampMs, historyWindow, historyLoading, loadHistory]);
 
   useEffect(() => {
     if (!playback?.isPlaying) {
@@ -208,13 +237,17 @@ export const TelemetryReplayView: React.FC = () => {
       setSnapshot(value);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Playback control failed.');
+      setPreviewMs(null);
     }
   };
 
   const commitSeek = () => {
-    if (previewMs === null || lastSeekRef.current === previewMs) return;
-    lastSeekRef.current = previewMs;
-    void runControl({ action: 'seek', timestamp: new Date(previewMs).toISOString() });
+    if (previewMs === null || lastSeekRef.current === previewMs || !playback) return;
+    const minMs = Date.parse(playback.startUtc);
+    const maxMs = Date.parse(playback.endUtc);
+    const clamped = Math.max(minMs, Math.min(maxMs, previewMs));
+    lastSeekRef.current = clamped;
+    void runControl({ action: 'seek', timestamp: new Date(clamped).toISOString() });
   };
 
   const startOrRestart = async () => {
@@ -240,12 +273,72 @@ export const TelemetryReplayView: React.FC = () => {
   }, [history, historyLine]);
 
   const historyValues = historyEntries.flatMap((entry) => entry.segments.flatMap((segment) => segment.map((point) => point.value)));
-  const yMin = historyValues.length ? Math.min(...historyValues) - 2 : 0;
-  const yMax = historyValues.length ? Math.max(...historyValues) + 2 : 100;
+  const activeValues = (snapshot?.lines ?? []).flatMap((line) => {
+    const val = line.soilObservation?.humiditySignalPctRh;
+    return typeof val === 'number' && Number.isFinite(val) ? [val] : [];
+  });
+  const allValues = [...historyValues, ...activeValues];
+  const yMin = allValues.length ? Math.min(...allValues) - 2 : 0;
+  const yMax = allValues.length ? Math.max(...allValues) + 2 : 100;
   const ySpan = yMax - yMin || 1;
   const xMin = historyWindow ? Date.parse(historyWindow.start) : 0;
   const xMax = historyWindow ? Date.parse(historyWindow.end) : xMin + 1;
   const xSpan = xMax - xMin || 1;
+  const currentSimulatedMs = previewMs ?? playback?.timestampMs ?? xMin;
+  const isPlayheadInWindow = historyWindow
+    ? currentSimulatedMs >= xMin && currentSimulatedMs <= xMax
+    : false;
+  const playheadRatio = Math.max(0, Math.min(1, (currentSimulatedMs - xMin) / xSpan));
+  const playheadX = 58 + playheadRatio * 636;
+
+  const getSvgChartX = (svg: SVGSVGElement, clientX: number): number => {
+    try {
+      const ctm = svg.getScreenCTM();
+      if (ctm) {
+        const pt = svg.createSVGPoint();
+        pt.x = clientX;
+        pt.y = 0;
+        return pt.matrixTransform(ctm.inverse()).x;
+      }
+    } catch {
+      // Fallback
+    }
+    const rect = svg.getBoundingClientRect();
+    return rect.width > 0 ? ((clientX - rect.left) / rect.width) * 720 : 0;
+  };
+
+  const handleSvgClick = (event: React.MouseEvent<SVGSVGElement>) => {
+    if (!historyWindow || !playback) return;
+    const chartX = getSvgChartX(event.currentTarget, event.clientX);
+    if (chartX >= 58 && chartX <= 694) {
+      const fraction = Math.max(0, Math.min(1, (chartX - 58) / 636));
+      const seekMs = Math.round(xMin + fraction * xSpan);
+      const minMs = Date.parse(playback.startUtc);
+      const maxMs = Date.parse(playback.endUtc);
+      const clampedSeekMs = Math.max(minMs, Math.min(maxMs, seekMs));
+      lastSeekRef.current = clampedSeekMs;
+      setPreviewMs(null);
+      void runControl({ action: 'seek', timestamp: new Date(clampedSeekMs).toISOString() });
+    }
+  };
+
+  const handleSvgMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
+    if (!historyWindow || !playback) return;
+    const chartX = getSvgChartX(event.currentTarget, event.clientX);
+    if (chartX >= 58 && chartX <= 694) {
+      const fraction = Math.max(0, Math.min(1, (chartX - 58) / 636));
+      const hoverMs = Math.round(xMin + fraction * xSpan);
+      const minMs = Date.parse(playback.startUtc);
+      const maxMs = Date.parse(playback.endUtc);
+      setHoveredMs(Math.max(minMs, Math.min(maxMs, hoverMs)));
+    } else {
+      setHoveredMs(null);
+    }
+  };
+
+  const handleSvgMouseLeave = () => {
+    setHoveredMs(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -397,50 +490,485 @@ export const TelemetryReplayView: React.FC = () => {
           <section className={`${panel} space-y-4`}>
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-base font-bold tracking-tight text-slate-900">Measured Soil Humidity Signal</h3>
-                <p className="mt-0.5 text-[11px] text-slate-500">%RH sensor output, not volumetric water content (VWC). Gaps over 30 minutes are not joined.</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold tracking-tight text-slate-900">Measured Soil Humidity Signal</h3>
+                  {playback.isPlaying ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600" />
+                      </span>
+                      Live Dynamic Trace ({playback.speed}×)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                      <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                      Paused
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  %RH sensor output, not volumetric water content (VWC). Gaps over 30 minutes are not joined. Click chart to seek time.
+                </p>
               </div>
-              <button type="button" disabled={historyLoading} onClick={() => void loadHistory(playback.timestampMs)} className={button}>
-                <RefreshCw size={12} className={historyLoading ? 'spin' : ''} /> Load 24h around playhead
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLiveScanMode((v) => !v)}
+                  className={`inline-flex min-h-8 items-center gap-1 rounded-lg border px-2.5 text-xs font-semibold shadow-2xs transition ${
+                    liveScanMode
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                  title="Toggle dynamic illuminated trace along the simulation timeline"
+                >
+                  <Sparkles size={12} className={liveScanMode ? 'text-emerald-600' : 'text-slate-400'} />
+                  <span>Dynamic Trace</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAutoFollow((v) => !v)}
+                  className={`inline-flex min-h-8 items-center gap-1 rounded-lg border px-2.5 text-xs font-semibold shadow-2xs transition ${
+                    autoFollow
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                  title="Automatically center 24h window as the simulation plays"
+                >
+                  <Crosshair size={12} className={autoFollow ? 'text-emerald-600' : 'text-slate-400'} />
+                  <span>Auto-Follow</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={historyLoading}
+                  onClick={() => {
+                    lastAutoLoadCenterRef.current = playback.timestampMs;
+                    void loadHistory(playback.timestampMs);
+                  }}
+                  className={button}
+                  title="Load 24h history window centered at current playhead"
+                >
+                  <RefreshCw size={12} className={historyLoading ? 'spin' : ''} />
+                  <span>Center 24h</span>
+                </button>
+              </div>
             </div>
-            {historyWindow && <p className="text-[10px] text-slate-400">Source observations from {formatUtc(historyWindow.start)} to {formatUtc(historyWindow.end)} · history is bounded and may be downsampled if truncated.</p>}
+
+            {historyWindow && !isPlayheadInWindow && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-2 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  Current simulated playhead (<strong>{formatUtc(currentSimulatedMs)}</strong>) is outside this 24-hour window.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    lastAutoLoadCenterRef.current = currentSimulatedMs;
+                    void loadHistory(currentSimulatedMs);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-2xs hover:bg-amber-700 transition"
+                >
+                  <Crosshair size={12} />
+                  Jump window to playhead
+                </button>
+              </div>
+            )}
+
+            {historyWindow && (
+              <p className="text-[10px] text-slate-400">
+                Source observations from {formatUtc(historyWindow.start)} to {formatUtc(historyWindow.end)} · history is bounded and may be downsampled if truncated.
+              </p>
+            )}
             {historyError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-xs text-rose-800">{historyError}</p>}
             {historyLoading && <p className="text-xs text-slate-500">Loading raw observations…</p>}
-            {!historyLoading && historyValues.length === 0 && <p className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">No recorded soil humidity points in this history window.</p>}
+            {!historyLoading && historyValues.length === 0 && (
+              <p className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
+                No recorded soil humidity points in this history window.
+              </p>
+            )}
             {!historyLoading && historyValues.length > 0 && historyWindow && (
               <div className="overflow-x-auto">
-                <svg className="h-64 min-w-[640px] w-full" viewBox="0 0 720 230" role="img" aria-label="Measured soil humidity sensor signal chart; gaps greater than 30 minutes are disconnected">
+                <svg
+                  className="h-64 min-w-[640px] w-full cursor-crosshair select-none"
+                  viewBox="0 0 720 230"
+                  preserveAspectRatio="none"
+                  role="img"
+                  aria-label="Measured soil humidity sensor signal chart; gaps greater than 30 minutes are disconnected. Click to seek."
+                  onClick={handleSvgClick}
+                  onMouseMove={handleSvgMouseMove}
+                  onMouseLeave={handleSvgMouseLeave}
+                >
+                  <defs>
+                    <linearGradient id="scanner-beam-grad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#059669" stopOpacity="0.3" />
+                      <stop offset="65%" stopColor="#059669" stopOpacity="0.08" />
+                      <stop offset="100%" stopColor="#059669" stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="playhead-line-grad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="45%" stopColor="#059669" />
+                      <stop offset="100%" stopColor="#047857" />
+                    </linearGradient>
+                    <clipPath id="trail-clip-past">
+                      <rect x="0" y="0" width={playheadX} height="230" />
+                    </clipPath>
+                    <clipPath id="trail-clip-future">
+                      <rect x={playheadX} y="0" width={Math.max(0, 720 - playheadX)} height="230" />
+                    </clipPath>
+                  </defs>
+
                   {[0, 1, 2, 3].map((i) => {
                     const y = 22 + i * 54;
                     const value = yMax - (i / 3) * ySpan;
-                    return <g key={i}><line x1="54" y1={y} x2="700" y2={y} stroke="#e2e8f0" strokeDasharray="3 4" /><text x="48" y={y + 3} textAnchor="end" fontSize="9" fill="#94a3b8" className="font-mono">{value.toFixed(1)}</text></g>;
+                    return (
+                      <g key={i}>
+                        <line x1="54" y1={y} x2="700" y2={y} stroke="#e2e8f0" strokeDasharray="3 4" />
+                        <text x="48" y={y + 3} textAnchor="end" fontSize="9" fill="#94a3b8" className="font-mono">
+                          {value.toFixed(1)}
+                        </text>
+                      </g>
+                    );
                   })}
-                  {historyEntries.map((entry) => {
-                    const style = LINE_STYLES[entry.lineId - 1] ?? LINE_STYLES[0];
-                    return <g key={entry.lineId}>
-                      {entry.segments.map((segment, segmentIndex) => {
-                        const path = segment.map((point, pointIndex) => {
-                          const x = 58 + ((point.timestampMs - xMin) / xSpan) * 636;
-                          const y = 22 + ((yMax - point.value) / ySpan) * 162;
-                          return `${pointIndex === 0 ? 'M' : 'L'} ${x} ${y}`;
-                        }).join(' ');
-                        return <g key={segmentIndex}>
-                          {segment.length > 1 && <path d={path} fill="none" stroke={style.color} strokeWidth="2" strokeDasharray={style.dash} />}
-                          {segment.map((point, pointIndex) => {
-                            const x = 58 + ((point.timestampMs - xMin) / xSpan) * 636;
-                            const y = 22 + ((yMax - point.value) / ySpan) * 162;
-                            return <circle key={pointIndex} cx={x} cy={y} r="2.8" fill={style.color}><title>{`Line ${entry.lineId}: ${point.value.toFixed(2)} %RH at ${new Date(point.timestampMs).toISOString()}`}</title></circle>;
+
+                  {/* Render Curves: Dynamic Trace (Past vs Future) or Standard Single Pass */}
+                  {liveScanMode && isPlayheadInWindow ? (
+                    <>
+                      {/* Past / Reached trace - illuminated with full saturation */}
+                      <g clipPath="url(#trail-clip-past)">
+                        {historyEntries.map((entry) => {
+                          const style = LINE_STYLES[entry.lineId - 1] ?? LINE_STYLES[0];
+                          return (
+                            <g key={`past-${entry.lineId}`}>
+                              {entry.segments.map((segment, segmentIndex) => {
+                                const path = segment
+                                  .map((point, pointIndex) => {
+                                    const x = 58 + ((point.timestampMs - xMin) / xSpan) * 636;
+                                    const y = 22 + ((yMax - point.value) / ySpan) * 162;
+                                    return `${pointIndex === 0 ? 'M' : 'L'} ${x} ${y}`;
+                                  })
+                                  .join(' ');
+                                return (
+                                  <g key={`past-seg-${segmentIndex}`}>
+                                    {segment.length > 1 && (
+                                      <path
+                                        d={path}
+                                        fill="none"
+                                        stroke={style.color}
+                                        strokeWidth="2.4"
+                                        strokeDasharray={style.dash}
+                                      />
+                                    )}
+                                    {segment.map((point, pointIndex) => {
+                                      const x = 58 + ((point.timestampMs - xMin) / xSpan) * 636;
+                                      const y = 22 + ((yMax - point.value) / ySpan) * 162;
+                                      return (
+                                        <circle
+                                          key={`past-pt-${pointIndex}`}
+                                          cx={x}
+                                          cy={y}
+                                          r="2.8"
+                                          fill={style.color}
+                                        >
+                                          <title>{`Line ${entry.lineId}: ${point.value.toFixed(2)} %RH at ${new Date(point.timestampMs).toISOString()}`}</title>
+                                        </circle>
+                                      );
+                                    })}
+                                  </g>
+                                );
+                              })}
+                            </g>
+                          );
+                        })}
+                      </g>
+
+                      {/* Future / Unreached trace - muted preview */}
+                      <g clipPath="url(#trail-clip-future)" opacity="0.32">
+                        {historyEntries.map((entry) => {
+                          const style = LINE_STYLES[entry.lineId - 1] ?? LINE_STYLES[0];
+                          return (
+                            <g key={`future-${entry.lineId}`}>
+                              {entry.segments.map((segment, segmentIndex) => {
+                                const path = segment
+                                  .map((point, pointIndex) => {
+                                    const x = 58 + ((point.timestampMs - xMin) / xSpan) * 636;
+                                    const y = 22 + ((yMax - point.value) / ySpan) * 162;
+                                    return `${pointIndex === 0 ? 'M' : 'L'} ${x} ${y}`;
+                                  })
+                                  .join(' ');
+                                return (
+                                  <g key={`future-seg-${segmentIndex}`}>
+                                    {segment.length > 1 && (
+                                      <path
+                                        d={path}
+                                        fill="none"
+                                        stroke={style.color}
+                                        strokeWidth="1.5"
+                                        strokeDasharray="4 4"
+                                      />
+                                    )}
+                                    {segment.map((point, pointIndex) => {
+                                      const x = 58 + ((point.timestampMs - xMin) / xSpan) * 636;
+                                      const y = 22 + ((yMax - point.value) / ySpan) * 162;
+                                      return (
+                                        <circle
+                                          key={`future-pt-${pointIndex}`}
+                                          cx={x}
+                                          cy={y}
+                                          r="1.8"
+                                          fill={style.color}
+                                        >
+                                          <title>{`Line ${entry.lineId}: ${point.value.toFixed(2)} %RH at ${new Date(point.timestampMs).toISOString()}`}</title>
+                                        </circle>
+                                      );
+                                    })}
+                                  </g>
+                                );
+                              })}
+                            </g>
+                          );
+                        })}
+                      </g>
+                    </>
+                  ) : (
+                    historyEntries.map((entry) => {
+                      const style = LINE_STYLES[entry.lineId - 1] ?? LINE_STYLES[0];
+                      return (
+                        <g key={entry.lineId}>
+                          {entry.segments.map((segment, segmentIndex) => {
+                            const path = segment
+                              .map((point, pointIndex) => {
+                                const x = 58 + ((point.timestampMs - xMin) / xSpan) * 636;
+                                const y = 22 + ((yMax - point.value) / ySpan) * 162;
+                                return `${pointIndex === 0 ? 'M' : 'L'} ${x} ${y}`;
+                              })
+                              .join(' ');
+                            return (
+                              <g key={segmentIndex}>
+                                {segment.length > 1 && (
+                                  <path
+                                    d={path}
+                                    fill="none"
+                                    stroke={style.color}
+                                    strokeWidth="2"
+                                    strokeDasharray={style.dash}
+                                  />
+                                )}
+                                {segment.map((point, pointIndex) => {
+                                  const x = 58 + ((point.timestampMs - xMin) / xSpan) * 636;
+                                  const y = 22 + ((yMax - point.value) / ySpan) * 162;
+                                  return (
+                                    <circle key={pointIndex} cx={x} cy={y} r="2.8" fill={style.color}>
+                                      <title>{`Line ${entry.lineId}: ${point.value.toFixed(2)} %RH at ${new Date(point.timestampMs).toISOString()}`}</title>
+                                    </circle>
+                                  );
+                                })}
+                              </g>
+                            );
                           })}
-                        </g>;
+                        </g>
+                      );
+                    })
+                  )}
+
+                  {/* Playhead vertical line, top badge, and active curve beacons */}
+                  {isPlayheadInWindow && (
+                    <g>
+                      {/* Subtle scanner beam glow */}
+                      <rect
+                        x={Math.max(58, playheadX - 16)}
+                        y="22"
+                        width={Math.min(16, playheadX - 58)}
+                        height="162"
+                        fill="url(#scanner-beam-grad)"
+                        opacity="0.8"
+                      />
+
+                      {/* Vertical Playhead Cursor Line */}
+                      <line
+                        x1={playheadX}
+                        y1="18"
+                        x2={playheadX}
+                        y2="186"
+                        stroke="url(#playhead-line-grad)"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+
+                      {/* Top Playhead Timestamp Badge */}
+                      {(() => {
+                        const badgeX = Math.max(92, Math.min(660, playheadX));
+                        return (
+                          <g transform={`translate(${badgeX}, 11)`}>
+                            <rect
+                              x="-42"
+                              y="-9"
+                              width="84"
+                              height="18"
+                              rx="4"
+                              fill="#0f172a"
+                              stroke="#10b981"
+                              strokeWidth="1"
+                            />
+                            <text
+                              x="0"
+                              y="3.5"
+                              textAnchor="middle"
+                              fontSize="8.5"
+                              fill="#f8fafc"
+                              fontWeight="600"
+                              className="font-mono tracking-tight"
+                            >
+                              {formatTimeOnly(currentSimulatedMs)} UTC
+                            </text>
+                          </g>
+                        );
+                      })()}
+
+                      {/* Live Signal Beacons on each active line */}
+                      {selectedLines.map((line) => {
+                        const style = LINE_STYLES[line.lineId - 1] ?? LINE_STYLES[0];
+                        const val = line.soilObservation?.humiditySignalPctRh;
+                        if (typeof val !== 'number' || !Number.isFinite(val)) return null;
+                        const beaconY = 22 + Math.max(0, Math.min(1, (yMax - val) / ySpan)) * 162;
+                        const tagOnLeft = playheadX > 625;
+                        const tagX = tagOnLeft ? playheadX - 56 : playheadX + 10;
+                        const tagYOffset = (line.lineId - 2) * 14;
+                        const tagY = Math.max(26, Math.min(176, beaconY + tagYOffset));
+
+                        return (
+                          <g key={`beacon-line-${line.lineId}`}>
+                            {/* Animated pulsing wave */}
+                            <circle
+                              cx={playheadX}
+                              cy={beaconY}
+                              r="4"
+                              fill="none"
+                              stroke={style.color}
+                              strokeWidth="1.5"
+                              opacity="0.8"
+                            >
+                              <animate attributeName="r" from="4" to="14" dur="2s" repeatCount="indefinite" />
+                              <animate attributeName="opacity" from="0.85" to="0" dur="2s" repeatCount="indefinite" />
+                            </circle>
+
+                            {/* Solid center dot */}
+                            <circle
+                              cx={playheadX}
+                              cy={beaconY}
+                              r="4.5"
+                              fill={style.color}
+                              stroke="#ffffff"
+                              strokeWidth="2"
+                            />
+
+                            {/* Floating live readout tag */}
+                            <g transform={`translate(${tagX}, ${tagY - 8})`}>
+                              <rect
+                                width="46"
+                                height="16"
+                                rx="4"
+                                fill="#ffffff"
+                                stroke={style.color}
+                                strokeWidth="1.25"
+                                opacity="0.95"
+                              />
+                              <text
+                                x="23"
+                                y="11"
+                                textAnchor="middle"
+                                fontSize="8"
+                                fontWeight="700"
+                                fill={style.color}
+                                className="font-mono"
+                              >
+                                L{line.lineId}: {val.toFixed(1)}%
+                              </text>
+                            </g>
+                          </g>
+                        );
                       })}
-                    </g>;
-                  })}
-                  <text x="58" y="212" fontSize="9" fill="#94a3b8" className="font-mono">{new Date(xMin).toLocaleString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} UTC</text>
-                  <text x="694" y="212" textAnchor="end" fontSize="9" fill="#94a3b8" className="font-mono">{new Date(xMax).toLocaleString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} UTC</text>
+                    </g>
+                  )}
+
+                  {/* Hover guideline and seek indicator */}
+                  {hoveredMs !== null && (() => {
+                    const hoverX = 58 + Math.max(0, Math.min(1, (hoveredMs - xMin) / xSpan)) * 636;
+                    const badgeX = Math.max(85, Math.min(665, hoverX));
+                    return (
+                      <g opacity="0.9">
+                        <line
+                          x1={hoverX}
+                          y1="22"
+                          x2={hoverX}
+                          y2="184"
+                          stroke="#64748b"
+                          strokeDasharray="2 3"
+                          strokeWidth="1.25"
+                        />
+                        <g transform={`translate(${badgeX}, 198)`}>
+                          <rect
+                            x="-44"
+                            y="-8"
+                            width="88"
+                            height="16"
+                            rx="3"
+                            fill="#334155"
+                            opacity="0.9"
+                          />
+                          <text
+                            x="0"
+                            y="3.5"
+                            textAnchor="middle"
+                            fontSize="8"
+                            fill="#ffffff"
+                            className="font-mono"
+                          >
+                            Seek: {formatTimeOnly(hoveredMs)}
+                          </text>
+                        </g>
+                      </g>
+                    );
+                  })()}
+
+                  <text x="58" y="214" fontSize="9" fill="#94a3b8" className="font-mono">
+                    {new Date(xMin).toLocaleString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} UTC
+                  </text>
+                  <text x="694" y="214" textAnchor="end" fontSize="9" fill="#94a3b8" className="font-mono">
+                    {new Date(xMax).toLocaleString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} UTC
+                  </text>
                 </svg>
-                <div className="mt-3 flex flex-wrap gap-4 text-[11px] text-slate-600">
-                  {historyEntries.map((entry) => { const style = LINE_STYLES[entry.lineId - 1] ?? LINE_STYLES[0]; return <span key={entry.lineId} className="inline-flex items-center gap-2"><i className="h-2.5 w-5 rounded-xs" style={{ background: style.color, borderTop: style.dash ? `2px ${style.dash === '7 4' ? 'dashed' : 'dotted'} ${style.color}` : undefined }} />Line {entry.lineId}: {entry.record.historicalTreatment}</span>; })}
+
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-600">
+                  <div className="flex flex-wrap items-center gap-4">
+                    {historyEntries.map((entry) => {
+                      const style = LINE_STYLES[entry.lineId - 1] ?? LINE_STYLES[0];
+                      const liveLine = snapshot.lines.find((l) => l.lineId === entry.lineId);
+                      const liveVal = liveLine?.soilObservation?.humiditySignalPctRh;
+                      return (
+                        <span key={entry.lineId} className="inline-flex items-center gap-2">
+                          <i
+                            className="h-2.5 w-5 rounded-xs"
+                            style={{
+                              background: style.color,
+                              borderTop: style.dash ? `2px ${style.dash === '7 4' ? 'dashed' : 'dotted'} ${style.color}` : undefined,
+                            }}
+                          />
+                          <span className="font-medium text-slate-800">Line {entry.lineId}</span>
+                          <span className="text-slate-500">({entry.record.historicalTreatment})</span>
+                          {typeof liveVal === 'number' && Number.isFinite(liveVal) && (
+                            <span
+                              className="font-mono font-bold px-1.5 py-0.5 rounded-md text-[10px]"
+                              style={{ color: style.color, backgroundColor: `${style.color}15` }}
+                            >
+                              {liveVal.toFixed(1)} %RH
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    Tip: Click anywhere on chart to seek replay time
+                  </span>
                 </div>
               </div>
             )}

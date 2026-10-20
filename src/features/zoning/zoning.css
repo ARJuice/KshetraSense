@@ -1183,6 +1183,7 @@
   font-weight: 600;
   white-space: nowrap;
   width: fit-content;
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
 }
 
 .zoning-fit-pill.is-optimal {
@@ -1254,6 +1255,7 @@
   height: 100%;
   background: #a7f3d0;
   border-radius: 2px;
+  transition: left 300ms cubic-bezier(0.4, 0, 0.2, 1), width 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .zoning-gauge-pip {
@@ -1265,7 +1267,14 @@
   border: 2px solid #ffffff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   transform: translateX(-50%);
-  transition: left 200ms ease;
+  transition: left 300ms cubic-bezier(0.4, 0, 0.2, 1), background-color 200ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zoning-gauge-band,
+  .zoning-gauge-pip {
+    transition: none !important;
+  }
 }
 
 .zoning-gauge-pip.is-optimal {

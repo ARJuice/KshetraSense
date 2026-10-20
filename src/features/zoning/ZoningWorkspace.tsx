@@ -1844,9 +1844,8 @@ function CropReferenceReport({
         ))}
       </div>
 
-      {/* Crop Fit Tab Panels with smooth transition */}
-      <div key={activeTab} className="module-nav-transition">
-        {activeTab === 'matrix' && (
+      {/* Tab 1: Compare Matrix (All Crops) */}
+      {activeTab === 'matrix' && (
         <div className="zoning-matrix-table-wrapper" role="tabpanel">
           <table className="zoning-matrix-table">
             <thead>
@@ -1997,7 +1996,6 @@ function CropReferenceReport({
           })()}
         </div>
       )}
-      </div>
 
       {/* Disclaimers & Backend Verification */}
       <div className="flex flex-col gap-1.5 pt-1">
