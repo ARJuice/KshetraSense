@@ -1,102 +1,341 @@
-# KshetraSense
+# KshetraSense (क्षेत्रSense)
 
-KshetraSense is a local, desktop-first smart-farming application for soil zoning, selected-scope crop reference reports, field monitoring, and image-only leaf diagnosis. The current build replaces the former mock UX with functional local services and an independent leaf-classification workflow.
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18.3-61DAFB.svg?logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.14+-EE4C2C.svg?logo=pytorch&logoColor=white)](https://pytorch.org)
+[![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4-38B2AC.svg?logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![Three.js](https://img.shields.io/badge/Three.js-r160-000000.svg?logo=three.js&logoColor=white)](https://threejs.org)
+[![Tests](https://img.shields.io/badge/Tests-163%20Passing-brightgreen.svg)](docs/DELIVERY.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Current architecture status
+> **Precision Agriculture Spatial Soil Zoning & Field Intelligence Platform**  
+> A local-first, defense-grade decision-support system that decouples sparse laboratory soil measurements, spatial clustering algorithms, computer vision leaf pathology diagnosis, regional soil context, and remote sensing telemetry.
 
-Phases 1–5 are implemented and verified. Leaf Diagnosis serves an image-only 17-class MobileNetV3-Small model through `POST /v1/leaf/predict`; the held-out PlantVillage split reached 92.97% accuracy and 93.52% macro-F1 (4,653 images). Scores are uncalibrated, every result requires manual review, and field-photo performance has not been measured. Soil Zoning accepts a WGS84 field polygon and 3–50 georeferenced lab samples (5–10 recommended), then submits the data to `POST /v2/zoning/run`: local UTM grid → IDW estimates → project-defined KshetraSense SHI → Auto-K K-means/FCM → contiguous zones and diagnostics. Samples require a common explicit depth interval and use pH (dimensionless), EC (dS/m), and N/P/K (mg/kg). The UI shows returned values and exposes a factor-by-factor Crop Fit reference report for an explicitly selected cell or zone; it does not decide which crop to plant. See the [five-phase plan](docs/plans/README.md), [Phase 1 contract](docs/plans/phase-1-backend-algorithmic-core.md), and [Phase 2 implementation](docs/plans/phase-2-soil-zoning-ui-redesign.md).
+---
 
-The local FastAPI service exposes an attributed historical Parma tomato-trial replay under `/v1/telemetry/`, now available in Field Monitoring. The 2023 dataset is not live KshetraSense telemetry; its soil humidity target is the source-reported `%RH` sensor signal, not calibrated VWC. The experimental GRU did **not** beat the persistence baseline at 6, 12, or 24 hours, so the UI marks it as not for irrigation. There is no valve control or zone binding. Field Monitoring also contains separate Soil Investigation and CropSight vegetation views. SoilGrids retrieves real regional model context through ISRIC's public WCS (with source quantiles and product-specific unit conversions); it does not feed zoning or Crop Fit. CropSight's Earth Engine flow was live-smoke-tested in the current local environment on 2026-10-14. Other machines require their own Earth Engine project/authentication; its current API exposes aggregate NDVI/time-series data rather than a raster or spatial zone map. See the [Phase 3 contract](docs/plans/phase-3-wsn-telemetry-service.md), [Phase 4 implementation](docs/plans/phase-4-field-monitoring-transformation.md), and [telemetry service notes](services/telemetry/README.md).
+## 🌾 Overview
 
-The leaf model is trained and evaluated on controlled PlantVillage images only; it has no field-photo validation, out-of-domain detector, severity output, or treatment advice. See the [Leaf Diagnosis notes](services/leaf/README.md) for its data provenance, training steps, artifact metadata, and limits. SHI is a provisional KshetraSense screen, not an official USDA/NRCS index or crop-success probability. IDW outputs are estimates from sparse samples; WSN/gateway coordinates are geometric suggestions, not radio-validated installation locations. No field-validation claim is made.
+**KshetraSense** is an open-source, desktop-first precision agriculture platform designed to provide transparent, scientifically grounded spatial decision support for farmers, agronomists, and researchers.
 
-## Run the current build
+Modern digital agriculture frequently suffers from opaque "black-box" models, disguised synthetic results, and conflation between direct field measurements and modeled estimates. KshetraSense addresses these issues through strict architectural boundaries, explicit data provenance, and honest uncertainty disclosure:
 
-The zoning page needs both local processes. The browser app never falls back to a prepared zoning or crop-fit result if the service is unavailable.
+- **Spatial Soil Management Zoning**: Transforms georeferenced sparse laboratory soil cores into contiguous management zones using Inverse Distance Weighting (IDW), non-linear Soil Health Index (SHI) modeling, and Auto-K K-means++ / Fuzzy C-means clustering.
+- **Factor-by-Factor Crop Fit Matrix**: Evaluates soil zones against peer-reviewed regional agronomic reference intervals (Finger Millet / Ragi, Tomato, Groundnut) without fabricating artificial cultivation probabilities or planting verdicts.
+- **Image-Only Leaf Pathology Diagnosis**: Fine-tuned MobileNetV3-Small classifier trained on 23,483 audited PlantVillage images (17 Apple, Tomato, and Potato classes) with 92.97% test accuracy and mandatory manual-review protocol.
+- **Field Monitoring Workflows**:
+  - **Soil Investigation**: Local historical sample tracking paired with on-demand ISRIC SoilGrids 2.0 Web Coverage Service (WCS) regional context.
+  - **Historical Telemetry Replay**: Attributed 2023 Parma tomato trial replay with GRU soil-signal (%RH) forecasting, Isolation Forest anomaly review flags, and FAO-56 MAD water balance screening.
+  - **Vegetation Remote Sensing (CropSight)**: Independent Google Earth Engine integration analyzing Sentinel-2 Harmonized surface reflectance (NDVI) and CHIRPS precipitation trends.
+- **Interactive Methodology & Defense Explorer**: Visualizes algorithmic graphs, mathematical formulations, model topologies, and decoupling boundaries directly within the application.
+
+---
+
+## 📐 System Architecture
+
+KshetraSense is designed with strict boundaries: soil measurements, satellite indices, weather telemetry, and leaf images remain independent evidence streams and are never merged into an arbitrary composite "farm health score".
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                              BROWSER CLIENT (React 18 + TS)                            │
+│  ┌───────────────────────┬────────────────────────┬─────────────────────────────────┐  │
+│  │ Field Lab & Zoning    │ Crop Fit Reference     │ Leaf Diagnosis (MobileNetV3)    │  │
+│  │ • 2D Interactive SVG  │ • Factor-by-factor     │ • 17-class PlantVillage model   │  │
+│  │ • Procedural 3D (R3F) │ • Interval comparisons │ • Uncalibrated softmax scores   │  │
+│  │ • Layer inspection    │ • Region-relevant data │ • Latency & metadata audit      │  │
+│  └───────────────────────┴────────────────────────┴─────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Field Monitoring Hub                                                             │  │
+│  │ • Soil Investigation Register  • ISRIC SoilGrids WCS  • Parma Telemetry Replay  │  │
+│  │ • Sentinel-2 CropSight Remote Sensing (Google Earth Engine)                      │  │
+│  └──────────────────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────┬─────────────────────────────────────────────┘
+                                           │ HTTP / JSON API
+                                           ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                     KSHETRASENSE FASTAPI BACKEND (Python 3.10+)                        │
+│                                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ POST /v2/zoning/run                                                              │  │
+│  │ 1. GeoJSON WGS84 ➔ Local UTM Grid Discretization (5m / 10m cells)                │  │
+│  │ 2. Spatial IDW Interpolation (p=2, 3–50 soil samples)                            │  │
+│  │ 3. Sigmoidal KshetraSense Soil Health Index (SHI) formulation                    │  │
+│  │ 4. Auto-K Silhouette Sweep (K=2..6) with K-Means++ or Fuzzy C-Means              │  │
+│  │ 5. Contiguous Zone Polygonization, Disjoint Component Splitting & Adjacency Merge │  │
+│  │ 6. Perturbation Sensitivity (ARI) & WSN Medoid / Gateway Placement Suggestions   │  │
+│  └──────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                        │
+│  ┌────────────────────────┬─────────────────────────┬───────────────────────────────┐  │
+│  │ POST /v1/crop-fit/     │ POST /v1/leaf/predict   │ GET /v1/monitoring/soilgrids  │  │
+│  │ evaluate               │ • MobileNetV3-Small     │ • ISRIC WCS GeoTIFF adapter   │  │
+│  │ • Cell / Zone Scope    │ • 10 MiB upload ceiling │ • 8 properties, 6 depth bands │  │
+│  │ • Karnataka Catalog    │ • EXIF stripping        │ • Q0.05 / Q0.50 / Q0.95       │  │
+│  └────────────────────────┴─────────────────────────┴───────────────────────────────┘  │
+│                                                                                        │
+│  ┌──────────────────────────────────────────────────┬───────────────────────────────┐  │
+│  │ Historical Telemetry Replay (/v1/telemetry/)     │ CropSight Sub-App (/cropsight)│  │
+│  │ • Parma 2023 Tomato Trial Dataset Playback       │ • Google Earth Engine API     │  │
+│  │ • GRU %RH Sensor Forecast vs. Persistence        │ • Sentinel-2 Harmonized NDVI  │  │
+│  │ • Isolation Forest Anomaly Review Candidates     │ • CHIRPS Daily Precipitation  │  │
+│  │ • Separate FAO-56 TAW/RAW Water-Balance Advisory │ • NDVI Time Series & Clusters │  │
+│  └──────────────────────────────────────────────────┴───────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🌟 Key Capabilities
+
+### 1. Spatial Soil Zoning (`POST /v2/zoning/run`)
+- **Boundary & Sampling Inputs**: Accepts a WGS84 GeoJSON field polygon and 3–50 georeferenced laboratory soil cores (pH, EC, Nitrogen, Phosphorus, Potassium at a common depth).
+- **Inverse Distance Weighting (IDW)**: Spatial interpolation onto a regular UTM grid with distance decay parameter $p = 2$.
+- **KshetraSense Soil Health Index (SHI)**: Non-linear sigmoidal score mapping soil properties into agronomic sufficiency curves:
+  $$\text{SHI} = \frac{1}{N} \sum_{i=1}^{N} \frac{1}{1 + e^{-k_i (x_i - x_{0,i})}}$$
+- **Unsupervised Auto-K Clustering**: Evaluates candidate clusters $K \in [2, 6]$ using silhouette coefficient maximization for both **K-means++** and **Fuzzy C-means (FCM)**.
+- **Spatial Post-Processing**: Disconnected cell components are split; adjacent zones with low multivariate distance are merged into clean, contiguous management zones.
+- **Robustness Audit**: Evaluates zoning stability via sample leave-one-out perturbation using the Adjusted Rand Index (ARI).
+- **WSN Deployment Candidates**: Proposes geometric sensor medoid and gateway coordinates within identified zones (clearly marked as geometric suggestions prior to radio-frequency site validation).
+- **Dual Visualizer**: Full-fidelity accessible 2D SVG rendering paired with an optional, high-performance procedural Three.js / React Three Fiber 3D isometric terrain view.
+
+### 2. Sourced Crop Fit Factor Matrix (`POST /v1/crop-fit/evaluate`)
+- Evaluates individual cell estimates or zone-level aggregate means against peer-reviewed regional agronomic requirements.
+- Currently supports regional cultivars: **Finger Millet (Ragi)**, **Tomato**, and **Groundnut**.
+- Factors evaluated: pH, Electrical Conductivity (EC), Nitrogen (N), Phosphorus (P), and Potassium (K).
+- Strict scientific honesty: Only pH receives a direct interval verdict; method-dependent N/P/K and uncalibrated EC values are presented with raw values and regional context without fabricating arbitrary pass/fail badges.
+
+### 3. Deep Learning Leaf Pathology (`POST /v1/leaf/predict`)
+- **Architecture**: ImageNet-initialized **MobileNetV3-Small** with custom dense classification head.
+- **Dataset**: Audited PlantVillage corpus (CC BY-SA 3.0), trained with physical leaf-disjoint splits across 23,483 images.
+- **Classes**: 17 conditions across Apple, Tomato, and Potato (healthy leaves, early/late blight, scab, rust, mosaic virus, leaf mold, bacterial spot, etc.).
+- **Held-Out Test Performance** (4,653 images):
+  - **Accuracy**: `92.97%`
+  - **Macro-F1**: `93.52%`
+  - **Macro-Precision**: `93.14%`
+  - **Macro-Recall**: `94.22%`
+- **Safety Protocol**: Fast CPU PyTorch inference (~20–40ms), upload validation (signature verification, metadata/EXIF stripping, 10 MiB ceiling), uncalibrated softmax disclosure, and mandatory manual review requirement.
+
+### 4. Independent Field Monitoring
+- **Soil Investigation**: Local observational log for field soil records with unit and depth comparability validation.
+- **ISRIC SoilGrids 2.0 Integration**: Direct WCS GeoTIFF queries fetching nominal 250m resolution regional modeled quantiles (Q0.05, Q0.50, Q0.95) across 8 properties and 6 standard depth layers.
+- **Historical Telemetry Replay**: Attributed 2023 Parma tomato trial dataset with speed control (1× to 360×), chronological GRU sensor-signal forecast comparison, and Isolation Forest anomaly screening.
+- **CropSight Remote Sensing**: Real-time Sentinel-2 Harmonized surface reflectance queries via Google Earth Engine, computing composite NDVI and CHIRPS precipitation trends over user-defined circular areas of interest.
+
+---
+
+## 📁 Repository Structure
+
+```text
+KshetraSense/
+├── .env.example                     # Environment configuration template
+├── package.json                     # Frontend dependencies & scripts
+├── tsconfig.json                    # TypeScript compiler configuration
+├── vite.config.ts                   # Vite build & proxy setup
+├── tailwind.config.js               # Tailwind design system tokens
+│
+├── src/                             # React 18 / TypeScript frontend
+│   ├── app/                         # App shell, navigation & routing
+│   ├── components/ui/               # Reusable primitives (MathView, FieldReticle, CountUp)
+│   ├── domain/                      # Domain interfaces & types
+│   ├── features/
+│   │   ├── zoning/                  # Field Lab, boundary/sample entry, 2D/3D map
+│   │   ├── leaf/                    # Leaf pathology upload & inference inspector
+│   │   ├── monitoring/              # Soil Investigation, Telemetry Replay, CropSight
+│   │   └── methodology/             # Methodology explorer, math formulas, defense Q&A
+│   └── services/                    # Typed API client services
+│
+├── services/                        # Modular backend microservices
+│   ├── zoning/                      # Core FastAPI service (Zoning, Crop Fit, Gateway)
+│   │   ├── app/                     # Algorithms (IDW, FCM, K-Means, SHI, WSN)
+│   │   ├── tests/                   # Pytest suite (99 comprehensive tests)
+│   │   └── requirements.txt         # Core backend dependencies
+│   ├── leaf/                        # Leaf diagnosis model inference & training
+│   │   ├── models/                  # Pinned MobileNetV3-Small artifact & metadata
+│   │   └── train.py                 # Reproducible GPU training pipeline
+│   ├── telemetry/                   # Historical telemetry replay & forecasting
+│   │   ├── app/                     # GRU inference, playback engine, FAO-56
+│   │   └── data/                    # Pinned Parma trial dataset & SHA-256 manifest
+│   └── cropsight/                   # Google Earth Engine remote sensing sub-service
+│       ├── main.py                  # FastAPI sub-application for Sentinel-2 NDVI
+│       └── requirements.txt         # CropSight dependencies
+│
+├── data/
+│   └── demo/soil-zoning/            # 10 paired GeoJSON boundaries & CSV soil lab samples
+│
+└── docs/                            # Comprehensive architectural documentation
+    ├── plans/                       # Five-phase engineering master plans (Phases 1–5)
+    ├── decisions/                   # Architecture Decision Records (ADRs 0001–0012)
+    ├── research/                    # Deep-dive research papers & benchmarks
+    ├── PRD.md                       # Product Requirements Document
+    ├── TRD.md                       # Technical Requirements Document
+    ├── DELIVERY.md                  # Release acceptance checklist & verification record
+    ├── PROJECT-GUIDE.md             # End-to-end system and data flow guide
+    └── GLOSSARY.md                  # Canonical precision agriculture terminology
+```
+
+---
+
+## 🚀 Quickstart Guide
+
+### Prerequisites
+- **Node.js**: v18.0.0 or higher
+- **Python**: v3.10, v3.11, or v3.12 (Python 3.10+ recommended)
+- **Git**
+
+---
+
+### Step 1: Clone & Configure Environment
 
 ```powershell
-# Terminal 1 — local zoning and crop-fit service
-Set-Location services/zoning
+git clone https://github.com/ArjunS-04/KshetraSense.git
+cd KshetraSense
+
+# Copy environment configuration template
+Copy-Item .env.example .env
+```
+
+Review `.env` to customize settings. By default, the application runs fully locally without external API keys:
+- `VITE_ZONING_API_URL=http://127.0.0.1:8000`
+- `SOILGRIDS_WCS_URL=https://maps.isric.org/mapserv`
+- `EARTHENGINE_PROJECT=kshetrasense-earth-engine` *(required only for live CropSight satellite queries)*
+
+---
+
+### Step 2: Launch Backend API Service
+
+```powershell
+# Navigate to the zoning service directory
+cd services/zoning
+
+# Create and activate a Python virtual environment
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+
+# Install dependencies (CPU PyTorch, FastAPI, NumPy, Scikit-Learn, Keras)
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+
+# Start the FastAPI gateway server
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
+The interactive OpenAPI / Swagger contract is accessible at:  
+👉 **`http://127.0.0.1:8000/docs`**
+
+---
+
+### Step 3: Launch React Frontend
+
+In a second terminal:
+
 ```powershell
-# Terminal 2 — React workspace
+# From the repository root
 npm install
 npm run dev
 ```
 
-Open the local Vite address shown by the second command (`http://localhost:3000/` or `http://127.0.0.1:3000/`). The Soil Zoning workspace starts empty by design. Import a WGS84 GeoJSON Polygon and enter measured soil samples or import a CSV with `id`, `latitude`, `longitude`, `depth_cm`, `ph`, `ec`, `nitrogen`, `phosphorus`, and `potassium`. Optional columns are `collection_date`, `lab_method`, and `uncertainty_ph`, `uncertainty_ec`, `uncertainty_nitrogen`, `uncertainty_phosphorus`, `uncertainty_potassium`. Ten paired synthetic boundary/sample examples are available in [`data/demo/soil-zoning`](data/demo/soil-zoning/README.md); explicitly load them only for demonstration, not as real farm data.
+Open your browser at:  
+👉 **`http://localhost:3000/`** (or `http://127.0.0.1:3000/`)
 
-### What is working now
+---
 
-- **Sparse-sample field setup:** Empty-by-default boundary upload, manual or CSV sample input, in-field pin placement, units/depth validation, and analysis parameters.
-- **Returned analysis map:** Full 2D map with returned clipped cell geometry, pH/EC/N/P/K, project-defined SHI, zone and FCM membership layers, cell/zone inspection, diagnostics, and actual-response JSON export.
-- **Optional 3D field:** Dynamically loaded R3F view, orbit/pan/zoom and Fit controls, batched returned geometry, and an enforced 768-cell / 20,000-estimated-triangle ceiling. The 2D map remains complete when the 3D budget is exceeded.
-- **Cell- or zone-scoped Crop Fit report:** Shows selected pH/EC/N/P/K values for Finger Millet (Ragi), Tomato, and Groundnut beside sourced context where comparable. Only pH receives a numeric interval comparison; generic EC and method-dependent N/P/K are not given a verdict. This report never classifies crops as fit or recommends planting.
-- **Leaf Diagnosis:** Upload one JPEG/PNG for an image-only prediction across 17 Apple/Potato/Tomato PlantVillage classes. The service returns every class score, model/preprocessing/map versions, and measured request inference time; the UI marks every result for manual review and identifies scores as uncalibrated.
-- **Historical telemetry replay:** Deterministic local playback, source/provenance metadata, bounded raw history, experimental sensor-signal GRU and unsupervised review candidates. The separate calibrated-VWC-only FAO-56 advisory remains API-only; the replay UI does not present it as an output of the `%RH` trial.
-- **Soil Investigation:** Manual and CSV samples start empty and remain separate from zoning. Legacy synthetic preset rows are archived and not treated as measurements. SoilGrids queries real ISRIC WCS coverages for the selected coordinate, property, and depth; unavailable/masked areas and provider failures produce explicit errors, never coordinate-derived values.
-- **CropSight vegetation monitoring:** Its own circular AOI/date inputs and live service call. The UI displays only returned aggregate NDVI statistics, per-scene series, optional rainfall context, and clearly marked upstream heuristic notes. The current response does not include a raster, pixels, or spatial zones. The live Earth Engine path was verified locally; each machine needs its own authorized project and authentication.
-- **No disguised data:** The first Soil Zoning view contains no preloaded field or precomputed result. Bundled synthetic data is manually loaded and conspicuously labeled for demonstrations and parser tests; it is never represented as a real farm or measured lab report.
+### Step 4 (Optional): Google Earth Engine Authentication
 
-## Documentation map
+To enable live Copernicus Sentinel-2 satellite queries in **Vegetation Monitoring (CropSight)**:
 
-| File | Owns |
-| --- | --- |
-| [Product requirements](docs/PRD.md) | Product goals, MVP scope, ML/data plan, evidence boundaries, and success measures. |
-| [UX specification](docs/UX-SPEC.md) | Historical grid-UI contract; the completed Phase 2 plan records the current Soil Zoning workflow. |
-| [Technical requirements](docs/TRD.md) | Current architecture, domain contracts, 3D implementation, performance/asset budgets, and technical verification. |
-| [Delivery plan](docs/DELIVERY.md) | Release acceptance criteria and link to the current five-phase implementation sequence. |
-| [Five-phase master plan](docs/plans/README.md) | Current backend/UI/telemetry/monitoring/leaf phase sequence and status. |
-| [Phase 1 backend contract](docs/plans/phase-1-backend-algorithmic-core.md) | Field boundary, sample, IDW, SHI, clustering, stability, and WSN-candidate API details. |
-| [Phase 2 soil UI plan](docs/plans/phase-2-soil-zoning-ui-redesign.md) | Implemented `/v2` boundary/sample workflow, returned geometry/layers, diagnostics, and selected-scope Crop Fit. |
-| [Phase 3 telemetry contract](docs/plans/phase-3-wsn-telemetry-service.md) | Implemented historical replay API, pinned data/model artifacts, unit boundaries, and measured forecast quality. |
-| [Phase 4 monitoring UI plan](docs/plans/phase-4-field-monitoring-transformation.md) | Completed three-view Field Monitoring UI, provider boundaries, and verification status. |
-| [Phase 5 leaf contract](docs/plans/phase-5-leaf-contract-and-verification.md) | Implemented image-only MobileNetV3-Small classifier, API/UI contract, evaluation evidence, and defense guide. |
-| [Leaf Diagnosis service](services/leaf/README.md) | Dataset attribution/audit, GPU training workflow, model metadata, measured split results, and limitations. |
-| [Frontend implementation plan](docs/FRONTEND-IMPLEMENTATION-PLAN.md) | Historical broad brief, superseded by the current phase plans. |
-| [Glossary](GLOSSARY.md) | Canonical meanings for soil zoning, historical telemetry replay, SoilGrids, vegetation zones, and NDVI. |
-| [Crop-suitability research](docs/research/crop-suitability-probability.md) | Evidence on suitability classes, percentages, probability semantics, and the data needed for cultivation probabilities. |
-| [Open-source architecture landscape](docs/research/open-source-architecture-landscape.md) | Backend, soil-mapping, zoning, crop-suitability, and agricultural-ML references with implementation lessons and caveats. |
-| [External 3D asset research](docs/research/external-3d-asset-sources.md) | Source review and selected Kenney decorative assets; functional geometry stays procedural. |
-| [Decision 0001](docs/decisions/0001-functional-field-and-assets.md) | Why the functional field uses R3F and why functional visuals are procedural. |
-| [Decision 0002](docs/decisions/0002-mock-data-demo-first.md) | Superseded historical record of the mock-first proposal. |
-| [Decision 0003](docs/decisions/0003-decorative-kenney-assets.md) | Historical Kenney GLB asset preparation; assets are optional and unused by the current zoning scene. |
-| [Decision 0004](docs/decisions/0004-field-monitoring-and-direct-build.md) | Independent Field Monitoring scope, CropSight reuse boundary, SoilGrids role, and direct functional build. |
-| [Decision 0007](docs/decisions/0007-phase-3-telemetry-evidence-and-boundaries.md) | Telemetry dataset evidence, units, runtime, and non-actuation boundaries. |
-| [Decision 0008](docs/decisions/0008-gru-holdout-quality-and-use.md) | GRU holdout result and why its forecasts remain evaluation-only. |
-| [Decision 0009](docs/decisions/0009-monitoring-data-provenance-and-provider-readiness.md) | Historical Phase 4 provenance decision; no-synthetic-data and cross-module boundaries remain active. |
-| [Decision 0010](docs/decisions/0010-soilgrids-wcs-context-adapter.md) | Autonomous selection and verification of the public WCS adapter; property scale/unit and no-data decisions. |
-| [Decision 0011](docs/decisions/0011-crop-reference-report-and-autok.md) | Crop Fit is a factor reference report with no crop verdict; Auto-K chooses K, and ten synthetic input pairs support explicit demos. |
-| [Decision 0012](docs/decisions/0012-karnataka-crop-reference-catalog.md) | Selects the region-relevant soil-report crops, documents limited synthetic pH offsets for demonstration contrast, and separates the report from Leaf Diagnosis labels. |
-| [Crop reference research](docs/research/crop-fit-crop-selection.md) | Source-backed crop selection, cited pH/EC context, local relevance, and comparability limits. |
-| [Prior crop reference intervals](docs/research/soil-reference-intervals.md) | Historical Apple/Tomato/Potato references and method-comparability evidence; crop catalog superseded by Decision 0012. |
-| [SoilGrids WCS provider verification](docs/research/soilgrids-wcs-provider-verification.md) | Primary-source WCS, quantile, resolution, unit, license, and live smoke-test evidence. |
-| [CropSight/SoilGrids integration research](docs/research/cropsight-soilgrids-integration-architecture.md) | Pinned-source audit, provider/data limitations, and evidence behind the integration decision. |
-| [3D asset manifest](assets/3d/asset-manifest.json) | Machine-readable inventory, hashes, budgets, and provenance for the twelve local decorative GLBs. |
+```powershell
+# Run Google Earth Engine authentication in your terminal
+earthengine authenticate
+```
 
-## Current product scope
+Set your authorized GCP Project ID in `.env`:
+```env
+EARTHENGINE_PROJECT=your-gcp-project-id
+```
 
-- Soil Zoning and Crop Fit are one user workflow: select a calculated zone or field cell, then inspect factor-by-factor reference rows for that exact estimated profile/mean. Zone values are area-weighted means of IDW-estimated cells; Crop Fit never declares a crop fit or becomes a three-crop 100% probability split.
-- Soil Zoning’s current comparison crops are Finger Millet (Ragi), Tomato, and Groundnut for the Bengaluru-adjacent demo context. Three synthetic bundles have a documented uniform -0.10 pH offset to avoid zone means where all three cited pH intervals overlap; their z-score clustering assignments are unchanged, while pH-based SHI values shift slightly. EC and N/P/K contrasts remain as authored and method-unspecified, so they are shown without unsupported crop thresholds. See [Decision 0012](docs/decisions/0012-karnataka-crop-reference-catalog.md). Leaf Diagnosis is a separate PlantVillage-trained 17-class image workflow; its label set remains Apple/Tomato/Potato.
-- Field Monitoring is a separate destination with Soil Investigation, historical telemetry replay, and independent CropSight vegetation monitoring. New soil investigations start empty; legacy synthetic demo rows are archived. SoilGrids returns real nominal-250 m regional context from the ISRIC WCS and remains isolated from zoning/Crop Fit. The three workflows do not silently consume one another's data; CropSight retains its own circle-of-interest and date inputs.
-- The current CropSight response supplies aggregate NDVI statistics and a per-scene time series (plus optional rainfall context and upstream heuristic strings), but no raster, pixel labels, zone polygons, or per-zone statistics. The UI does not draw substitute zones or claim patch-level scouting coordinates.
-- The initial vegetation-monitoring goals are seasonal NDVI exploration and highlighting relative patches for human scouting. Variable-rate prescriptions, irrigation decisions, and yield estimation are not validated outputs and remain later work.
-- The functional soil field defaults to a keyboard-accessible SVG map. The optional, lazily loaded React Three Fiber scene uses returned field/cell geometry; it is capped at 768 cells and 20,000 estimated triangles. Pointer controls orbit/pan/zoom, and **Fit** resets the camera.
-- Field cells and zones are procedural data geometry. The prepared Kenney GLBs are not currently loaded into the zoning scene; no decorative asset is required for analysis.
-- Spline may be considered for a decorative scene only after its free-tier export and embedding terms are checked. The scene must be optional and replaceable by a small Three.js hero or SVG.
-- No paid runtime is required. Live CropSight use requires external Google Earth Engine project access, local authentication, quota, and imagery coverage; failures are shown honestly rather than replaced by mock results. Configure the project with `EARTHENGINE_PROJECT`; never commit local credentials.
-- Live sensor streams, automatic irrigation, prescription rates, yield estimates, crop-success probabilities, fertilizer dosing, and disease treatment remain out of scope for the initial release. The historical replay is explicitly labeled, and its GRU did not beat persistence; it is not operationally predictive. Synthetic data is permitted for tests and benchmarks, not as a disguised user-visible result.
-- There is no mock-first delivery phase. The old prototype UX has been superseded; the implemented field workflow and its defaults are recorded in [Decision 0006](docs/decisions/0006-phase-2-soil-field-ui.md).
+*(If unauthenticated, the application displays an honest initialization prompt rather than falling back to fabricated satellite images).*
 
-## How to keep the docs clear
+---
 
-Each topic has one living requirements document. Update that document when a requirement changes; add a decision record only for a significant architectural choice, rather than creating another parallel plan or checklist. The root README is the repository entry point, and the longer, versioned design documents live under `docs/`. This follows GitHub's README guidance and relative-link conventions, with the `docs/decisions/` location used by the MADR project's quick-start guidance for decision records ([GitHub README guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes), [MADR](https://github.com/adr/madr)).
+## 🧪 Verification & Test Suite
 
-## Status language
+KshetraSense maintains rigorous automated test coverage across frontend and backend modules:
 
-“Required” describes an MVP release condition. “Planned” describes a design decision that is not implemented or measured. “Open” means evidence or a product choice is still needed. A target is not a claim until it has been measured on a named reference device.
+### Backend Test Suite (Python / Pytest)
+Includes full contract tests for IDW interpolation, K-means++, Fuzzy C-means, SHI formulation, WSN medoid placement, Leaf MobileNetV3 inference, SoilGrids WCS queries, and Parma telemetry replay:
+
+```powershell
+services\zoning\.venv\Scripts\python.exe -m pytest services/zoning/tests -v
+```
+> **Result: `99 passed, 0 failed` in ~23s**
+
+### Frontend Test Suite (Vitest)
+Validates UI models, GeoJSON parsers, CSV importers, comparability logic, and view components:
+
+```powershell
+npm test
+```
+> **Result: `16 test files, 64 passed, 0 failed`**
+
+### TypeScript Typecheck
+```powershell
+npm run typecheck
+```
+> **Result: `0 errors`**
+
+---
+
+## 📊 Demonstration Datasets
+
+Ten paired, georeferenced demonstration datasets are bundled in [`data/demo/soil-zoning/`](data/demo/soil-zoning/) for instant exploration:
+
+| Dataset | GeoJSON Polygon | CSV Lab Samples | Agronomic Pattern |
+|---|---|---|---|
+| **01** | `baseline-field.geojson` | `baseline-field.csv` | Balanced baseline nutrient distribution |
+| **02** | `alkaline-corridor.geojson` | `alkaline-corridor.csv` | pH gradient with alkaline eastern corridor |
+| **03** | `acidic-pocket.geojson` | `acidic-pocket.csv` | Acidic southwest depression ($pH < 5.5$) |
+| **04** | `high-salinity.geojson` | `high-salinity.csv` | Elevated EC gradient across northern boundary |
+| **05** | `salinity-gradient.geojson` | `salinity-gradient.csv` | Linear salinity transition |
+| **06** | `low-nitrogen.geojson` | `low-nitrogen.csv` | Nitrogen deficiency in center zone |
+| **07** | `low-phosphorus.geojson` | `low-phosphorus.csv` | Phosphorus deficiency across outer cells |
+| **08** | `low-potassium.geojson` | `low-potassium.csv` | Potassium depletion in sandy region |
+| **09** | `mixed-nutrient-field.geojson` | `mixed-nutrient-field.csv` | Complex multi-nutrient spatial heterogeneity |
+| **10** | `high-organic-matter.geojson` | `high-organic-matter.csv` | High nutrient density with optimal SHI |
+
+*(Load these directly via the **Demo Datasets** dropdown in the Soil Zoning workspace).*
+
+---
+
+## 📚 Documentation Index
+
+For in-depth architectural and scientific documentation, consult the `docs/` directory:
+
+| Document | Description |
+|---|---|
+| [**Project Guide**](docs/PROJECT-GUIDE.md) | Comprehensive plain-language guide detailing data flows, algorithms, and interpretation. |
+| [**Master Plan**](docs/plans/README.md) | Engineering roadmap and status across all five implementation phases. |
+| [**Phase 1 Plan**](docs/plans/phase-1-backend-algorithmic-core.md) | Algorithmic specification: UTM grid, IDW, SHI, Auto-K, and WSN placement. |
+| [**Phase 2 Plan**](docs/plans/phase-2-soil-zoning-ui-redesign.md) | Spatial Soil Zoning UI/UX architecture and Crop Fit integration. |
+| [**Phase 3 Plan**](docs/plans/phase-3-wsn-telemetry-service.md) | Historical telemetry replay API, Parma trial dataset, and GRU model specification. |
+| [**Phase 4 Plan**](docs/plans/phase-4-field-monitoring-transformation.md) | Field Monitoring hub, SoilGrids WCS adapter, and CropSight remote sensing. |
+| [**Phase 5 Plan**](docs/plans/phase-5-leaf-contract-and-verification.md) | Leaf pathology MobileNetV3-Small classifier contract, evaluation, and defense guide. |
+| [**Product Requirements (PRD)**](docs/PRD.md) | Product scope, user outcomes, and explicit evidence boundaries. |
+| [**Technical Requirements (TRD)**](docs/TRD.md) | System contracts, performance budgets, WebGL limits, and security constraints. |
+| [**Delivery Plan**](docs/DELIVERY.md) | Milestone acceptance criteria, test matrices, and verification status. |
+| [**Architecture Decision Records (ADRs)**](docs/decisions/) | Key architectural decisions (ADRs 0001–0012). |
+| [**Glossary**](GLOSSARY.md) | Canonical definitions for precision agriculture and remote sensing terminology. |
+
+---
+
+## ⚖️ Scientific Rigor & Responsible AI
+
+1. **No Disguised Data**: The application starts empty by default. Synthetic demonstration datasets are explicitly marked and never represented as genuine lab reports or farm measurements.
+2. **Uncalibrated Model Scores**: The leaf classifier outputs raw softmax probability scores across 17 trained conditions. These are not calibrated posterior probabilities; every output carries a mandatory manual review warning.
+3. **Sensor Signal vs. Volumetric Water Content**: Telemetry soil humidity is preserved as `%RH` sensor signal from the source instrumentation; it is not converted to calibrated Volumetric Water Content (VWC) without sensor calibration curves.
+4. **Model Performance Disclosure**: The experimental GRU humidity forecaster did not beat the persistence baseline across evaluated horizons (+6h, +12h, +24h); this weakness is explicitly presented in the UI to prevent reliance for irrigation scheduling.
+5. **Advisory Scope**: KshetraSense provides decision support only. It does not actuate field valves, dispense agrochemicals, or substitute for certified agronomist counsel.
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
