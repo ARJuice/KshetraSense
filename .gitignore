@@ -11,3 +11,10 @@ build/
 services/leaf/data/
 services/leaf/models/.training/
 .agents/
+.vscode/
+.idea/
+*.log
+.coverage
+coverage/
+.cache/
+
