@@ -290,16 +290,16 @@ Ten paired, georeferenced demonstration datasets are bundled in [`data/demo/soil
 
 | Dataset | GeoJSON Polygon | CSV Lab Samples | Agronomic Pattern |
 |---|---|---|---|
-| **01** | `baseline-field.geojson` | `baseline-field.csv` | Balanced baseline nutrient distribution |
-| **02** | `alkaline-corridor.geojson` | `alkaline-corridor.csv` | pH gradient with alkaline eastern corridor |
-| **03** | `acidic-pocket.geojson` | `acidic-pocket.csv` | Acidic southwest depression ($pH < 5.5$) |
-| **04** | `high-salinity.geojson` | `high-salinity.csv` | Elevated EC gradient across northern boundary |
-| **05** | `salinity-gradient.geojson` | `salinity-gradient.csv` | Linear salinity transition |
-| **06** | `low-nitrogen.geojson` | `low-nitrogen.csv` | Nitrogen deficiency in center zone |
-| **07** | `low-phosphorus.geojson` | `low-phosphorus.csv` | Phosphorus deficiency across outer cells |
-| **08** | `low-potassium.geojson` | `low-potassium.csv` | Potassium depletion in sandy region |
-| **09** | `mixed-nutrient-field.geojson` | `mixed-nutrient-field.csv` | Complex multi-nutrient spatial heterogeneity |
-| **10** | `high-organic-matter.geojson` | `high-organic-matter.csv` | High nutrient density with optimal SHI |
+| **01** | `balanced-reference.geojson` | `balanced-reference.csv` | Moderate mixed values around common pH context |
+| **02** | `acidic-low-nutrients.geojson` | `acidic-low-nutrients.csv` | Lower pH and lower nutrient values |
+| **03** | `alkaline-high-phosphorus.geojson` | `alkaline-high-phosphorus.csv` | Higher pH and higher P values |
+| **04** | `salinity-gradient.geojson` | `salinity-gradient.csv` | Spatial EC contrast with otherwise varied values |
+| **05** | `low-nitrogen.geojson` | `low-nitrogen.csv` | Low illustrative N values |
+| **06** | `low-phosphorus.geojson` | `low-phosphorus.csv` | Low illustrative P values |
+| **07** | `low-potassium.geojson` | `low-potassium.csv` | Low illustrative K values |
+| **08** | `high-nutrient-mixed-ec.geojson` | `high-nutrient-mixed-ec.csv` | Higher nutrient values with a mixed EC profile |
+| **09** | `contrasting-ph-patches.geojson` | `contrasting-ph-patches.csv` | Low-to-high pH contrast across sample points |
+| **10** | `mixed-nutrient-field.geojson` | `mixed-nutrient-field.csv` | Contrasting nutrient and EC patterns |
 
 *(Load these directly via the **Demo Datasets** dropdown in the Soil Zoning workspace).*
 
