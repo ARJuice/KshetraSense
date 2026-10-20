@@ -1,4 +1,6 @@
-ndvi_env
-modules/_pycache_
-backend/venv
-node_modules
+__pycache__/
+*.py[cod]
+.venv/
+ndvi_env/
+node_modules/
+.env
