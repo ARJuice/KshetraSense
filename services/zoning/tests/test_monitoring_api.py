@@ -58,9 +58,16 @@ def test_soilgrids_endpoint_out_of_bounds_coordinates():
     assert res_lon.status_code == 422
 
 
-def test_cropsight_analyze_field_uninitialized_ee():
+def test_cropsight_analyze_field_uninitialized_ee(monkeypatch):
     # Calling analyze-field without GCP/Earth Engine authentication returns HTTP 500
     # with honest Earth Engine initialization error (FM-07)
+    import ee
+
+    def mock_point(*args, **kwargs):
+        raise ee.EEException("Earth Engine client library not initialized")
+
+    monkeypatch.setattr(ee.Geometry, "Point", mock_point)
+
     payload = {
         "latitude": 30.9015,
         "longitude": 75.8524,
