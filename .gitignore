@@ -10,3 +10,4 @@ build/
 .DS_Store
 services/leaf/data/
 services/leaf/models/.training/
+.agents/
