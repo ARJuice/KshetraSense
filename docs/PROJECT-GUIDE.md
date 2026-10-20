@@ -80,7 +80,7 @@ The frontend service files convert screen input into API requests and validate p
 | `services/telemetry/app/` | Dataset loading, replay controls, forecast, anomaly review, and water-balance advisory |
 | `services/leaf/` | Image checks, model, inference route, and training/data tools |
 | `services/cropsight/main.py` | Current Earth Engine-backed CropSight API |
-| `services/cropsight/app.py` and `services/cropsight/modules/` | Older, separate CropSight prototype code; the current React screen calls `main.py` |
+| `services/cropsight/app.py` | Older, separate CropSight prototype code; the current React screen calls `main.py` |
 | `data/demo/soil-zoning/` | Explicitly selected synthetic Soil Zoning examples |
 | `services/telemetry/data/` | Pinned source files for the historical trial replay |
 

@@ -23,14 +23,16 @@ warnings.filterwarnings("ignore")
 # Set page configuration
 st.set_page_config(layout="wide", page_title="NDVI Based Field Segmentation")
 
+EARTHENGINE_PROJECT = os.getenv("EARTHENGINE_PROJECT", "kshetrasense-earth-engine")
+
 # Initialize Earth Engine
 @st.cache_resource
 def initialize_ee():
     try:
-        ee.Initialize(project='ndvi-field-segmentation')
+        ee.Initialize(project=EARTHENGINE_PROJECT)
     except Exception:
         ee.Authenticate()
-        ee.Initialize(project='ndvi-field-segmentation')
+        ee.Initialize(project=EARTHENGINE_PROJECT)
 
 # Call the initialization function
 initialize_ee()

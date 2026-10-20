@@ -4,11 +4,11 @@
 [![Google Earth Engine](https://img.shields.io/badge/Google_Earth_Engine-API-4285F4.svg?logo=google&logoColor=white)](https://earthengine.google.com)
 [![Copernicus Sentinel-2](https://img.shields.io/badge/Copernicus-Sentinel--2-004B87.svg)](https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_HARMONIZED)
 [![CHIRPS Daily](https://img.shields.io/badge/CHIRPS-Precipitation-brightgreen.svg)](https://developers.google.com/earth-engine/datasets/catalog/UCSB-CHG_CHIRPS_DAILY)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../../LICENSE)
 
 CropSight is an independent remote sensing sub-service integrated into **KshetraSense** for satellite vegetation monitoring. It retrieves Copernicus Sentinel-2 surface reflectance imagery and CHIRPS daily precipitation data via Google Earth Engine to compute Normalized Difference Vegetation Index (NDVI) statistics, time-series trajectories, and exploratory spatial clustering.
 
-Integrated and adapted from the open-source repository [Priyam-28/CropSight](https://github.com/Priyam-28/CropSight) under the MIT License.
+Integrated and adapted from the open-source repository [Priyam-28/CropSight](https://github.com/Priyam-28/CropSight). Distributed as part of KshetraSense under the project's [MIT License](../../LICENSE).
 
 ---
 
