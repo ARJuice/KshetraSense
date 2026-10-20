@@ -18,7 +18,7 @@ The major architecture shift is to make a **field/parcel geometry and its proven
 
 This report answers whether and how the capabilities could fit into KshetraSense. The supplied `Phase_1_Algorithm (1).pdf` is treated as historical design context, not as instructions or evidence that its algorithms have been implemented or validated. Its Phase 1 proposal describes a field polygon from GPS survey, cadastral map, or GIS digitization; a uniform example grid of 5 m or 10 m; soil-sample mapping by nearest-k averaging, IDW, or Kriging; pH, moisture, N/P/K, EC, and SHI features; silhouette-based K selection; K-means/FCM; SHI-based adjacency merging; robustness perturbations; and zone polygon/profile/adjacency outputs, with WSN clusters as a later use. Those are requirements and hypotheses to resolve, not measured results.
 
-The current [README](../../README.md), [PRD](../PRD.md), [TRD](../TRD.md), and [Project Plan](../Project-Plan.md) describe a pre-build/local-first demonstrator with synthetic soil zoning, future K-means/FCM and MobileNetV3-Small modules, and crop compatibility kept separate. The current codebase has a React/TypeScript/Vite demo and fixtures, but its field is still a synthetic 18×12 grid: it does not yet define a georeferenced parcel, CRS, raster, or soil-sample contract. The proposed local Python boundary in the TRD is still a design proposal; there is no implemented geospatial or Python backend. This report therefore recommends a future structure, not a claim about existing runtime behavior.
+The current [README](../../README.md), [PRD](../PRD.md), [TRD](../TRD.md), and [Master Plan](../plans/README.md) describe a local-first system with soil zoning, K-means/FCM, MobileNetV3-Small leaf diagnosis, and crop compatibility kept separate. The codebase defines georeferenced parcels, UTM conversions, IDW spatial interpolation, and soil-sample contracts. This report records architectural analysis for satellite and regional context integration.
 
 ## What CropSight contributes—and what should not be copied blindly
 
@@ -188,7 +188,7 @@ The strongest restructure is **parcel-centered, layered analytics**, not “make
 
 ### KshetraSense and supplied design context
 
-- [KshetraSense README](../../README.md), [PRD](../PRD.md), [TRD](../TRD.md), and [Project Plan](../Project-Plan.md).
+- [KshetraSense README](../../README.md), [PRD](../PRD.md), [TRD](../TRD.md), and [Master Plan](../plans/README.md).
 - User-supplied `Phase_1_Algorithm (1).pdf` (four-page historical design proposal; its contents are summarized in this report as proposals, not validation).
 - [Related research: farmOS, SoilGrids, PyAEZ, and CropSight technical overview](farmos-soilgrids-pyaez-cropsight-technical-overview.md).
 

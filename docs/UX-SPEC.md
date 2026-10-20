@@ -1,8 +1,8 @@
 # UX specification
 
-**Status:** historical UX contract for the previous grid-painting workflow. It is superseded for the current Soil Zoning workflow by the implemented boundary/sample UI in [Phase 2](plans/phase-2-soil-zoning-ui-redesign.md), which uses the `/v2` API. Field Monitoring is implemented as the three independent views in [Phase 4](plans/phase-4-field-monitoring-transformation.md). Do not use brush/preset interactions below as the current implementation spec. Product scope remains in the [PRD](PRD.md); backend contracts are in the [TRD](TRD.md) and phase plans.
+**Status:** Production UX specification for the KshetraSense decision-support application. Soil Zoning is implemented as the boundary and sparse-sample workflow defined in [Phase 2](plans/phase-2-soil-zoning-ui-redesign.md) using `/v2/zoning/run`. Field Monitoring is implemented as the three independent views in [Phase 4](plans/phase-4-field-monitoring-transformation.md). Leaf Diagnosis is implemented as the image-only MobileNetV3-Small workflow in [Phase 5](plans/phase-5-leaf-contract-and-verification.md). Product scope is in [PRD](PRD.md) and technical architecture is in [TRD](TRD.md).
 
-The existing prototype UI is not the design baseline. Rebuild the experience from the user's jobs and real module boundaries. There is no presentation-only mock phase, no canned result, and no fake algorithm progress. Use synthetic fixtures only for tests/benchmarks or an explicitly labeled development diagnostic.
+The experience is built directly from real user workflows and explicit scientific boundaries. There is no presentation-only mock phase, no canned result, and no fake algorithm progress. Synthetic fixtures are available strictly for automated tests and clearly labeled demonstration datasets.
 
 ## Experience principles
 
@@ -33,11 +33,11 @@ The first screen should briefly explain the available jobs, then let the user ch
 
 ### Soil Zoning — Field Lab
 
-1. Select or create a soil dataset/field and review data source, supported features, units, and missing-measurement warnings.
-2. Inspect cells and measurements. A cell or zone selection opens an accessible inspector with values, units, measurement context, and source.
-3. Edit one parameter using the approved preset or brush interaction. Show affected cells and exact before/after values; support undo/redo. Any prior real result becomes stale without being discarded.
-4. Select K-means or Fuzzy C-means and the supported run settings; Auto-K evaluates valid cluster counts from 2 through 6 and chooses by silhouette. The UI does not let the user set the final K or expose the search ceiling as a chosen cluster count.
-5. On a real service response, show zone assignments, profiles, adjacency, diagnostics, and FCM membership where relevant. Show an indeterminate pending state tied to the real request; never invent progress, centroid motion, or convergence.
+1. **Boundary & Sample Input**: Provide a field polygon (WGS84 GeoJSON) and 3–50 georeferenced laboratory soil samples (pH, EC, N, P, K at a common depth). Samples can be entered manually or imported via CSV. Ten explicitly labeled demo datasets are provided for exploration.
+2. **Analysis Parameters**: Configure grid resolution (e.g. 10 m), IDW power ($p=2$), and clustering algorithm (K-means++ or Fuzzy C-means with Auto-K silhouette sweep up to $K=6$).
+3. **Live Execution**: The backend (`POST /v2/zoning/run`) converts GeoJSON to local UTM, clips cells to boundary, runs IDW spatial interpolation, computes the KshetraSense Soil Health Index (SHI), identifies optimal $K$ via silhouette maximization, merges adjacent clusters within variance tolerances, splits disjoint spatial components, and evaluates stability via sample perturbation ARI.
+4. **Inspection & Layer Visualization**: Inspect the returned 2D field map or toggle the optional React Three Fiber 3D terrain. Switch between returned analytical layers: Management Zones, KshetraSense SHI, pH, Electrical Conductivity, Nitrogen, Phosphorus, Potassium, and FCM Membership probabilities.
+5. **WSN Candidate Suggestions**: Review suggested wireless sensor node (WSN) medoids and gateway placement coordinates (labeled as geometric suggestions, radio-unvalidated). Export full JSON response for audit.
 
 Zone identity uses labels/patterns as well as color. A map shows cluster similarity, not “good/bad soil,” a crop recommendation, or a treatment prescription. Cell height is a bounded visual encoding of a selected feature, not geospatial elevation.
 
@@ -117,4 +117,4 @@ Prefer “modeled regional context,” “satellite-derived vegetation pattern,�
 
 The functional field uses Three.js through React Three Fiber and derives geometry, colors, relief, and overlays from actual application data. The 2D mode is complete, not a loading placeholder. Labels, inspectors, legends, and accessible selection remain outside the 3D canvas. See [TRD](TRD.md) for budgets and fallback requirements.
 
-Prepared Kenney GLBs and any later optional Spline/Three.js vignette are decorative only. No model, Spline scene, imported plant, or stylized satellite map may encode analytical values or imply live telemetry. Keep all core functions usable when decorations are removed.
+The 3D field is completely procedural data geometry. No external 3D model files, decorative packs, or proprietary Spline assets are bundled. All core functions remain fully accessible in 2D and 3D without external asset downloads.

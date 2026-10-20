@@ -102,7 +102,7 @@ Before frontend implementation, author a versioned fixture manifest and exact ce
 | Leaf Diagnosis | Arbitrary local preview plus separate canned result | Fixed MobileNetV3-Small 17-class inference with supported-label and review behavior |
 | Data/telemetry | Synthetic values only | User-provided/validated inputs as later approved; no live sensor claim without integration |
 
-No Spline scene or downloaded model is required for task completion. The small, optional decorative Kenney accents are governed by [Decision 0003](0003-decorative-kenney-assets.md); functional field geometry and markers remain procedural and must stay within the [TRD performance budgets](../TRD.md#performance-budgets).
+No Spline scene or downloaded model is required. Functional field geometry and markers remain procedural and stay within the [TRD performance budgets](../TRD.md#performance-budgets).
 
 ## Demo completion gate
 

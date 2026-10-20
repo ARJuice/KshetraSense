@@ -1,6 +1,6 @@
 # Decision 0001: functional field and 3D assets
 
-**Status:** accepted for the functional-field architecture; the no-model bundling restriction is superseded by [Decision 0003](0003-decorative-kenney-assets.md)
+**Status:** accepted — procedural geometry confirmed; no external 3D models bundled
 **Date:** 2026-10-06
 
 ## Context
@@ -9,18 +9,16 @@ The field changes when users edit soil values and when clustering returns new as
 
 ## Decision
 
-Use Three.js through React Three Fiber for the desktop functional field, with a complete 2D mode and fallback. Generate cells, zones, overlays, sensor markers, crop cues, and root layers from instanced low-poly geometry or SVG. Bundle no external model for the current MVP.
+Use Three.js through React Three Fiber for the desktop functional field, with a complete 2D mode and fallback. Generate cells, zones, overlays, sensor markers, crop cues, and root layers from instanced low-poly geometry or SVG. Bundle no external 3D models for the production build.
 
-Spline may be evaluated for a decorative scene only. It must be free-tier compatible, lazy-loaded, removable, and replaceable by a small Three.js or SVG illustration. No field interaction or required information may depend on Spline.
-
-Any future GLB must meet [the budgets and asset policy in the TRD](../TRD.md#performance-budgets), have model-specific license/provenance and checksum records, pass glTF validation, and provide a fallback.
+Spline was evaluated for a decorative scene but avoided to ensure clean performance and zero external proprietary dependencies. No field interaction or required information depends on external 3D assets.
 
 ## Consequences
 
 - The field remains data-responsive and the 2D mode remains useful for every core task.
-- Repeated geometry must be instanced and share materials; profiling must verify the stated limits.
-- At the time of this decision, the manifest recorded zero downloaded models. [Decision 0003](0003-decorative-kenney-assets.md) later approves small Kenney accents; functional visuals remain procedural.
-- The implementation needs a consistent palette and geometry vocabulary shared by 2D and 3D.
+- Repeated geometry is procedurally instanced and shares materials within stated WebGL budgets.
+- Zero external 3D model files are bundled in the repository.
+- The implementation uses a consistent palette and geometry vocabulary shared by 2D and 3D.
 
 ## Alternatives considered
 
